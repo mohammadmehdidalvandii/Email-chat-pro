@@ -1,159 +1,405 @@
-# CLAUDE.md
+# Email-Chat-Pro — Working with Claude
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## Project Overview
 
-## Current repository state
+Email-Chat-Pro is a real-time 1-on-1 messaging platform where users communicate
+via email-based accounts. This is a full-stack learning project built with
+Next.js (frontend), NestJS (backend), and PostgreSQL (database).
 
-**There is no source code yet.** The repo contains only the seven planning docs in `app/docs/`.
-`app/backend/`, `app/frontend/`, and `app/package/{types,constants,utils}/` exist but are empty.
-There is no root `package.json`, no `pnpm-workspace.yaml`, no `docker-compose.yml`, no `.gitignore`,
-and no README.
+The project is structured as a monorepo using pnpm workspaces with clear
+separation of concerns:
 
-Phase 0 (infrastructure and project setup) is `IN PROGRESS` with all ten subtasks still `[ ] Pending`.
-`app/docs/7-done.md` is an unfilled template — nothing has been completed and approved yet.
+- **Frontend** (apps/frontend): Next.js React application on localhost:3000
+- **Backend** (apps/backend): NestJS API server on localhost:4000
+- **Database**: PostgreSQL running on localhost:5432 (Docker)
+- **Shared**: TypeScript types, constants, and utilities in packages/
 
-Consequence: the build/lint/test commands below are **specified by the docs but do not exist yet**.
-Creating them is Phase 0 work. Do not assume any command runs until the corresponding subtask is done.
+## Project Structure
 
-## The docs are the specification, and they are authoritative
+```
+email-chat-pro/
+├── apps/
+│   ├── frontend/          # Next.js application
+│   │   ├── public/locales/    # i18n translations
+│   │   ├── src/
+│   │   │   ├── app/           # Next.js pages
+│   │   │   ├── components/    # React components (domain-based)
+│   │   │   ├── hooks/         # Custom hooks
+│   │   │   ├── services/      # API clients
+│   │   │   ├── store/         # Zustand stores
+│   │   │   ├── types/         # Local types
+│   │   │   ├── utils/         # Utilities
+│   │   │   ├── styles/        # Global CSS
+│   │   │   └── config/        # Configuration
+│   │   └── [config files]
+│   │
+│   └── backend/           # NestJS application
+│       ├── src/
+│       │   ├── modules/       # Feature modules
+│       │   ├── common/        # Shared utilities
+│       │   ├── config/        # Configuration
+│       │   ├── database/      # Database setup
+│       │   ├── constants/     # Constants
+│       │   ├── utils/         # Utilities
+│       │   └── main.ts        # App bootstrap
+│       └── [config files]
+│
+├── packages/              # Shared code
+│   ├── types/             # TypeScript types (API contracts)
+│   ├── constants/         # Error messages, validation rules
+│   └── utils/             # Shared utility functions
+│
+├── docs/                  # Context engineering files
+│   ├── overview-project.md
+│   ├── stack.md
+│   ├── architecture.md
+│   ├── features.md
+│   ├── rules.md
+│   ├── current-task.md
+│   └── done.md
+│
+└── [root configs]
 
-Everything about this project — what to build, where files go, which library to use, how to format a
-line of code — is fixed in `app/docs/`. Read them before writing anything:
-
-| File | Role |
-| --- | --- |
-| `1-overview-project.md` | Scope, goals, user stories, non-goals, "done means" criteria |
-| `2-stack.md` | Every approved dependency and why it was chosen; env vars |
-| `3-rules.md` | Naming, code style, TS config, import order, git/PR/review process |
-| `4-features.md` | The complete feature list, per phase, with acceptance criteria |
-| `5-architecture.md` | Folder layout, SQL schema, shared types, all REST endpoints, all Socket.IO events |
-| `6-current-task.md` | The active phase and its subtasks — the only valid work queue |
-| `7-done.md` | Completed and approved phases (template only, so far) |
-
-Two hard rules from `3-rules.md`:
-
-- **Never build a feature that is not listed in `4-features.md`.** If the user asks for one, the
-  feature must be added to that file first.
-- **When docs conflict, precedence is: overview > features > architecture > stack > rules.** This
-  matters in practice (see Known doc conflicts below).
-
-## Phase-gate workflow
-
-Work proceeds one phase at a time, and each phase requires explicit human approval before the next
-starts. Only Mohammad Mehdi (Product Owner / reviewer) can approve or merge.
-
-1. Read the active phase in `6-current-task.md`. Do not start work not listed there.
-2. Implement, following `3-rules.md` and `5-architecture.md`.
-3. Commit as `type: description` (`feat`, `fix`, `refactor`, `docs`, `style`, `test`, `chore`) on a
-   feature branch — never directly to `main`. Branches: `feature/auth-module`, `fix/message-persistence`.
-4. Push, open a PR, and wait for formal approval. Do not proceed without it.
-5. After approval, move the phase from `6-current-task.md` to `7-done.md` with a 100–150 word summary.
-
-Before requesting review, all four must pass: `type-check`, `lint`, `test`, `build`.
-
-## Commands (per `2-stack.md` / `6-current-task.md` — to be created in Phase 0)
-
-```bash
-pnpm install                 # pnpm is the package manager; workspaces at root
-pnpm dev                     # start all services
-pnpm frontend                # frontend only
-pnpm backend                 # backend only
-docker-compose up            # PostgreSQL on localhost:5432
-pnpm type-check              # must be zero errors
-pnpm lint
-pnpm build
-pnpm test                    # unit
-pnpm test:integration
-pnpm test:e2e                # must pass with two browser windows side by side
 ```
 
-Unit test files are named `domain.service.spec.ts` and use nested `describe` blocks
-(`describe('AuthService') > describe('validatePassword') > it(...)`). Run a single Jest test with
-`pnpm test -- -t 'should return true for valid password'` once the backend exists.
+## Context Files (Single Source of Truth)
 
-## Architecture in brief
+All development decisions are documented in context files. Always refer to them
+in this priority order:
 
-Two independent halves that talk over exactly two channels, so either can be replaced alone:
+1. **overview-project.md** — Project goals, scope, user flows
+2. **features.md** — What to build (phase-by-phase)
+3. **architecture.md** — How to structure the system
+4. **stack.md** — Which technologies to use
+5. **rules.md** — How to write code (naming, patterns, standards)
+6. **current-task.md** — What to work on now
+7. **done.md** — What has been completed
 
-- **REST (HTTP)** — auth, profile, user search, contacts, file upload. Base `/api/v1`.
-- **Socket.IO** — message delivery, typing indicators, presence. Namespace `/chats`, one room per
-  chat (`chat:<uuid>`), joined only by the two participants.
+If a rule or decision isn't in these files, it doesn't exist yet and should be
+added before implementing.
 
-Backend is NestJS with feature modules (`auth`, `users`, `chat`, `messages`, `contacts`, `websocket`,
-`files`), each holding its own `controller` / `service` / `module` / `dto/` / `entities/`. Cross-module
-code goes in `common/` (decorators, exceptions, pipes, middleware, interceptors), never into a
-sibling module.
+## Development Workflow
 
-Frontend is Next.js App Router with route groups `(auth)` and `(dashboard)`. Components are grouped
-by domain (`Auth/`, `Chat/`, `Layout/`, `Common/`, `Providers/`) — not by type. **Zustand holds UI
-state only; TanStack Query owns all server state.** Keep that split.
+### Starting a New Phase
 
-`app/package/{types,constants,utils}` are the single source of truth shared by both halves:
-`types` for API contracts (never duplicate a type locally), `constants` for every error message and
-WebSocket event name, `utils` for shared validators/formatters.
+1. Read all context files (especially features.md for current phase)
+2. Open current-task.md and locate the current phase
+3. Review prerequisites and dependencies
+4. Read "Context Files to Review" section
+5. Understand all subtasks for the phase
+6. Create a new Git branch: `git checkout -b feature/phase-X-name`
+7. Implement subtasks one by one
+8. After each subtask: commit with proper message format
+9. When phase complete: request code review from Mohammad Mehdi
 
-### Data model invariants
+### During Development
 
-These are the non-obvious parts of the schema in `5-architecture.md`:
+Follow these rules STRICTLY:
 
-- **`chats` stores the pair normalized as `user_a < user_b`**, enforced by `CHECK (user_a < user_b)`
-  plus `UNIQUE (user_a, user_b)`. Every lookup must swap the ids before querying, or `(3,7)` and
-  `(7,3)` will not find the same row.
-- **A chat row only exists after a contact request is accepted.** Messaging requires an `accepted`
-  row in `contact_requests`; the backend must verify this before persisting a message, and a
-  `declined` request blocks messaging until a new request is sent.
-- **Account deletion is anonymization, not deletion.** Set `deleted_at`, set `is_active = false`,
-  rename username to `deleted#{original_id}`, clear `full_name`/`bio`/`avatar_url`/`password_hash`.
-  Messages keep their original `sender_id` and surface as "Deleted User" in API responses. This is
-  why usernames may not begin with `deleted`.
-- **Messages are never edited or deleted.** `created_at` is server time and the sole ordering key;
-  `idx_messages_chat_created (chat_id, created_at DESC)` is the hot path for the last-50 fetch.
-- Every table carries `id UUID` PK, `created_at`, `updated_at`, and nullable `deleted_at`.
-- DB is `snake_case` (`user_id`, `is_active`, plural table names); shared TS types are `camelCase`
-  (`userId`, `isActive`). TypeORM entities are the mapping layer.
-- Put integrity in the database (`NOT NULL`, `UNIQUE`, `CHECK`), not only in application code.
+- **Read context files first** — Before writing any code, read relevant docs
+- **Follow naming conventions** (rules.md) — Exactly
+- **Follow folder structure** (architecture.md) — Exactly
+- **No console.log** — Use Winston (backend) or Sonner (frontend)
+- **Handle errors explicitly** — Never silent failures
+- **Type safety** — TypeScript strict mode everywhere
+- **Test before committing** — npm run type-check, npm run lint
+- **Write clean commits** — Format: type: description
+- **Keep commits small** — One logical change per commit
+- **Push frequently** — Don't work locally for hours without pushing
 
-## Code style — the surprising parts
+### Code Review Process
 
-`3-rules.md` is prescriptive. The ones most likely to be violated by habit:
+Before requesting review:
 
-- **No semicolons** (Prettier strips them). Single quotes. 2 spaces. 100-char lines. Trailing commas
-  in multiline literals.
-- **Never `any`** — use `unknown`. Strict mode is fully on, including `noUnusedLocals`,
-  `noUnusedParameters`, `noImplicitReturns`, `noFallthroughCasesInSwitch`.
-- **No wildcard imports.** Imports come in four groups separated by blank lines: external libs →
-  shared packages (`@/packages/*`) → local modules/services → relative utils.
-- **No `console.*` anywhere.** Backend uses the Winston logger, frontend uses Sonner toasts.
-- `interface` for contracts and entity shapes; `type` for unions and tuples. Descriptive generic
-  parameters (`<TResponse>`, not `<R>`).
-- Every error is caught. Backend: log with Winston, then throw `HttpException` with a code and
-  message from `packages/constants`. Frontend: catch, show a toast, rethrow.
-- Folders are always kebab-case. Backend files are `domain.service.ts`, `domain.entity.ts`,
-  `create-domain.dto.ts`; frontend components are `PascalCase.tsx`; hooks are `use`-prefixed.
-- REST URLs contain no verbs — actions are subresources (`PATCH /contacts/requests/:id`, not
-  `/acceptContact`). Every response is wrapped: `{ success, data }` or
-  `{ success: false, error: { code, message }, timestamp }`.
-- Comments explain *why*, never *what*. JSDoc on exported functions.
+1. All code committed and pushed to GitHub
+2. npm run type-check passes (zero TS errors)
+3. npm run lint passes (zero linting errors)
+4. npm run build succeeds
+5. All tests pass (if any)
+6. No console.log or debug code
+7. All acceptance criteria met
+8. Docs updated if needed
 
-## Known doc conflicts — resolve with the owner, don't silently pick
+Code review will be performed by Mohammad Mehdi. Approval required before
+merging to main.
 
-1. **Ports.** `2-stack.md` says frontend `4000` / backend `3000`. `5-architecture.md` and
-   `6-current-task.md` say frontend `3000` / backend `4000`, and the documented API base URL is
-   `http://localhost:4000/api/v1`. Architecture outranks stack, so **frontend 3000, backend 4000**
-   is the reading to use — but `2-stack.md` still needs correcting.
-2. **Workspace paths.** All docs describe `apps/frontend`, `apps/backend`, `packages/*` at the repo
-   root. On disk the directories are `app/frontend`, `app/backend`, `app/package/{types,constants,utils}`
-   (singular `app`, singular `package`). Phase 0 must settle which layout is real before
-   `pnpm-workspace.yaml` and the `@/packages/*` aliases are written.
-3. **Languages.** `2-stack.md` and `5-architecture.md` include Spanish locales; `1-overview-project.md`
-   "done means" only requires Persian (fa-IR) and English (en-US). Spanish is Medium priority in
-   `4-features.md`.
-4. **Password reset** is listed under out-of-scope non-goals in `1-overview-project.md` ("no password
-   reset emails") but has endpoints in `5-architecture.md` and a Phase 4 feature in `4-features.md`.
-   Features outrank overview, so it is in scope for Phase 4.
+### After Approval
 
-## Documentation upkeep
+1. Phase moved from current-task.md to done.md
+2. Write 100-150 word summary in done.md
+3. Commit: "docs: Phase X complete"
+4. Delete feature branch
+5. Pull latest main
+6. Begin next phase
 
-Completing work means updating the docs too: new endpoints go into `5-architecture.md`, phase
-completions move to `7-done.md`, and every package/app folder needs its own README (what it does,
-how to install, how to run, key files).
+## Important Rules
+
+### Naming Conventions (from rules.md)
+
+Files:
+  - Backend: domain.service.ts, domain.entity.ts, domain.dto.ts
+  - Frontend: PascalCase.tsx for components, camelCase.ts for utilities
+  - Folders: kebab-case (auth-module, chat-messages)
+
+Code:
+  - Components: PascalCase (LoginForm.tsx)
+  - Hooks: usePrefix (useAuth.ts)
+  - Functions: camelCase (sendMessage)
+  - Constants: UPPER_SNAKE_CASE (MAX_MESSAGE_LENGTH)
+  - Types: PascalCase (User, LoginInput)
+  - Booleans: is/has/can prefix (isLoading, hasMessages)
+
+### Folder Structure (from architecture.md)
+
+Frontend:
+  - app/ — Next.js pages
+  - components/ — Domain-based components
+  - hooks/ — Custom hooks
+  - services/ — API clients
+  - store/ — Zustand stores
+  - types/ — Local types
+  - utils/ — Utilities
+
+Backend:
+  - modules/ — Feature modules
+  - common/ — Shared utilities
+  - config/ — Configuration
+  - database/ — Database setup
+  - constants/ — Constants
+  - utils/ — Utilities
+
+### Validation (from rules.md)
+
+Email:
+  - Format: RFC 5322 simplified
+  - Min 5, Max 255 characters
+  - Unique per user
+
+Username:
+  - Format: [a-zA-Z0-9_-]
+  - Min 3, Max 30 characters
+  - Case-insensitive
+
+Password:
+  - Min 8 characters
+  - At least one uppercase, lowercase, digit, special char
+  - Hashed with bcryptjs
+
+### API Response Format (from architecture.md)
+
+Success:
+  ```json
+  {
+    "success": true,
+    "data": { ... },
+    "timestamp": "2024-01-15T10:30:00Z"
+  }
+  ```
+
+Error:
+  ```json
+  {
+    "success": false,
+    "error": {
+      "code": "ERROR_CODE",
+      "message": "Human readable message"
+    },
+    "timestamp": "2024-01-15T10:30:00Z"
+  }
+  ```
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js v22+
+- Docker and Docker Compose
+- Git
+- pnpm (npm install -g pnpm)
+
+### Initial Setup
+
+```bash
+# Clone repository
+git clone <repo-url>
+cd email-chat-pro
+
+# Install dependencies
+pnpm install
+
+# Setup environment
+cp .env.example .env
+# Edit .env with your values (database credentials, etc)
+
+# Start PostgreSQL
+docker-compose up -d
+
+# Start development servers
+pnpm run dev
+
+# Frontend: http://localhost:3000
+# Backend: http://localhost:4000
+# API Docs: http://localhost:4000/api/docs
+```
+
+### Available Commands
+
+```bash
+# Development
+npm run dev              # Start all services
+npm run frontend:dev     # Start frontend only
+npm run backend:dev      # Start backend only
+
+# Building
+npm run build            # Build all projects
+npm run frontend:build   # Build frontend
+npm run backend:build    # Build backend
+
+# Quality checks
+ppm run type-check       # TypeScript strict check
+ppm run lint             # ESLint check
+ppm run format           # Prettier format
+ppm run format:check     # Check formatting
+
+# Testing (when available)
+npm run test             # Run all tests
+npm run test:e2e         # End-to-end tests
+
+# Database
+npm run db:migrate       # Run migrations
+npm run db:seed          # Seed database (optional)
+```
+
+### Git Workflow
+
+```bash
+# Start new phase
+git checkout -b feature/phase-0-infrastructure
+
+# Make changes, commit frequently
+git commit -m "chore: setup monorepo with pnpm"
+git commit -m "feat: initialize Next.js frontend"
+
+# Push to GitHub
+git push origin feature/phase-0-infrastructure
+
+# Create Pull Request on GitHub
+# Request review from Mohammad Mehdi
+# Address feedback, push new commits
+# Merge after approval
+```
+
+## Common Tasks
+
+### Adding a New Dependency
+
+Frontend:
+```bash
+cd apps/frontend
+npm add package-name
+```
+
+Backend:
+```bash
+cd apps/backend
+npm add package-name
+```
+
+Shared package:
+```bash
+cd packages/types  # or constants, utils
+pnpm add package-name
+```
+
+### Creating a New Component
+
+1. Create file: apps/frontend/src/components/Domain/ComponentName.tsx
+2. Follow component pattern from existing components
+3. Import types from @/packages/types
+4. Import constants from @/packages/constants
+5. Use hooks from src/hooks/
+6. Test locally with npm run dev
+
+### Creating a New API Endpoint
+
+1. Create controller in apps/backend/src/modules/domain/
+2. Create service in same folder
+3. Add DTO in dto/ subfolder
+4. Add entity in entities/ subfolder if needed
+5. Export types in @/packages/types
+6. Test with Swagger docs at /api/docs
+7. Verify response format matches architecture.md
+
+### Debugging
+
+Frontend:
+- Browser DevTools (F12)
+- Console logs in development only
+- Check Redux DevTools for Zustand stores
+- TanStack Query DevTools for server state
+
+Backend:
+- Terminal logs (Winston)
+- Debug breakpoints in VS Code
+- Check /api/docs for endpoint testing
+- Database logs from Docker
+
+## When Stuck
+
+1. Check context files (docs/)
+2. Read relevant section in rules.md
+3. Check architecture.md for patterns
+4. Look at existing code examples
+5. Ask Mohammad Mehdi for clarification
+6. Document the solution in appropriate context file
+
+## Phases
+
+Phase 0: Infrastructure (4-6 hours)
+  - Monorepo setup
+  - Frontend and backend initialization
+  - Docker PostgreSQL
+  - Configuration and documentation
+
+Phase 1: Authentication (8-10 hours)
+  - User registration and email verification
+  - Login/logout with JWT
+  - Profile management
+  - Account deletion
+
+Phase 2: Real-time Messaging (10-12 hours)
+  - Socket.IO server
+  - Message persistence
+  - Chat UI components
+  - Image/video support
+
+Phase 3: Contact Management (8-10 hours)
+  - User search
+  - Contact requests
+  - Messaging restrictions
+  - Contact lists
+
+Phase 4: Advanced Features (12-15 hours)
+  - Internationalization (Persian, English, Spanish)
+  - Rate limiting
+  - Performance optimization
+  - Typing indicators
+  - Online status
+  - Password reset
+  - Activity logging
+
+## Contact
+
+For questions about:
+- Code decisions → Check context files first
+- Architecture → Read architecture.md
+- Naming → Check rules.md
+- Features → Check features.md and current-task.md
+- General guidance → Ask Mohammad Mehdi
+
+## Last Updated
+
+2025-01-15
+
+This document should be updated as the project evolves. Changes to workflow,
+guidelines, or standards should be documented here and in relevant context files.

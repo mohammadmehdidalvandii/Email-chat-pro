@@ -4,7 +4,7 @@
 
 npm
 Package manager for JavaScript. Used across both frontend and backend for
-dependency management. Workspace management handled by pnpm at the monorepo level.
+dependency management. Workspace management handled by npm at the monorepo level.
 
 node.js (v22+)
 Runtime environment for JavaScript on the server. Provides the foundation for

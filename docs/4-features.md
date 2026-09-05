@@ -3,7 +3,7 @@
 ## Phase 0: Infrastructure and Project Setup
 
 Feature: Project Structure and Dependencies Installation
-  Description: Set up monorepo with pnpm workspaces. Install all frontend and
+  Description: Set up monorepo with npm workspaces. Install all frontend and
   backend dependencies. Configure Docker and Docker Compose for PostgreSQL.
   Setup environment templates (.env.example).
   Acceptance Criteria:

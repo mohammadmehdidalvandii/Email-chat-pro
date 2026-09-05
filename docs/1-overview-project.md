@@ -109,7 +109,7 @@ Shared packages (Monorepo):
 - utils: shared validators, formatters, error handlers
 
 Infrastructure:
-- Monorepo with pnpm workspaces
+- Monorepo with npm workspaces
 - Docker and Docker Compose for local development (PostgreSQL database)
 - Environment-based configuration
 

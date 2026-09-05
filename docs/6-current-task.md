@@ -34,7 +34,7 @@ Prerequisites
   - Docker and Docker Compose installed
   - Git initialized and ready for commits
   - GitHub repository created and cloned locally
-  - Package manager pnpm installed globally
+  - Package manager npm installed globally
 
 Dependencies
 
@@ -55,27 +55,27 @@ Key Guidelines
   - Use folder structure from architecture.md as template
   - Do not write any business logic (auth, messaging, etc)
   - All dependencies must be latest stable versions
-  - Use pnpm instead of npm for package management
+  - Use npm instead of npm for package management
   - Docker Compose must work without manual configuration
   - All .env files must have .env.example template
 
 Subtasks (Phase 0)
 
-Subtask 0.1: Monorepo Setup with pnpm Workspaces
+Subtask 0.1: Monorepo Setup with npm Workspaces
   Status: [ ] Pending
-  Description: Create monorepo root with pnpm-workspace.yaml. Configure pnpm
+  Description: Create monorepo root with npm-workspace.yaml. Configure npm
   settings. Initialize root package.json. Setup path aliases (@/packages/*, @/apps/*).
   
   Acceptance Criteria:
-    - pnpm-workspace.yaml created with apps/ and packages/ workspaces
+    - npm-workspace.yaml created with apps/ and packages/ workspaces
     - Root package.json configured
     - Path aliases working in both TS paths
-    - pnpm install succeeds with no errors
+    - npm install succeeds with no errors
     - Root tsconfig.base.json extends to all apps
     - ESLint and Prettier configs at root apply to all projects
   
   Files to Create:
-    - pnpm-workspace.yaml
+    - npm-workspace.yaml
     - package.json (root)
     - tsconfig.base.json
     - .eslintrc.json (root)
@@ -84,12 +84,12 @@ Subtask 0.1: Monorepo Setup with pnpm Workspaces
   Estimated Duration: 45 minutes
   
   Testing:
-    - pnpm install completes
-    - pnpm list shows all workspaces
+    - npm install completes
+    - npm list shows all workspaces
     - TypeScript resolves path aliases
   
   Commits:
-    - "chore: setup monorepo with pnpm workspaces"
+    - "chore: setup monorepo with npm workspaces"
     - "chore: configure root tsconfig and linting"
 
 Subtask 0.2: Frontend App Initialization (Next.js)
@@ -229,7 +229,7 @@ Subtask 0.4: Shared Packages Setup
   Testing:
     - Import from @/packages/types in both apps works
     - TypeScript finds types without errors
-    - pnpm build compiles all packages
+    - npm build compiles all packages
   
   Commits:
     - "feat: create shared packages (types, constants, utils)"
@@ -420,7 +420,7 @@ All of the following must be true to mark Phase 0 as complete:
   - npm run dev starts frontend on port 3000
   - npm run start:dev starts backend on port 4000
   - PostgreSQL running on port 5432
-  - pnpm install succeeds (no conflicts)
+  - npm install succeeds (no conflicts)
   - No TypeScript errors
   - No linting errors
   - All commits follow format from rules.md
@@ -428,7 +428,7 @@ All of the following must be true to mark Phase 0 as complete:
 
 Testing Checklist for Phase 0
 
-  ✓ pnpm install completes without errors
+  ✓ npm install completes without errors
   ✓ npm run dev (frontend) starts on 3000
   ✓ npm run start:dev (backend) starts on 4000
   ✓ docker-compose up starts PostgreSQL on 5432
@@ -451,7 +451,7 @@ Types for Phase 0:
   - config: configuration files
 
 Example commits:
-  chore: setup monorepo with pnpm workspaces
+  chore: setup monorepo with npm workspaces
   feat: initialize Next.js frontend app
   feat: initialize NestJS backend app
   feat: create shared packages
