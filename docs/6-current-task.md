@@ -1,603 +1,670 @@
-# Email-Chat-Pro — Current Task Tracking
+# Current Task
 
-This file tracks the current phase of development. Each phase has prerequisites,
-subtasks, acceptance criteria, and guidelines. When a subtask is complete, move
-it to done.md with a professional summary.
+## Purpose
 
-Before starting any phase:
-  1. Read all context files (overview-project.md, stack.md, rules.md, features.md, architecture.md)
-  2. Review the phase description in this file
-  3. Understand prerequisites and dependencies
-  4. Check File Review section
-  5. Follow all Key Guidelines
-  6. Test according to Testing Checklist
-  7. Commit according to Commit Strategy
-  8. Request code review per Code Review Points
+This file defines the **exact work currently authorized** for Claude Code.
+
+`current-task.md` is the execution boundary for the current development step.
+
+Claude Code MUST NOT implement work outside the scope explicitly defined in this file.
+
+When the task is completed and verified, the completed work MUST be recorded in `done.md`, and this file MUST be updated or replaced with the next approved task.
 
 ---
 
-## Phase 0: Infrastructure and Project Setup
+# Current Phase
 
-Status: IN PROGRESS
-Priority: Critical
-Estimated Duration: 4-6 hours
+## Phase 0 — Infrastructure and Project Setup
 
-Phase Overview
+The current task is to establish and verify the project foundation for the Email-Chat-Pro monorepo.
 
-Set up monorepo structure with all dependencies, folder layouts, and development
-environment. This phase is the foundation for all subsequent phases. No feature
-code is written in Phase 0; only infrastructure.
-
-Prerequisites
-
-  - Node.js v22+ installed locally
-  - Docker and Docker Compose installed
-  - Git initialized and ready for commits
-  - GitHub repository created and cloned locally
-  - Package manager npm installed globally
-
-Dependencies
-
-  - Phase 0 has no dependencies (starting phase)
-  - All other phases depend on Phase 0 completion
-
-Context Files to Review
-
-  - overview-project.md: Read "Architecture overview" section
-  - stack.md: Understand each tool and its purpose
-  - rules.md: Read "Folder Structure Rules" section
-  - architecture.md: Understand "Folder Layout" section
-  - features.md: Understand what Phase 0 includes
-
-Key Guidelines
-
-  - Follow naming conventions from rules.md exactly
-  - Use folder structure from architecture.md as template
-  - Do not write any business logic (auth, messaging, etc)
-  - All dependencies must be latest stable versions
-  - Use npm instead of npm for package management
-  - Docker Compose must work without manual configuration
-  - All .env files must have .env.example template
-
-Subtasks (Phase 0)
-
-Subtask 0.1: Monorepo Setup with npm Workspaces
-  Status: [ ] Pending
-  Description: Create monorepo root with npm-workspace.yaml. Configure npm
-  settings. Initialize root package.json. Setup path aliases (@/packages/*, @/apps/*).
-  
-  Acceptance Criteria:
-    - npm-workspace.yaml created with apps/ and packages/ workspaces
-    - Root package.json configured
-    - Path aliases working in both TS paths
-    - npm install succeeds with no errors
-    - Root tsconfig.base.json extends to all apps
-    - ESLint and Prettier configs at root apply to all projects
-  
-  Files to Create:
-    - npm-workspace.yaml
-    - package.json (root)
-    - tsconfig.base.json
-    - .eslintrc.json (root)
-    - .prettierrc
-  
-  Estimated Duration: 45 minutes
-  
-  Testing:
-    - npm install completes
-    - npm list shows all workspaces
-    - TypeScript resolves path aliases
-  
-  Commits:
-    - "chore: setup monorepo with npm workspaces"
-    - "chore: configure root tsconfig and linting"
-
-Subtask 0.2: Frontend App Initialization (Next.js)
-  Status: [ ] Pending
-  Description: Create apps/frontend with Next.js app router. Install all frontend
-  dependencies from stack.md. Setup initial Next.js configuration.
-  
-  Acceptance Criteria:
-    - Next.js app created in apps/frontend
-    - App Router structure ready (no pages yet)
-    - TypeScript strict mode enabled
-    - Tailwind CSS configured
-    - ShadCN UI initialized
-    - All frontend dependencies installed
-    - next.config.ts configured
-    - tailwind.config.ts configured
-    - tsconfig.json configured with strict mode
-  
-  Dependencies to Install:
-    - next, react, react-dom
-    - typescript
-    - tailwind-css, autoprefixer, postcss
-    - @shadcn/ui
-    - zustand, @tanstack/react-query
-    - react-hook-form, zod, @hookform/resolvers
-    - socket.io-client, axios
-    - sonner, react-window, lucide-react
-    - sweetalert2
-    - i18next, next-i18next
-    - eslint, prettier, @types/node, @types/react
-  
-  Files to Create:
-    - apps/frontend/package.json
-    - apps/frontend/next.config.ts
-    - apps/frontend/tsconfig.json
-    - apps/frontend/tailwind.config.ts
-    - apps/frontend/postcss.config.js
-    - apps/frontend/.eslintrc.json
-    - Initial folder structure from architecture.md
-  
-  Estimated Duration: 1 hour
-  
-  Testing:
-    - npm run dev starts frontend on port 3000
-    - Next.js compiles without errors
-    - TypeScript strict check passes
-    - ESLint shows no errors
-  
-  Commits:
-    - "feat: initialize Next.js frontend app"
-    - "feat: configure Tailwind CSS and ShadCN UI"
-    - "feat: setup TypeScript strict mode and linting"
-
-Subtask 0.3: Backend App Initialization (NestJS)
-  Status: [ ] Pending
-  Description: Create apps/backend with NestJS. Install all backend dependencies
-  from stack.md. Setup initial NestJS configuration.
-  
-  Acceptance Criteria:
-    - NestJS CLI app created in apps/backend
-    - All backend dependencies installed
-    - TypeScript strict mode enabled
-    - nest-cli.json configured
-    - TypeORM configured (PostgreSQL)
-    - Swagger configured
-    - Winston logger configured
-    - Rate limiting configured
-    - CORS configured
-    - Helmet configured
-    - tsconfig.json configured with strict mode
-  
-  Dependencies to Install:
-    - @nestjs/core, @nestjs/common, @nestjs/platform-express
-    - @nestjs/typeorm, typeorm, pg (PostgreSQL driver)
-    - @nestjs/jwt, @nestjs/passport, passport, passport-jwt
-    - @nestjs/websockets, @nestjs/platform-socket.io, socket.io
-    - @nestjs/swagger, swagger-ui-express
-    - @nestjs/throttler
-    - bcryptjs
-    - class-validator, class-transformer
-    - winston, helmet, cors
-    - zod
-    - typescript, @types/node, @types/express
-    - eslint, prettier, ts-loader
-  
-  Files to Create:
-    - apps/backend/package.json
-    - apps/backend/nest-cli.json
-    - apps/backend/tsconfig.json
-    - apps/backend/.eslintrc.json
-    - apps/backend/src/main.ts (bootstrap)
-    - apps/backend/src/app.module.ts
-    - Initial module structure from architecture.md
-  
-  Estimated Duration: 1 hour
-  
-  Testing:
-    - npm run start:dev starts backend on port 4000
-    - NestJS compiles without errors
-    - TypeScript strict check passes
-    - ESLint shows no errors
-  
-  Commits:
-    - "feat: initialize NestJS backend app"
-    - "feat: configure TypeORM and PostgreSQL"
-    - "feat: setup authentication and security modules"
-
-Subtask 0.4: Shared Packages Setup
-  Status: [ ] Pending
-  Description: Create packages/types, packages/constants, and packages/utils.
-  Setup TypeScript compilation and path aliases for shared packages.
-  
-  Acceptance Criteria:
-    - packages/types/package.json created
-    - packages/constants/package.json created
-    - packages/utils/package.json created
-    - Each package has tsconfig.json
-    - Each package has index.ts (exports all)
-    - Path alias @/packages/types working
-    - Path alias @/packages/constants working
-    - Path alias @/packages/utils working
-    - Build process for each package working
-  
-  Files to Create:
-    - packages/types/package.json
-    - packages/types/tsconfig.json
-    - packages/types/src/index.ts
-    - packages/constants/package.json
-    - packages/constants/tsconfig.json
-    - packages/constants/src/index.ts
-    - packages/utils/package.json
-    - packages/utils/tsconfig.json
-    - packages/utils/src/index.ts
-  
-  Estimated Duration: 30 minutes
-  
-  Testing:
-    - Import from @/packages/types in both apps works
-    - TypeScript finds types without errors
-    - npm build compiles all packages
-  
-  Commits:
-    - "feat: create shared packages (types, constants, utils)"
-    - "feat: setup package path aliases"
-
-Subtask 0.5: Docker and PostgreSQL Setup
-  Status: [ ] Pending
-  Description: Create docker-compose.yml with PostgreSQL service. Configure
-  database connection, environment variables, and health checks.
-  
-  Acceptance Criteria:
-    - docker-compose.yml created with PostgreSQL 15+
-    - Volume mounted for data persistence (/var/lib/postgresql/data)
-    - Environment variables configured (POSTGRES_DB, POSTGRES_USER, POSTGRES_PASSWORD)
-    - Health check configured for database
-    - Port 5432 exposed
-    - Backend can connect to database
-    - Database accessible via psql or database client
-  
-  Files to Create:
-    - docker-compose.yml (root)
-    - .env.example with database credentials
-    - Backend database connection config
-  
-  Estimated Duration: 30 minutes
-  
-  Testing:
-    - docker-compose up starts PostgreSQL
-    - Database accessible on localhost:5432
-    - Backend can connect and run migrations
-    - docker-compose down stops cleanly
-    - Volume persists data across restart
-  
-  Commits:
-    - "chore: add docker-compose with PostgreSQL"
-    - "chore: configure database connection"
-
-Subtask 0.6: Environment and Configuration Files
-  Status: [ ] Pending
-  Description: Create .env.example templates and environment configuration files.
-  Setup environment variable validation schema.
-  
-  Acceptance Criteria:
-    - .env.example file in root with all required variables
-    - Backend .env.example with database, JWT, Cloudinary vars
-    - Frontend .env.example with API URLs
-    - Environment variable validation schema
-    - TypeScript can read environment variables safely
-    - .env files in .gitignore
-    - All secrets documented in .env.example
-  
-  Files to Create:
-    - .env.example (root)
-    - apps/backend/.env.example
-    - apps/frontend/.env.example
-    - Backend env validation (backend/src/config/validation.schema.ts)
-    - Frontend env loading (frontend/src/config/env.ts)
-  
-  Estimated Duration: 30 minutes
-  
-  Testing:
-    - Backend validates .env on startup
-    - Frontend loads NEXT_PUBLIC_* variables
-    - Type safety for environment variables
-  
-  Commits:
-    - "chore: add .env.example templates"
-    - "chore: setup environment validation"
-
-Subtask 0.7: Frontend Folder Structure
-  Status: [ ] Pending
-  Description: Create all frontend folders according to architecture.md. No files
-  written yet (only folder structure). Create folder layout for pages, components,
-  hooks, services, stores, etc.
-  
-  Acceptance Criteria:
-    - All folders from architecture.md created in apps/frontend/src
-    - Folder organization matches architecture.md exactly
-    - Subfolders for components (Auth, Chat, Layout, Common, Providers)
-    - Config and constants folders ready
-    - No code files yet (folders only)
-  
-  Estimated Duration: 15 minutes
-  
-  Testing:
-    - All folders exist as per architecture.md
-    - No build errors (empty folders)
-  
-  Commits:
-    - "chore: create frontend folder structure"
-
-Subtask 0.8: Backend Folder Structure and Modules
-  Status: [ ] Pending
-  Description: Create all backend folders according to architecture.md. Create
-  empty module structure (no code yet).
-  
-  Acceptance Criteria:
-    - All folders from architecture.md created in apps/backend/src
-    - Folder organization matches architecture.md exactly
-    - Module folders created (auth, users, chat, messages, contacts, websocket, files)
-    - Common folder for shared backend utilities
-    - Config and database folders ready
-    - Empty module.ts for each module
-  
-  Estimated Duration: 15 minutes
-  
-  Testing:
-    - All folders exist as per architecture.md
-    - NestJS can compile without module code
-  
-  Commits:
-    - "chore: create backend folder structure"
-    - "chore: initialize empty NestJS modules"
-
-Subtask 0.9: GitHub Repository Setup and CI/CD Basics
-  Status: [ ] Pending
-  Description: Configure GitHub repository with .gitignore, README, and basic
-  CI/CD (optional: GitHub Actions for linting/type-checking).
-  
-  Acceptance Criteria:
-    - Comprehensive .gitignore (node_modules, .env, build outputs, etc)
-    - Root README.md with project overview
-    - GitHub branch protection rules (main)
-    - .gitattributes for line endings
-    - Optional: GitHub Actions workflow for type-check and lint
-  
-  Files to Create:
-    - .gitignore (comprehensive)
-    - README.md (root)
-    - .gitattributes
-    - Optional: .github/workflows/ci.yml
-  
-  Estimated Duration: 30 minutes
-  
-  Testing:
-    - git status shows correct ignored files
-    - README readable and clear
-    - GitHub Actions (if used) runs successfully
-  
-  Commits:
-    - "chore: add .gitignore and repository setup"
-    - "docs: add comprehensive README"
-    - "chore: setup GitHub Actions CI" (optional)
-
-Subtask 0.10: Documentation and Setup Instructions
-  Status: [ ] Pending
-  Description: Create setup documentation for developers. Include how to install,
-  run locally, and debug.
-  
-  Acceptance Criteria:
-    - docs/SETUP.md with installation steps
-    - docs/DEVELOPMENT.md with how to run locally
-    - docs/DEBUGGING.md with debugging tips
-    - docs/DATABASE.md with database setup and migrations
-    - Database initialization script (optional)
-    - Example .env files are clear and complete
-  
-  Files to Create:
-    - docs/SETUP.md
-    - docs/DEVELOPMENT.md
-    - docs/DEBUGGING.md
-    - docs/DATABASE.md
-  
-  Estimated Duration: 30 minutes
-  
-  Testing:
-    - Follow SETUP.md → project runs locally
-    - npm run dev starts all services
-    - Database initializes correctly
-  
-  Commits:
-    - "docs: add setup and development documentation"
-
-Phase 0 Acceptance Criteria (Overall)
-
-All of the following must be true to mark Phase 0 as complete:
-
-  - Monorepo structure created and working
-  - Frontend and backend apps initialize without errors
-  - All dependencies installed successfully
-  - Docker Compose starts PostgreSQL
-  - Folder structure matches architecture.md
-  - All configuration files in place
-  - Environment variables documented
-  - TypeScript strict mode enabled everywhere
-  - ESLint and Prettier configured globally
-  - Path aliases (@/packages/*, @/apps/*) working
-  - npm run dev starts frontend on port 3000
-  - npm run start:dev starts backend on port 4000
-  - PostgreSQL running on port 5432
-  - npm install succeeds (no conflicts)
-  - No TypeScript errors
-  - No linting errors
-  - All commits follow format from rules.md
-  - Code review approved by Mohammad Mehdi
-
-Testing Checklist for Phase 0
-
-  ✓ npm install completes without errors
-  ✓ npm run dev (frontend) starts on 3000
-  ✓ npm run start:dev (backend) starts on 4000
-  ✓ docker-compose up starts PostgreSQL on 5432
-  ✓ TypeScript strict mode passes (npm run type-check)
-  ✓ ESLint passes (npm run lint)
-  ✓ Prettier check passes (npm run format)
-  ✓ Path aliases resolve correctly
-  ✓ Shared packages compile
-  ✓ No console errors or warnings
-  ✓ .env.example is complete and clear
-
-Commit Strategy for Phase 0
-
-Commits should follow the format: type: description (from rules.md)
-
-Types for Phase 0:
-  - chore: infrastructure changes
-  - feat: new package or tool setup
-  - docs: documentation
-  - config: configuration files
-
-Example commits:
-  chore: setup monorepo with npm workspaces
-  feat: initialize Next.js frontend app
-  feat: initialize NestJS backend app
-  feat: create shared packages
-  chore: add docker-compose with PostgreSQL
-  chore: configure environment variables
-  docs: add setup and development documentation
-
-Each subtask should have at least one commit. Larger subtasks may have 2-3
-commits (feature + configuration + testing).
-
-Code Review Points for Phase 0
-
-Before requesting review, ensure:
-
-  ✓ All subtasks completed
-  ✓ npm run type-check passes (no TS errors)
-  ✓ npm run lint passes (no linting errors)
-  ✓ npm run build succeeds (both apps)
-  ✓ Docker Compose runs without errors
-  ✓ .env.example is complete
-  ✓ README.md is clear and accurate
-  ✓ All commits follow message format
-  ✓ No console.log statements left
-  ✓ No security issues (secrets, API keys in code)
-  ✓ Folder structure matches architecture.md
-  ✓ All dependencies are necessary and up-to-date
-  ✓ TypeScript path aliases work correctly
-
-Reviewer (Mohammad Mehdi) will check:
-  - Does Phase 0 match features.md Phase 0 requirements?
-  - Is the structure aligned with architecture.md?
-  - Are all naming conventions from rules.md followed?
-  - Can the project be run locally as described?
-  - Are there any breaking changes or issues?
-  - Is documentation clear for Phase 1 developers?
-
-Breaking Changes
-
-Phase 0 is infrastructure only. No breaking changes expected. All subsequent
-phases depend on this foundation, so any misconfiguration here will impact later
-phases.
-
-If issues discovered during Phase 0:
-  1. Document the issue clearly
-  2. Create a fix commit: fix: description
-  3. Request code review again
-  4. Do not proceed to Phase 1 until Phase 0 fully approved
+The goal is to create or complete the minimum technical foundation required for later development without implementing product features prematurely.
 
 ---
 
-## Phase 1: Authentication and User Profile Management
+# Current Objective
 
-Status: NOT STARTED
-Prerequisites: Phase 0 completion and approval
-Estimated Duration: 8-10 hours
+Establish the project structure and local development infrastructure for:
 
-This phase will implement user registration, email verification, login/logout,
-profile management, and JWT authentication.
+* Frontend application
+* Backend application
+* Shared types package
+* Shared constants package
+* Shared utilities package
+* npm workspace configuration
+* PostgreSQL local development environment
+* Basic TypeScript configuration
+* Basic development scripts
+* Environment configuration structure
 
-To begin Phase 1:
-  - Phase 0 must be approved and merged
-  - Review: overview-project.md, features.md (Phase 1), architecture.md, rules.md
-  - Create new GitHub branch: feature/phase-1-auth
-  - Update this file with Phase 1 subtasks once approved
-
----
-
-## Phase 2: Real-time Messaging Core
-
-Status: NOT STARTED
-Prerequisites: Phase 1 completion and approval
-Estimated Duration: 10-12 hours
-
-This phase will implement chat interface, message sending, WebSocket server, and
-message persistence.
-
-To begin Phase 2:
-  - Phase 1 must be approved and merged
-  - Review: features.md (Phase 2), architecture.md (WebSocket Events)
-  - Create new GitHub branch: feature/phase-2-messaging
+The project must be ready for the next development phase without implementing authentication, messaging, contacts, or other product features.
 
 ---
 
-## Phase 3: Contact Management and Search
+# Authorized Scope
 
-Status: NOT STARTED
-Prerequisites: Phase 2 completion and approval
-Estimated Duration: 8-10 hours
+Claude Code is authorized to work only on the following areas.
 
-This phase will implement user search, contact requests, and messaging restrictions.
+## 1. Repository Inspection
 
-To begin Phase 3:
-  - Phase 2 must be approved and merged
-  - Review: features.md (Phase 3), architecture.md (Contact Requests)
-  - Create new GitHub branch: feature/phase-3-contacts
+Before making changes:
+
+* Inspect the existing repository.
+* Inspect the existing directory structure.
+* Inspect `package.json` files.
+* Inspect existing TypeScript configuration.
+* Inspect existing application configuration.
+* Inspect existing Docker configuration.
+* Inspect existing source files.
+* Inspect existing scripts.
+* Inspect existing dependencies.
+
+Determine what already exists before creating anything.
+
+### Important
+
+If a required application, package, configuration, or directory already exists:
+
+**modify or complete it instead of recreating or reinitializing it.**
+
+Do not blindly run project generators.
 
 ---
 
-## Phase 4: Internationalization, Rate Limiting, Performance
+# 2. Monorepo Configuration
 
-Status: NOT STARTED
-Prerequisites: Phase 3 completion and approval
-Estimated Duration: 12-15 hours
+Establish or verify npm Workspaces.
 
-This phase will implement i18n, rate limiting, performance optimization, and
-advanced features (online status, typing indicators, etc).
+The intended workspace structure is:
 
-To begin Phase 4:
-  - Phase 3 must be approved and merged
-  - Review: features.md (Phase 4), stack.md (i18next), architecture.md (Rate Limiting)
-  - Create new GitHub branch: feature/phase-4-polish
+```text
+apps/
+  frontend/
+  backend/
+
+packages/
+  types/
+  constants/
+  utils/
+```
+
+The root project should provide the workspace configuration required for these packages.
+
+Do not introduce another package manager unless explicitly approved.
+
+Do not introduce a monorepo framework unless explicitly approved.
 
 ---
 
-## Guidelines for Development
+# 3. Frontend Foundation
 
-During Development:
+Establish or verify the frontend application using:
 
-  1. Always reference context files (overview-project.md, features.md, architecture.md, rules.md)
-  2. Follow naming conventions from rules.md exactly
-  3. Follow folder structure from architecture.md
-  4. No console.log in production code
-  5. Handle errors explicitly (never silent failures)
-  6. Write tests (unit, integration where applicable)
-  7. Keep commits small and focused
-  8. Push to GitHub frequently
-  9. Do not merge to main without approval
-  10. Update done.md when phase completes
+* Next.js
+* React
+* TypeScript
+* Tailwind CSS
+* App Router
 
-Before Requesting Code Review:
+The frontend must be prepared for future development.
 
-  1. All type checks pass (npm run type-check)
-  2. All linting passes (npm run lint)
-  3. All tests pass (npm run test)
-  4. Build succeeds (npm run build)
-  5. No console.log or debug code
-  6. All commits follow message format
-  7. All acceptance criteria met
-  8. Documentation updated if needed
-  9. README updated if needed
+Only foundation-level configuration is authorized.
 
-After Approval:
+Do NOT implement:
 
-  1. Move phase from current-task.md to done.md
-  2. Write 100-word summary in done.md describing what was built
-  3. Create commit: "docs: Phase X complete" (with summary in commit message)
-  4. Delete feature branch after merge
-  5. Pull latest main
-  6. Begin next phase
+* authentication pages
+* login
+* registration
+* profile pages
+* chat UI
+* contact UI
+* messaging UI
+* product-specific business logic
+
+unless explicitly required by an existing repository state and confirmed as necessary for the foundation.
+
+---
+
+# 4. Backend Foundation
+
+Establish or verify the backend application using:
+
+* NestJS
+* Node.js
+* TypeScript
+
+The backend foundation should be prepared for future modules.
+
+The architecture must remain compatible with:
+
+```text
+Auth
+Users
+Contacts
+Chats
+Messages
+WebSocket
+```
+
+At this stage, only foundational setup is authorized.
+
+Do NOT implement:
+
+* registration logic
+* login logic
+* JWT authentication flows
+* email verification
+* contact requests
+* messaging
+* chat business logic
+
+These belong to later tasks.
+
+---
+
+# 5. Shared Packages
+
+Establish or verify:
+
+```text
+packages/types
+packages/constants
+packages/utils
+```
+
+## packages/types
+
+Prepare the package for shared API contracts and shared TypeScript types.
+
+This package is the **Single Source of Truth** for contracts shared between frontend and backend.
+
+Do not duplicate shared API contracts inside applications.
+
+Only foundation-level types are authorized at this stage.
+
+Do not invent product contracts that have not yet been approved.
+
+---
+
+## packages/constants
+
+Prepare the package for shared constants.
+
+Examples of future responsibilities include:
+
+* API constants
+* error codes
+* validation constants
+* status constants
+* WebSocket event names
+
+Only constants required for the current foundation may be created.
+
+Do not invent unnecessary constants.
+
+---
+
+## packages/utils
+
+Prepare the package for reusable, environment-independent utilities.
+
+Utilities must remain:
+
+* reusable
+* deterministic where appropriate
+* independent from frontend and backend frameworks
+
+Do not place application-specific business logic here.
+
+---
+
+# 6. PostgreSQL Development Environment
+
+Establish or verify the local PostgreSQL environment using:
+
+* PostgreSQL
+* Docker
+* Docker Compose
+
+The intended local database port is:
+
+```text
+5432
+```
+
+The database environment must be suitable for local development.
+
+Do not introduce:
+
+* Redis
+* Kafka
+* RabbitMQ
+* NATS
+* Kubernetes
+* distributed cache
+* message broker
+* WebSocket clustering
+
+These are explicitly outside the current scope.
+
+---
+
+# 7. Environment Configuration
+
+Establish the environment-variable structure required for local development.
+
+Sensitive values MUST NOT be committed to Git.
+
+Environment configuration may include placeholders for future values such as:
+
+```text
+DATABASE_URL
+JWT_SECRET
+JWT_EXPIRES_IN
+CLOUDINARY_CLOUD_NAME
+CLOUDINARY_API_KEY
+CLOUDINARY_API_SECRET
+```
+
+However:
+
+**Do not implement or configure features that are not part of the current task merely because an environment variable exists.**
+
+Provide appropriate example/environment-template files when needed.
+
+Never place real secrets in source code or committed configuration.
+
+---
+
+# 8. Ports
+
+The intended development ports are:
+
+```text
+Frontend:   3000
+Backend:    4000
+PostgreSQL: 5432
+```
+
+If the existing repository already uses these ports, preserve them.
+
+If a conflict exists, report it before making an architectural change.
+
+Do not silently change the project's intended ports.
+
+---
+
+# 9. API Foundation
+
+Prepare the backend for the API base path:
+
+```text
+/api/v1
+```
+
+The intended local API base URL is:
+
+```text
+http://localhost:4000/api/v1
+```
+
+Only foundational configuration is authorized.
+
+Do not implement product endpoints unless explicitly required by the current repository state and task.
+
+---
+
+# 10. Basic Development Tooling
+
+Verify or establish the minimum development scripts required to work with the monorepo.
+
+Examples may include:
+
+```text
+dev
+build
+lint
+type-check
+test
+```
+
+Only create scripts that are appropriate for the technologies actually present in the repository.
+
+Do not invent scripts that reference tools that are not installed.
+
+---
+
+# 11. TypeScript Foundation
+
+TypeScript configuration should be suitable for strict development.
+
+The intended standard is:
+
+```text
+strict: true
+```
+
+Frontend, backend, and shared packages should use compatible TypeScript configuration.
+
+Avoid unnecessary configuration duplication where shared configuration is appropriate.
+
+Do not weaken TypeScript strictness to hide errors.
+
+---
+
+# 12. Dependency Installation
+
+Install only dependencies required by the approved stack and the current foundation.
+
+Approved technologies are defined in:
+
+```text
+stack.md
+```
+
+Do not install libraries merely because they might be useful later.
+
+Do not replace an approved technology with another technology without explicit approval.
+
+---
+
+# 13. Docker Configuration
+
+Docker Compose should provide the local PostgreSQL development environment.
+
+The configuration must be simple and development-focused.
+
+Do not create production Kubernetes/Docker orchestration.
+
+Do not add unnecessary infrastructure services.
+
+---
+
+# 14. Initial Verification
+
+After implementation, Claude Code MUST verify the foundation.
+
+At minimum, inspect and run the repository's available validation commands for:
+
+* dependency installation
+* TypeScript
+* linting
+* build
+* tests
+* Docker configuration
+
+Only run commands that actually exist in the repository.
+
+If a command does not exist, do not invent it.
+
+---
+
+# Explicitly NOT Authorized
+
+The following work MUST NOT be implemented during this task.
+
+## Authentication
+
+Do not implement:
+
+* registration
+* login
+* logout
+* JWT authentication flow
+* password hashing logic
+* email verification
+* email change
+* account deletion
+* protected routes
+
+---
+
+## User Features
+
+Do not implement:
+
+* profile management
+* username search
+* profile editing
+* avatar upload
+
+---
+
+## Contacts
+
+Do not implement:
+
+* contact requests
+* accepting requests
+* declining requests
+* contact lists
+* contact authorization logic
+
+---
+
+## Messaging
+
+Do not implement:
+
+* chat creation
+* message creation
+* message persistence
+* message history
+* conversation lists
+* real-time messaging
+
+---
+
+## WebSocket
+
+Do not implement product-level WebSocket behavior.
+
+Socket.IO may be prepared at the foundation level if required by the existing architecture, but no messaging behavior should be implemented.
+
+---
+
+## Media
+
+Do not implement:
+
+* Cloudinary uploads
+* image messages
+* video messages
+
+---
+
+## Advanced Infrastructure
+
+Do not introduce:
+
+* Redis
+* Kafka
+* RabbitMQ
+* NATS
+* Kubernetes
+* distributed caching
+* WebSocket clustering
+* message brokers
+* service discovery
+* microservices
+
+---
+
+## Product Features Outside Phase 0
+
+Do not implement any feature that belongs to Phase 1, Phase 2, Phase 3, or Phase 4 unless explicitly moved into this task through an approved change.
+
+---
+
+# Repository Creation Rule
+
+Claude Code MUST inspect the repository before creating files or directories.
+
+If the required structure does not exist, Claude Code may create it.
+
+For example, if this structure is missing:
+
+```text
+apps/frontend
+apps/backend
+packages/types
+packages/constants
+packages/utils
+```
+
+Claude Code may create the missing directories and files.
+
+However:
+
+**Claude Code MUST NOT reinitialize the entire project simply because the desired structure is incomplete.**
+
+Do not blindly execute:
+
+```text
+create-next-app
+nest new
+npm init
+```
+
+against an existing project.
+
+Use the existing repository as the source of truth.
+
+---
+
+# Change Minimization
+
+Changes must remain limited to the current task.
+
+Do not perform unrelated:
+
+* refactors
+* dependency upgrades
+* formatting changes
+* architectural changes
+* naming changes
+* file moves
+* feature implementations
+
+If an unrelated issue is discovered:
+
+1. Do not silently fix it.
+2. Report it.
+3. Continue only if it does not block the current task.
+
+---
+
+# Architecture Protection
+
+The implementation MUST remain consistent with:
+
+```text
+overview-project.md
+features.md
+architecture.md
+stack.md
+rules.md
+```
+
+If these documents conflict:
+
+**STOP and report the conflict.**
+
+Do not resolve architectural conflicts by guessing.
+
+---
+
+# Product Decision Boundary
+
+Claude Code is not authorized to make product decisions.
+
+If implementation requires choosing between multiple valid product or architectural approaches that are not already defined in the context documents:
+
+**STOP → REPORT → ASK**
+
+Do not silently choose an approach.
+
+---
+
+# Completion Criteria
+
+The task is complete only when:
+
+* npm workspace structure is established or verified
+* frontend foundation is established or verified
+* backend foundation is established or verified
+* shared packages are established or verified
+* PostgreSQL Docker environment is established or verified
+* required environment structure exists
+* intended ports are configured
+* API base path foundation is configured
+* TypeScript foundation is valid
+* required development scripts are available
+* dependencies are consistent with `stack.md`
+* validation commands have been executed where available
+* no unauthorized product features were implemented
+* no unapproved infrastructure was introduced
+* no secrets were committed
+* the repository remains in a coherent runnable state
+
+---
+
+# Reporting Requirements
+
+At the end of the task, Claude Code MUST report:
+
+## 1. What changed
+
+List the files, directories, configuration, and infrastructure that were created or modified.
+
+## 2. What was verified
+
+List the commands and checks that were successfully executed.
+
+## 3. Problems
+
+Report any:
+
+* existing errors
+* blocked commands
+* dependency conflicts
+* configuration problems
+* Docker problems
+* TypeScript problems
+* lint problems
+* test problems
+
+Do not hide failures.
+
+## 4. Scope Check
+
+Explicitly confirm whether any work outside `current-task.md` was performed.
+
+The expected answer is:
+
+```text
+No unauthorized scope changes.
+```
+
+if nothing outside the task was implemented.
+
+---
+
+# Next Step
+
+After this task is successfully completed and verified:
+
+1. Record the completed work in `done.md`.
+2. Review the repository state.
+3. Stop.
+4. Wait for the next approved task.
+
+Do not automatically continue into Phase 1.
+
+---
+
+# Golden Rule
+
+> Build the foundation, verify it, report it, and stop.
+
+Do not implement future features simply because the architecture anticipates them.
