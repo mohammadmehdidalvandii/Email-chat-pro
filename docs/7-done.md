@@ -59,60 +59,136 @@ The reason MUST be documented.
 
 ### Task 0.1 — Repository and Monorepo Foundation
 
-**Status:** Pending
+**Status:** Completed with Known Issues
+
+**Date:** 2026-09-06
 
 **Scope:**
 
-* Inspect existing repository.
-* Establish or verify npm Workspaces.
-* Establish or verify:
+- Inspect existing repository.
+- Establish or verify npm Workspaces.
+- Establish or verify:
 
-  * `apps/frontend`
-  * `apps/backend`
-  * `packages/types`
-  * `packages/constants`
-  * `packages/utils`
-* Establish or verify frontend foundation.
-* Establish or verify backend foundation.
-* Establish or verify shared packages.
-* Establish or verify PostgreSQL Docker environment.
-* Establish or verify environment configuration structure.
-* Establish or verify intended development ports.
-* Establish or verify `/api/v1` API foundation.
-* Establish or verify TypeScript configuration.
-* Establish or verify development scripts.
+  - `apps/frontend`
+  - `apps/backend`
+  - `packages/types`
+  - `packages/constants`
+  - `packages/utils`
 
-**Verification:**
+- Establish or verify frontend foundation.
+- Establish or verify backend foundation.
+- Establish or verify shared packages.
+- Establish or verify PostgreSQL Docker environment.
+- Establish or verify environment configuration structure.
+- Establish or verify intended development ports.
+- Establish or verify `/api/v1` API foundation.
+- Establish or verify TypeScript configuration.
+- Establish or verify development scripts.
 
-* Dependencies:
+**Implemented / Verified State:**
 
-  * Pending
-* TypeScript:
+- npm Workspaces configured in root `package.json` (`apps/*`, `packages/*`); all five workspaces linked in `node_modules/@email-chat-pro`.
+- Frontend: Next.js 15.5.25 App Router, React 19, TypeScript, Tailwind CSS v4 via `@tailwindcss/postcss`.
+- Backend: NestJS 11, TypeScript, TypeORM 0.3 + `pg`, global prefix from shared `API_BASE_PATH`, CORS restricted to `http://localhost:3000`.
+- Shared packages build to `dist` and are consumed by both apps: `@email-chat-pro/types` (`ApiResponse`, `PaginatedResponse`), `@email-chat-pro/constants` (`API_BASE_PATH`), `@email-chat-pro/utils` (`isValidEmail`).
+- PostgreSQL 16-alpine via `docker-compose.yml` on port 5432 with healthcheck and named volume `pgdata`.
+- Environment structure: root `.env.example`, `apps/backend/.env.example`, `apps/frontend/.env.example`. Only placeholders committed; `apps/backend/.env` is untracked and ignored by `.gitignore`.
+- Ports confirmed as frontend 3000, backend 4000, PostgreSQL 5432. No port changes were made.
+- TypeScript strict foundation in `tsconfig.base.json` (`strict`, `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns`, `noFallthroughCasesInSwitch`), extended by all workspaces.
+- Root scripts available: `dev`, `build`, `build:packages`, `build:apps`, `type-check`, `lint`, `test`, `format`, `format:check`.
+- Repository formatted with the project Prettier configuration (`npm run format`), which normalized end-of-file newlines across 36 files and reformatted `apps/backend/package.json` (jest arrays), `apps/frontend/eslint.config.mjs` (ignores array), and `CLAUDE.md` (Markdown bullet markers `*` → `-`). No source behavior was changed.
 
-  * Pending
-* Lint:
+**Verification (executed 2026-09-06):**
 
-  * Pending
-* Tests:
+- Dependencies:
 
-  * Pending
-* Build:
+  - `npm install` → PASS (`up to date, audited 860 packages`). Node v24.17.0, npm 11.13.0.
 
-  * Pending
-* Docker/PostgreSQL:
+- TypeScript:
 
-  * Pending
+  - `npm run type-check` → PASS (shared packages built, then `tsc --noEmit` clean for backend, frontend, types, constants, utils).
 
-**Files Changed:**
+- Lint:
+
+  - `npm run lint` → PASS (backend `eslint "src/**/*.ts"`, frontend `eslint .`, no findings).
+
+- Tests:
+
+  - `npm test` → PASS (backend jest: 1 suite, 1 test — `app.controller.spec.ts`). Frontend and shared packages have no test scripts.
+
+- Build:
+
+  - `npm run build` → PASS (`nest build` for backend; `next build` for frontend, 4 static pages generated).
+
+- Formatting:
+
+  - `npm run format:check` → PASS after `npm run format` (`All matched files use Prettier code style!`).
+
+- Docker/PostgreSQL:
+
+  - `docker compose config` → PASS (valid, port 5432, volume `pgdata`).
+  - `docker compose ps` → container `email-chat-pro-db` Up and healthy, `0.0.0.0:5432->5432/tcp`.
+  - `docker compose exec postgres psql ...` → PASS (PostgreSQL 16.15, database `email_chat_pro`, user `email_chat_dev`).
+
+- Runtime:
+
+  - Backend started from `apps/backend/dist/main.js`; TypeORM connected to PostgreSQL; `GET http://127.0.0.1:4000/api/v1` → `200` with `{"success":true,"data":{"message":"Email-Chat-Pro API is running."},...}` and `Access-Control-Allow-Origin: http://localhost:3000`.
+  - Frontend started with `next start`; `GET http://127.0.0.1:3000` → `200`, page renders the shared `API_BASE_PATH` value.
+  - Both processes were stopped after verification.
+
+**Files Changed (this session):**
 
 ```text
-Pending
+docs/7-done.md
+
+Formatting-only (npm run format, 36 files):
+.prettierrc.json
+CLAUDE.md
+README.md
+package.json
+tsconfig.base.json
+docker-compose.yml
+apps/backend/eslint.config.mjs
+apps/backend/nest-cli.json
+apps/backend/package.json
+apps/backend/tsconfig.json
+apps/backend/tsconfig.build.json
+apps/backend/src/app.controller.spec.ts
+apps/backend/src/app.controller.ts
+apps/backend/src/app.module.ts
+apps/backend/src/app.service.ts
+apps/backend/src/config/database.config.ts
+apps/backend/src/main.ts
+apps/frontend/eslint.config.mjs
+apps/frontend/next.config.mjs
+apps/frontend/postcss.config.mjs
+apps/frontend/tsconfig.json
+apps/frontend/src/app/globals.css
+apps/frontend/src/app/layout.tsx
+apps/frontend/src/app/page.tsx
+packages/constants/package.json
+packages/constants/tsconfig.json
+packages/constants/src/api.constants.ts
+packages/constants/src/index.ts
+packages/types/package.json
+packages/types/tsconfig.json
+packages/types/src/api.types.ts
+packages/types/src/index.ts
+packages/utils/package.json
+packages/utils/tsconfig.json
+packages/utils/src/index.ts
+packages/utils/src/validators.ts
 ```
+
+No application source logic was created or modified in this session. The workspace,
+frontend, backend, and shared-package foundations already existed from the previous
+session and were inspected and verified rather than recreated.
 
 **Notes:**
 
 ```text
-This task must be completed according to current-task.md.
+Verification only plus repository formatting. Nothing was reinitialized and no
+generators were run. No Phase 1 work was started. current-task.md was not modified.
 ```
 
 ---
@@ -597,6 +673,35 @@ Unauthorized scope changes:
 
 Do not claim a check passed unless it was actually executed successfully.
 
+## Recorded Verifications
+
+```text
+Task: 0.1
+Date: 2026-09-06
+
+Environment:
+- Node.js v24.17.0
+- npm 11.13.0
+- Docker 29.5.3
+
+Checks:
+- npm install:        PASS (up to date, 860 packages audited)
+- npm run type-check: PASS
+- npm run lint:       PASS
+- npm test:           PASS (backend jest, 1 suite / 1 test)
+- npm run build:      PASS (nest build + next build)
+- npm run format:     EXECUTED (36 files reformatted)
+- npm run format:check: PASS (after format)
+- docker compose config: PASS
+- docker compose ps:  PASS (email-chat-pro-db Up, healthy, 5432)
+- psql connectivity:  PASS (PostgreSQL 16.15 / email_chat_pro / email_chat_dev)
+- Backend runtime:    PASS (GET http://127.0.0.1:4000/api/v1 → 200)
+- Frontend runtime:   PASS (GET http://127.0.0.1:3000 → 200)
+
+Unauthorized scope changes:
+- None
+```
+
 ---
 
 # Known Issues
@@ -614,6 +719,66 @@ Next Action:
 ```
 
 Do not hide known failures.
+
+## Open Issues After Task 0.1
+
+```text
+Issue: npm audit reports 2 vulnerabilities (1 moderate, 1 high) in the
+       installed transitive dependency tree.
+Impact: Non-blocking for Phase 0. No verification command failed.
+Discovered During: Task 0.1 dependency installation.
+Current Status: Not remediated. Fixing requires dependency changes that are
+       outside the authorized scope of Task 0.1.
+Next Action: Awaiting a decision on whether to run `npm audit` review and
+       apply updates as a separate authorized task.
+```
+
+```text
+Issue: Environment variable naming differs between docs/4-stack.md and
+       apps/backend/.env.example. stack.md lists JWT_EXPIRATION,
+       CLOUDINARY_NAME; the example file uses JWT_EXPIRES_IN,
+       CLOUDINARY_CLOUD_NAME. docs/6-current-task.md lists JWT_EXPIRES_IN.
+Impact: None in Phase 0 — these values are unused placeholders. Would matter
+       in Phase 1 (JWT) and Phase 4 (Cloudinary).
+Discovered During: Task 0.1 environment configuration inspection.
+Current Status: Not changed. Variable names may be adjusted only through an
+       explicit project decision (stack.md §25).
+Next Action: Confirm the canonical variable names before Phase 1 begins.
+```
+
+```text
+Issue: apps/backend/.env.example sets DATABASE_URL with host `localhost`,
+       while the code default in src/config/database.config.ts uses
+       127.0.0.1 (documented there as deliberate, to avoid IPv6 ::1).
+Impact: None observed — the backend connected successfully to PostgreSQL.
+       A developer copying .env.example could hit an IPv6 resolution issue
+       on some systems.
+Discovered During: Task 0.1 configuration inspection.
+Current Status: Left as-is. Not part of the authorized scope.
+Next Action: Optional alignment of the example file, if approved.
+```
+
+```text
+Issue: A stale `next start` process from an earlier session was holding
+       port 3000, causing one frontend start attempt to fail with
+       EADDRINUSE.
+Impact: Local environment only. The process was terminated and the frontend
+       then started and served successfully on port 3000.
+Discovered During: Task 0.1 runtime verification.
+Current Status: Resolved. No project configuration or port was changed.
+Next Action: None.
+```
+
+```text
+Issue: Only the backend has a test script. Frontend and shared packages have
+       no configured test runner.
+Impact: `npm test` exercises backend tests only.
+Discovered During: Task 0.1 verification.
+Current Status: Expected for Phase 0. No test tooling was added, since
+       inventing scripts for uninstalled tools is not authorized.
+Next Action: Decide test tooling for the frontend and shared packages when a
+       later task requires it.
+```
 
 Do not silently remove or rewrite an issue simply because it is inconvenient.
 
@@ -661,6 +826,30 @@ File:
 Change:
 Reason:
 Approved By:
+```
+
+## Recorded Context Changes
+
+```text
+Context Change: Markdown formatting only.
+File: CLAUDE.md
+Change: Prettier normalized unordered-list markers from `*` to `-`
+       (208 lines) and added a trailing newline. No wording, rule, or
+       instruction was altered.
+Reason: `npm run format` applies the repository Prettier configuration
+       repo-wide; CLAUDE.md is not listed in .prettierignore (docs/ is).
+Approved By: Mohammad Mehdi (formatting step explicitly requested during
+       Task 0.1).
+```
+
+```text
+Context Change: Task 0.1 record completed.
+File: docs/7-done.md
+Change: Task 0.1 status moved from Pending to "Completed with Known Issues",
+       with actual verification results, changed-file list, verification
+       record, and open issues.
+Reason: Required by the Task 0.1 completion workflow.
+Approved By: Mohammad Mehdi.
 ```
 
 ---

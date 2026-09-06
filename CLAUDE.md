@@ -18,26 +18,26 @@ You MUST follow the project's approved context files before making implementatio
 
 Your responsibility is to:
 
-* inspect the existing repository
-* understand the approved architecture
-* implement only authorized work
-* preserve existing project decisions
-* write maintainable TypeScript code
-* keep frontend and backend responsibilities separated
-* preserve shared API contracts
-* verify your changes
-* report problems honestly
-* stop when the authorized task is complete
+- inspect the existing repository
+- understand the approved architecture
+- implement only authorized work
+- preserve existing project decisions
+- write maintainable TypeScript code
+- keep frontend and backend responsibilities separated
+- preserve shared API contracts
+- verify your changes
+- report problems honestly
+- stop when the authorized task is complete
 
 Your responsibility is NOT to:
 
-* invent product requirements
-* redesign the architecture without approval
-* introduce technologies because they seem useful
-* implement future features prematurely
-* reinitialize an existing application
-* perform unrelated refactors
-* hide errors or failed verification
+- invent product requirements
+- redesign the architecture without approval
+- introduce technologies because they seem useful
+- implement future features prematurely
+- reinitialize an existing application
+- perform unrelated refactors
+- hide errors or failed verification
 
 ---
 
@@ -68,13 +68,13 @@ Each file has a specific responsibility.
 
 Defines:
 
-* project identity
-* project goals
-* non-goals
-* high-level architecture
-* phases
-* roles
-* core invariants
+- project identity
+- project goals
+- non-goals
+- high-level architecture
+- phases
+- roles
+- core invariants
 
 It explains **what the project is**.
 
@@ -84,11 +84,11 @@ It explains **what the project is**.
 
 Defines:
 
-* product features
-* feature scope
-* included functionality
-* excluded functionality
-* phase boundaries
+- product features
+- feature scope
+- included functionality
+- excluded functionality
+- phase boundaries
 
 It answers:
 
@@ -100,16 +100,16 @@ It answers:
 
 Defines:
 
-* system architecture
-* application boundaries
-* frontend responsibilities
-* backend responsibilities
-* database model
-* API architecture
-* WebSocket architecture
-* shared package responsibilities
-* data integrity rules
-* architectural constraints
+- system architecture
+- application boundaries
+- frontend responsibilities
+- backend responsibilities
+- database model
+- API architecture
+- WebSocket architecture
+- shared package responsibilities
+- data integrity rules
+- architectural constraints
 
 It answers:
 
@@ -121,13 +121,13 @@ It answers:
 
 Defines:
 
-* approved technologies
-* frameworks
-* libraries
-* infrastructure
-* ports
-* development environment
-* prohibited infrastructure
+- approved technologies
+- frameworks
+- libraries
+- infrastructure
+- ports
+- development environment
+- prohibited infrastructure
 
 It answers:
 
@@ -139,16 +139,16 @@ It answers:
 
 Defines:
 
-* coding standards
-* implementation rules
-* naming conventions
-* TypeScript rules
-* error handling
-* testing
-* security
-* Git rules
-* performance rules
-* development behavior
+- coding standards
+- implementation rules
+- naming conventions
+- TypeScript rules
+- error handling
+- testing
+- security
+- Git rules
+- performance rules
+- development behavior
 
 It answers:
 
@@ -174,11 +174,11 @@ Even if a feature exists in `features.md`, you MUST NOT implement it unless it i
 
 Defines:
 
-* completed tasks
-* verification results
-* known issues
-* architecture changes
-* context changes
+- completed tasks
+- verification results
+- known issues
+- architecture changes
+- context changes
 
 It answers:
 
@@ -326,11 +326,11 @@ current-task.md
 
 Determine exactly:
 
-* what must be implemented
-* what may be changed
-* what may be created
-* what must not be implemented
-* what verification is required
+- what must be implemented
+- what may be changed
+- what may be created
+- what must not be implemented
+- what verification is required
 
 Anything outside that scope is unauthorized.
 
@@ -348,14 +348,14 @@ STOP
 
 Never silently decide:
 
-* new product behavior
-* new API behavior
-* new database behavior
-* new architecture
-* new infrastructure
-* new feature scope
-* new authentication behavior
-* new security policy
+- new product behavior
+- new API behavior
+- new database behavior
+- new architecture
+- new infrastructure
+- new feature scope
+- new authentication behavior
+- new security policy
 
 when the context documents do not define the answer.
 
@@ -373,13 +373,13 @@ Make the smallest change necessary to complete the current task.
 
 Do NOT:
 
-* refactor unrelated code
-* rename unrelated files
-* upgrade unrelated dependencies
-* reorganize unrelated folders
-* introduce abstractions for hypothetical future needs
-* improve code that is outside the task
-* rewrite working code without a reason
+- refactor unrelated code
+- rename unrelated files
+- upgrade unrelated dependencies
+- reorganize unrelated folders
+- introduce abstractions for hypothetical future needs
+- improve code that is outside the task
+- rewrite working code without a reason
 
 A task should produce focused, reviewable changes.
 
@@ -422,22 +422,22 @@ Do not install it automatically.
 
 The frontend is responsible for:
 
-* presentation
-* routing
-* UI state
-* client-side validation
-* server-state management
-* API communication
-* WebSocket client communication
-* internationalization
-* user-facing error handling
+- presentation
+- routing
+- UI state
+- client-side validation
+- server-state management
+- API communication
+- WebSocket client communication
+- internationalization
+- user-facing error handling
 
 The frontend MUST NOT:
 
-* access PostgreSQL directly
-* contain authoritative business rules
-* bypass backend authorization
-* duplicate backend security decisions
+- access PostgreSQL directly
+- contain authoritative business rules
+- bypass backend authorization
+- duplicate backend security decisions
 
 Backend validation and authorization remain authoritative.
 
@@ -447,16 +447,16 @@ Backend validation and authorization remain authoritative.
 
 The backend is responsible for:
 
-* business logic
-* authentication
-* authorization
-* validation
-* persistence
-* database integrity
-* API behavior
-* WebSocket authorization
-* message persistence
-* security boundaries
+- business logic
+- authentication
+- authorization
+- validation
+- persistence
+- database integrity
+- API behavior
+- WebSocket authorization
+- message persistence
+- security boundaries
 
 Controllers should remain thin.
 
@@ -490,11 +490,11 @@ Shared constants belong here when they genuinely need to be shared.
 
 Examples:
 
-* error codes
-* status constants
-* validation constants
-* API constants
-* WebSocket event names
+- error codes
+- status constants
+- validation constants
+- API constants
+- WebSocket event names
 
 ---
 
@@ -565,12 +565,12 @@ Errors must be handled intentionally.
 
 Do NOT:
 
-* swallow errors
-* silently ignore failed requests
-* return fake success
-* hide database errors
-* hide validation errors
-* catch an error without handling or rethrowing it
+- swallow errors
+- silently ignore failed requests
+- return fake success
+- hide database errors
+- hide validation errors
+- catch an error without handling or rethrowing it
 
 Backend errors should follow the project's standardized error architecture.
 
@@ -595,20 +595,20 @@ Use the approved shared types and constants where applicable.
 
 When authentication is implemented:
 
-* JWT must follow the approved architecture.
-* Passwords must be hashed with bcryptjs.
-* Secrets must come from environment variables.
-* Authentication state must not be trusted solely because it exists on the frontend.
-* Backend authorization is authoritative.
+- JWT must follow the approved architecture.
+- Passwords must be hashed with bcryptjs.
+- Secrets must come from environment variables.
+- Authentication state must not be trusted solely because it exists on the frontend.
+- Backend authorization is authoritative.
 
 Never expose:
 
-* passwords
-* password hashes
-* JWT secrets
-* API secrets
-* Cloudinary secrets
-* database credentials
+- passwords
+- password hashes
+- JWT secrets
+- API secrets
+- Cloudinary secrets
+- database credentials
 
 in logs, responses, source code, or committed configuration.
 
@@ -622,11 +622,11 @@ Use TypeORM according to the architecture.
 
 Preserve:
 
-* foreign-key integrity
-* uniqueness constraints
-* transaction boundaries
-* soft-deletion semantics
-* message history
+- foreign-key integrity
+- uniqueness constraints
+- transaction boundaries
+- soft-deletion semantics
+- message history
 
 Do not destroy message records as a shortcut for account deletion.
 
@@ -689,11 +689,11 @@ Do not introduce effects when derived state or direct computation is sufficient.
 
 Avoid unnecessary:
 
-* `useEffect`
-* duplicated state
-* re-renders
-* client-side data duplication
-* global state
+- `useEffect`
+- duplicated state
+- re-renders
+- client-side data duplication
+- global state
 
 Follow the project's existing component architecture before introducing new patterns.
 
@@ -705,17 +705,17 @@ Socket.IO is the approved WebSocket technology.
 
 WebSocket communication must respect:
 
-* authentication
-* authorization
-* chat membership
-* shared event contracts
+- authentication
+- authorization
+- chat membership
+- shared event contracts
 
 Do not implement excluded functionality such as:
 
-* typing indicators
-* read receipts
-* voice calls
-* video calls
+- typing indicators
+- read receipts
+- voice calls
+- video calls
 
 unless the product scope is explicitly changed.
 
@@ -727,12 +727,12 @@ Sensitive configuration must use environment variables.
 
 Never commit real:
 
-* passwords
-* JWT secrets
-* API keys
-* database credentials
-* Cloudinary credentials
-* access tokens
+- passwords
+- JWT secrets
+- API keys
+- database credentials
+- Cloudinary credentials
+- access tokens
 
 Use appropriate environment example files when necessary.
 
@@ -762,10 +762,10 @@ When tests exist, preserve them.
 
 Do not:
 
-* delete tests to make a build pass
-* weaken assertions
-* skip failing tests without explanation
-* hard-code behavior only for tests
+- delete tests to make a build pass
+- weaken assertions
+- skip failing tests without explanation
+- hard-code behavior only for tests
 
 Tests should verify actual behavior.
 
@@ -843,9 +843,9 @@ Temporary files may be created when genuinely necessary for investigation or ver
 
 However:
 
-* keep them minimal
-* do not commit them
-* clean them up when no longer needed
+- keep them minimal
+- do not commit them
+- clean them up when no longer needed
 
 Do not leave debugging scripts or temporary artifacts in the repository without a reason.
 
@@ -877,11 +877,11 @@ Treat all external input as untrusted.
 
 Validate:
 
-* request bodies
-* query parameters
-* route parameters
-* uploaded media
-* authentication data
+- request bodies
+- query parameters
+- route parameters
+- uploaded media
+- authentication data
 
 Do not expose internal implementation details through public errors.
 
@@ -895,32 +895,32 @@ Backend authorization must be enforced independently of frontend behavior.
 
 Unless the project context explicitly changes, do NOT implement:
 
-* group chats
-* channels
-* message editing
-* message deletion
-* read receipts
-* unread counters
-* typing indicators
-* voice calls
-* video calls
-* password reset
-* OAuth
-* blocking
-* muting
-* reactions
-* rich text
-* arbitrary file sharing
-* end-to-end encryption
-* payments
-* subscriptions
-* social integrations
-* admin/moderation
-* distributed Redis
-* message brokers
-* WebSocket clustering
-* Kubernetes
-* Spanish localization
+- group chats
+- channels
+- message editing
+- message deletion
+- read receipts
+- unread counters
+- typing indicators
+- voice calls
+- video calls
+- password reset
+- OAuth
+- blocking
+- muting
+- reactions
+- rich text
+- arbitrary file sharing
+- end-to-end encryption
+- payments
+- subscriptions
+- social integrations
+- admin/moderation
+- distributed Redis
+- message brokers
+- WebSocket clustering
+- Kubernetes
+- Spanish localization
 
 ---
 
@@ -1012,13 +1012,13 @@ Do not resolve architectural or product contradictions through assumptions.
 
 When uncertain about:
 
-* architecture
-* API behavior
-* product behavior
-* database behavior
-* security behavior
-* dependency choice
-* feature scope
+- architecture
+- API behavior
+- product behavior
+- database behavior
+- security behavior
+- dependency choice
+- feature scope
 
 do not guess.
 
@@ -1038,12 +1038,12 @@ When reporting progress:
 
 Be:
 
-* concise
-* factual
-* technical
-* explicit about failures
-* explicit about scope
-* clear about verification
+- concise
+- factual
+- technical
+- explicit about failures
+- explicit about scope
+- clear about verification
 
 Do not provide self-congratulatory reports.
 
@@ -1091,13 +1091,13 @@ when applicable.
 
 You are expected to be:
 
-* careful
-* repository-aware
-* incremental
-* evidence-driven
-* conservative with architecture
-* strict about scope
-* honest about failures
+- careful
+- repository-aware
+- incremental
+- evidence-driven
+- conservative with architecture
+- strict about scope
+- honest about failures
 
 You should be proactive about executing clearly authorized work.
 
