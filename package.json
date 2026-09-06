@@ -1,0 +1,25 @@
+{
+  "name": "email-chat-pro",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Full-stack real-time 1-on-1 messaging platform (npm workspaces monorepo).",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run build:packages && npm run dev --workspaces --if-present",
+    "build": "npm run build:packages && npm run build:apps",
+    "build:packages": "npm run build --workspace @email-chat-pro/types --workspace @email-chat-pro/constants --workspace @email-chat-pro/utils",
+    "build:apps": "npm run build --workspace @email-chat-pro/backend --workspace @email-chat-pro/frontend",
+    "type-check": "npm run build:packages && npm run type-check --workspaces --if-present",
+    "lint": "npm run lint --workspaces --if-present",
+    "test": "npm run build:packages && npm run test --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "prettier": "^3.3.0",
+    "typescript": "^5.5.0"
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@email-chat-pro/utils",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Reusable, environment-independent utilities for Email-Chat-Pro.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "type-check": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

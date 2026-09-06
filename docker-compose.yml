@@ -1,0 +1,25 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: email-chat-pro-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-email_chat_dev}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-email_chat_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-email_chat_pro}
+    ports:
+      - '5432:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'pg_isready -U ${POSTGRES_USER:-email_chat_dev} -d ${POSTGRES_DB:-email_chat_pro}',
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata:
