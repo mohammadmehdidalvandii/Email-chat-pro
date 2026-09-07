@@ -1,4 +1,5 @@
-import { ConflictException } from '@nestjs/common'
+import { ConflictException, UnauthorizedException } from '@nestjs/common'
+import { JwtService } from '@nestjs/jwt'
 import { createHash } from 'node:crypto'
 import { Test } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
@@ -13,6 +14,13 @@ import { AuthService } from './auth.service'
 import { RegisterDto } from './dto/register.dto'
 import { User } from './entities/user.entity'
 
+// @nestjs/jwt v12 ships ESM-only (type: module), which the CJS ts-jest pipeline
+// cannot require. Unit tests mock the token issuer; the real module is
+// exercised by live/integration verification.
+jest.mock('@nestjs/jwt', () => ({
+  JwtService: class JwtService {},
+}))
+
 describe('AuthService', () => {
   let service: AuthService
 
@@ -25,7 +33,11 @@ describe('AuthService', () => {
   beforeEach(async () => {
     jest.clearAllMocks()
     const moduleRef = await Test.createTestingModule({
-      providers: [AuthService, { provide: getRepositoryToken(User), useValue: repository }],
+      providers: [
+        AuthService,
+        { provide: getRepositoryToken(User), useValue: repository },
+        { provide: JwtService, useValue: { signAsync: jest.fn() } },
+      ],
     }).compile()
 
     service = moduleRef.get(AuthService)
@@ -245,6 +257,114 @@ describe('AuthService', () => {
         },
       })
       expect(repository.save).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('login', () => {
+    const dto = { email: 'User@Example.com', password: 'SecurePass123!' }
+
+    const verifiedUser = {
+      id: 'uuid-1',
+      email: 'user@example.com',
+      passwordHash: bcrypt.hashSync('SecurePass123!', 10),
+      isVerified: true,
+      isActive: true,
+      deletedAt: null,
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+    }
+
+    it('normalizes the email and signs a JWT for a verified active user', async () => {
+      repository.findOne.mockResolvedValue(verifiedUser)
+      const jwtService = { signAsync: jest.fn().mockResolvedValue('signed.jwt.token') }
+      const moduleRef = await Test.createTestingModule({
+        providers: [
+          AuthService,
+          { provide: getRepositoryToken(User), useValue: repository },
+          { provide: JwtService, useValue: jwtService },
+        ],
+      }).compile()
+      const svc = moduleRef.get(AuthService)
+
+      const result = await svc.login(dto)
+
+      expect(repository.findOne).toHaveBeenCalledWith({
+        where: { email: 'user@example.com' },
+      })
+      expect(jwtService.signAsync).toHaveBeenCalledWith({
+        sub: 'uuid-1',
+        email: 'user@example.com',
+      })
+      expect(result).toEqual({
+        token: 'signed.jwt.token',
+        user: {
+          id: 'uuid-1',
+          email: 'user@example.com',
+          isVerified: true,
+          isActive: true,
+          createdAt: '2026-01-01T00:00:00.000Z',
+        },
+      })
+    })
+
+    it('rejects an unknown account with a generic 401', async () => {
+      repository.findOne.mockResolvedValue(null)
+
+      await expect(service.login(dto)).rejects.toBeInstanceOf(UnauthorizedException)
+      await expect(service.login(dto)).rejects.toMatchObject({
+        status: 401,
+        response: {
+          code: ERROR_CODES.UNAUTHORIZED,
+          message: ERROR_MESSAGES.INVALID_CREDENTIALS,
+        },
+      })
+    })
+
+    it('rejects a soft-deleted account with a generic 401', async () => {
+      repository.findOne.mockResolvedValue({ ...verifiedUser, deletedAt: new Date() })
+
+      await expect(service.login(dto)).rejects.toMatchObject({ status: 401 })
+    })
+
+    it('rejects an inactive account with a generic 401', async () => {
+      repository.findOne.mockResolvedValue({ ...verifiedUser, isActive: false })
+
+      await expect(service.login(dto)).rejects.toMatchObject({ status: 401 })
+    })
+
+    it('rejects a wrong password with a generic 401', async () => {
+      repository.findOne.mockResolvedValue(verifiedUser)
+      const wrongPassword = {
+        email: 'user@example.com',
+        password: 'WrongPass123!',
+      }
+
+      await expect(service.login(wrongPassword)).rejects.toMatchObject({
+        status: 401,
+        response: {
+          code: ERROR_CODES.UNAUTHORIZED,
+          message: ERROR_MESSAGES.INVALID_CREDENTIALS,
+        },
+      })
+    })
+
+    it('rejects an unverified account with a distinct 401', async () => {
+      repository.findOne.mockResolvedValue({ ...verifiedUser, isVerified: false })
+
+      await expect(service.login(dto)).rejects.toMatchObject({
+        status: 401,
+        response: {
+          code: ERROR_CODES.UNAUTHORIZED,
+          message: ERROR_MESSAGES.EMAIL_NOT_VERIFIED,
+        },
+      })
+    })
+  })
+
+  describe('logout', () => {
+    it('returns a logged out message', async () => {
+      const result = await service.logout()
+
+      expect(result).toEqual({ message: ERROR_MESSAGES.LOGGED_OUT })
     })
   })
 })

@@ -361,7 +361,9 @@ apps/backend/src/modules/auth/dto/verify-email.dto.ts
 
 ## Task 1.3 — Login and Logout
 
-**Status:** Not Started
+**Status:** Completed with Known Issues
+
+**Date:** 2026-09-07
 
 **Scope:**
 
@@ -371,16 +373,80 @@ apps/backend/src/modules/auth/dto/verify-email.dto.ts
 * Logout
 * Authentication error handling
 
+**Implemented / Verified State:**
+
+- **JWT infrastructure:**
+  - `passport-jwt` strategy (`JwtStrategy`) configured to accept tokens from `Authorization: Bearer` header or from an httpOnly cookie (`auth_token`).
+  - `JwtAuthGuard` guard (`AuthGuard('jwt')`) attaches authenticated user entity to `req.user`.
+  - `JwtModule.registerAsync` configured with `JWT_SECRET` from environment (exported at runtime, never hard-coded) and `JWT_EXPIRES_IN` (defaults to `30d`).
+  - `getJwtConfig()` validates that `JWT_SECRET` is present; throws on startup if missing.
+
+- **Login endpoint** (`POST /api/v1/auth/login`):
+  - Accepts `{ email, password }` validated by `LoginDto` (shared regex + length constants from `@email-chat-pro/constants`).
+  - Normalizes email to lowercase, looks up user by email.
+  - Returns generic `401 UNAUTHORIZED` for unknown/deleted/inactive/wrong-password.
+  - Returns distinct `401 UNAUTHORIZED` with `EMAIL_NOT_VERIFIED` for unverified accounts.
+  - On success: signs JWT with `{ sub: user.id, email: user.email }`, sets httpOnly cookie `auth_token` (`sameSite: lax`, `secure` in production, `path: /`), returns `200` with `{ token, user }`.
+  - Shared contract: `LoginInput` / `LoginResponse` in `@email-chat-pro/types`.
+
+- **Logout endpoint** (`POST /api/v1/auth/logout`):
+  - Clears the `auth_token` cookie and returns `200` with `{ message }`.
+  - Shared contract: `LogoutResponse` in `@email-chat-pro/types`.
+
+- **Session endpoint** (`GET /api/v1/auth/session`):
+  - Protected by `@UseGuards(JwtAuthGuard)`.
+  - Returns `200` with `{ user }` when the token is valid and the account is active.
+  - Returns `401` for missing/invalid/expired tokens or inactive accounts.
+  - Shared contract: `SessionResponse` in `@email-chat-pro/types`.
+
+- **Tests:** 26/26 passing (app.controller, auth.service [14], auth.controller [8]). Specs use `jest.mock('@nestjs/jwt', ...)` to sidestep ESM/CJS incompatibility in the test runner (see Known Issues).
+
 **Verification:**
 
 ```text
-Not Started
+Executed 2026-09-07.
+
+- npm run type-check:  PASS (types, constants, utils, backend, frontend)
+- npm run lint:        PASS (backend + frontend)
+- npm test:            PASS (3 suites / 26 tests)
+- npm run format:check PASS
+- migration:run:       PASS (no new migrations; existing schema unchanged)
+- Live endpoint tests (backend on port 4001, isolated):
+  1.  register verified user          -> 201
+  2.  register unverified user        -> 201
+  3.  DB seed is_verified             -> confirmed
+  4.  login wrong password            -> 401 UNAUTHORIZED
+  5.  login unverified account        -> 401 EMAIL_NOT_VERIFIED
+  6.  login valid (verified account)  -> 200 + token + user + Set-Cookie
+  7.  session via Bearer header       -> 200 + user
+  8.  session via httpOnly cookie     -> 200 + user
+  9.  session no token                -> 401
+  10. session invalid token           -> 401
+  11. logout                          -> 200 + clears cookie
+  12. post-logout session             -> 401 (cookie cleared)
 ```
 
 **Files Changed:**
 
 ```text
-Not Started
+Modified:
+apps/backend/package.json                              (+ @nestjs/passport, passport, passport-jwt, @types/passport-jwt)
+apps/backend/src/modules/auth/auth.controller.ts       (+ login, logout, session endpoints)
+apps/backend/src/modules/auth/auth.controller.spec.ts  (+ login/logout/session tests)
+apps/backend/src/modules/auth/auth.module.ts           (+ PassportModule, JwtModule.registerAsync, JwtStrategy, JwtAuthGuard providers)
+apps/backend/src/modules/auth/auth.service.ts          (+ login, logout, toUserDto methods)
+apps/backend/src/modules/auth/auth.service.spec.ts     (+ login/logout tests, JwtService mock)
+packages/constants/src/error.constants.ts              (+ EMAIL_NOT_VERIFIED, LOGGED_OUT error messages)
+packages/types/src/auth.types.ts                       (+ LoginInput, LoginResponse, LogoutResponse, SessionResponse)
+packages/types/src/index.ts                            (+ user.types export)
+package-lock.json                                      (reify passport dependencies)
+
+Created:
+apps/backend/src/config/jwt.config.ts                  (JWT_SECRET + JWT_EXPIRES_IN from env)
+apps/backend/src/modules/auth/dto/login.dto.ts         (LoginDto with class-validator)
+apps/backend/src/modules/auth/guards/jwt.guard.ts      (JwtAuthGuard)
+apps/backend/src/modules/auth/strategies/jwt.strategy.ts (JwtStrategy + AUTH_COOKIE_NAME)
+packages/types/src/user.types.ts                       (User type for shared contracts)
 ```
 
 ---
@@ -866,6 +932,33 @@ Unauthorized scope changes:
 - None
 ```
 
+```text
+Task: 1.3
+Date: 2026-09-07
+
+Environment:
+- Node.js v24.17.0
+- npm 11.13.0
+- Docker 29.5.3
+- PostgreSQL 16 (email-chat-pro-db container, port 5432)
+
+Checks:
+- npm run type-check:  PASS (types, constants, utils, backend, frontend)
+- npm run lint:        PASS (backend + frontend)
+- npm test:            PASS (3 suites / 26 tests)
+- npm run format:check PASS
+- migration:run:       PASS (no new migrations)
+- Live endpoint tests: PASS (12/12 checks: register x2, SQL seed,
+                       login wrong-password 401, login unverified 401,
+                       login valid 200 + token + cookie, session Bearer 200,
+                       session cookie 200, session no-token 401,
+                       session invalid-token 401, logout 200 + clear cookie,
+                       post-logout 401)
+
+Unauthorized scope changes:
+- None
+```
+
 ---
 
 # Known Issues
@@ -1048,6 +1141,57 @@ Next Action: If approved, refine the filter to return the first (or primary)
 ```
 
 Do not silently remove or rewrite an issue simply because it is inconvenient.
+
+## Open Issues After Task 1.3
+
+```text
+Issue: @nestjs/jwt v12.0.1 is an ESM-only package (its package.json declares
+       "type": "module"). The test runner (ts-jest) runs in CommonJS mode and
+       cannot `require()` the real module at import time, producing
+       "ERR_REQUIRE_ESM" at runtime.
+Impact: All unit specs that import from @nestjs/jwt (auth.service.spec.ts,
+       auth.controller.spec.ts) must include `jest.mock('@nestjs/jwt', ...)` at
+       the top of the file to sidestep the ESM import. This mock is minimal
+       (stubs JwtService as an empty class) and does not affect production builds
+       (NestJS compiles to CJS in dist/ and Node 24's require(esm) handles it).
+Discovered During: Task 1.3 test execution — tests failed with
+       "Cannot use import statement outside a module" until the mock was added.
+Current Status: Mitigated via module-level jest.mock() in affected spec files.
+       Not a production issue.
+Next Action: Monitor for a CJS-compatible @nestjs/jwt release, or if upgrading
+       to a future NestJS version that bundles a compatible JWT module.
+```
+
+```text
+Issue: The frontend production build continues to fail (carried from Task 1.1).
+       The error originates in Next.js internal chunks during static-page
+       generation, not in any Task 1.3 change.
+Impact: `npm run build:apps` remains PARTIALLY passing (backend PASS,
+       frontend FAIL). Backend tests and endpoints are unaffected.
+Discovered During: Task 1.1; unchanged in Task 1.3.
+Current Status: Known, not remediated. Outside Task 1.3 scope.
+Next Action: Investigate as a separate authorized task.
+```
+
+```text
+Issue: Logout is stateless-JWT logout: it clears the httpOnly cookie client-side
+       by issuing an expired Set-Cookie (verified: `auth_token=; Expires=Thu,
+       01 Jan 1970`), but the JWT itself remains cryptographically valid until
+       normal expiration (~30d default). A client that retains the old token
+       value and re-sends it manually is still accepted by the protected
+       endpoint. There is no server-side token-invalidation store (Redis/sessions
+       are not in the approved architecture).
+Impact: Browsers honoring the clear cookie are logged out correctly (post-logout
+       session with the cleared cookie returns 401 — verified live). The
+       limitation only applies to a client that deliberately or accidentally
+       replays a captured token. Consistent with the approved stateless-JWT
+       architecture; no unauthorized fix was applied.
+Discovered During: Task 1.3 live verification (post-logout replay check).
+Current Status: Expected behavior of the approved architecture. Documented as a
+       known limitation rather than "fixed" with unapproved infrastructure.
+Next Action: Revisit only if an explicit rejection requirement for replayed
+       tokens is added to the project scope.
+```
 
 ---
 

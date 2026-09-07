@@ -16,19 +16,19 @@ When the task is completed and verified, the completed work MUST be recorded in 
 
 ## Phase 1 — Authentication and User Profile
 
-The current task is **Task 1.2 — Email Verification**.
+The current task is **Task 1.3 — Login and Logout**.
 
-Task 1.1 (Registration) is completed and verified (`docs/7-done.md`).
+Tasks 1.1 (Registration) and 1.2 (Email Verification) are completed and verified (`docs/7-done.md`).
 
 ---
 
 # Current Objective
 
-Implement email verification for accounts registered under Task 1.1.
+Implement login and logout so a verified user can authenticate with their credentials, receive a JWT, and end their session.
 
-The goal is to verify that a registered email address belongs to the user who registered it, and to transition the account from the unverified/pending state (`is_verified = false`) to the verified state (`is_verified = true`) after successful verification.
+Login is the first point where the project's **verified-account invariant** is enforced: an unverified user MUST NOT be able to authenticate successfully (`features.md` — User Login, acceptance criterion: "Unverified users cannot authenticate successfully").
 
-Email verification is **mandatory before authenticated application features are accessible** (project invariant). Authentication guards and protected routes belong to Task 1.3 and are NOT part of this task.
+Protected routes, JWT guards, and the "me" endpoints are the foundation for profile (Task 1.4) and messaging phases.
 
 ---
 
@@ -36,57 +36,90 @@ Email verification is **mandatory before authenticated application features are 
 
 Claude Code is authorized to work only on the following areas.
 
-## 1. Verification Token Generation
+## 1. Login
 
-* A unique, cryptographically secure verification token MUST be generated for each new account.
-* Token generation is **initiated at registration** (inside the existing `register()` flow).
-* The plaintext token MUST be stored securely (a hash of the token at rest); the raw token MUST NOT be returned in API responses or written to logs.
-* Token generation MUST use the approved stack (`node:crypto`) and MUST NOT introduce a new dependency.
-
-## 2. Verification Token Expiration and Secure Handling
-
-* Verification tokens MUST have a defined expiration period.
-* The default expiration is **24 hours**, defined as a shared constant in `packages/constants` so it is easily adjustable.
-* Expired tokens MUST be rejected.
-* Already-used tokens MUST be rejected (the token is consumed/cleared on successful verification).
-* The token, its hash, and expiry MUST never be exposed in logs, responses, or source code.
-
-## 3. Verify-Email Endpoint
-
-* Implement `POST /auth/verify-email` per `architecture.md` §API Endpoints:
+* Implement `POST /auth/login` per `architecture.md` §API Endpoints:
 
   ```text
-  POST /auth/verify-email
-    Request: { "token": "verification_token" }
-    Response: 200 { "message": "Email verified successfully" }
+  POST /auth/login
+    Request: { "email": "user@example.com", "password": "SecurePass123!" }
+    Response: 200
+      {
+        "success": true,
+        "data": {
+          "user": { ... User object ... },
+          "token": "jwt_token"
+        }
+      }
+    Sets: httpOnly cookie with JWT token
   ```
 
-* The endpoint MUST validate the token and transition `is_verified` from `false` to `true` on success.
-* The endpoint MUST return the standardized `ApiResponse<T>` envelope and use the shared error architecture.
+* Validate credentials securely with bcryptjs against the stored `password_hash`.
+* An **unverified account MUST NOT authenticate successfully** (`features.md` — User Login). The endpoint MUST return a `401` authentication error for unverified users.
+* Invalid credentials MUST return a generic `401 UNAUTHORIZED` without revealing which part (email or password) was wrong.
+* The login response MUST use the standardized `ApiResponse<T>` envelope and shared error architecture.
 
-## 4. Verification State
+## 2. JWT-Based Authentication
 
-* Change `is_verified` from `false` to `true` only after successful verification.
-* Record when verification occurred (`verified_at`).
-* Clear the stored verification token and expiry after successful verification.
+* Use **Passport-JWT** (approved decision, 2026-09-07). This adds `@nestjs/passport`, `passport`, and `passport-jwt` to the backend.
+* Implement the backend layout per `architecture.md`:
+
+  ```text
+  strategies/jwt.strategy.ts
+  guards/jwt.guard.ts
+  ```
+
+* The JWT secret and expiration MUST come from environment configuration (never hard-coded, never committed).
+* JWT expiration is a shared constant in `packages/constants` where appropriate.
+* No refresh-token flow. `POST /auth/refresh-token` is **deferred** (approved decision, 2026-09-07) and MUST NOT be implemented in this task.
+
+## 3. Authentication State
+
+* The JWT guard protects a minimal authenticated endpoint that proves the authentication state works (e.g. the login response returns `{ user, token }` per the architecture contract).
+* `@nestjs/jwt` (or equivalent approved JWT dependency) provides signing/verification. The guard validates the `Authorization: Bearer <token>` header.
+* Do NOT implement user profile endpoints, `/users/me`, or profile data. Those belong to Task 1.4.
+
+## 4. Logout
+
+* Implement `POST /auth/logout` per `architecture.md` §API Endpoints:
+
+  ```text
+  POST /auth/logout
+    Response: 200
+      {
+        "success": true,
+        "data": { "message": "Logged out" }
+      }
+  ```
+
+* Logout clears the authentication session (clears the httpOnly JWT cookie / invalidates the token on the client).
+* Logout does NOT delete user data or conversations.
 
 ## 5. Access Restrictions for Unverified Accounts
 
-* Implement access restrictions for unverified users **only where explicitly defined by the project context**.
-* No protected routes, guards, or JWT exist yet (Task 1.3). Nothing in the current context defines an enforceable restriction before authentication exists, so no speculative guard infrastructure may be introduced.
-* The verification state (`is_verified`) is the mechanism that future tasks will use to enforce verification-based restrictions.
+* Enforce that unverified users cannot authenticate (see Login).
+* JWT-registered protected routes enforce verified-account access where the current task defines a protected endpoint. No broader profile/route guard scope is added here.
 
 ## 6. Shared Packages
 
-* Add shared types to `packages/types` where the frontend and backend share a contract (e.g., the verify-email request/response).
-* Add shared constants to `packages/constants` where they genuinely need to be shared (e.g., token length, expiration, verification error code/message).
+* Add shared login/logout request and response types to `packages/types` (single source of truth for the frontend/backend contract defined by the architecture).
+* Add shared auth constants (e.g. JWT expiration, login error messages/codes) to `packages/constants` where they genuinely need to be shared.
 * Do not move backend logic into `packages/utils`.
 
-## 7. Tests
+## 7. Environment Configuration
 
-* Add tests for the verification success case.
-* Add tests for the failure cases: unknown/invalid token, expired token, already-used token.
-* Preserve the existing Task 1.1 tests.
+* The JWT secret and expiration are read from environment variables at runtime.
+* `.env.example` receives only placeholders. Real secrets remain in the untracked `apps/backend/.env`.
+* Document any new environment variables in the appropriate context file as a factual record.
+
+## 8. Tests
+
+* Add tests for:
+  * login success (valid credentials, verified user → 200, user + token returned),
+  * login with invalid credentials → 401,
+  * login by an unverified user → 401,
+  * logout success (→ 200, session cleared).
+* Preserve all existing Task 1.1 and Task 1.2 tests.
 
 ---
 
@@ -94,28 +127,34 @@ Claude Code is authorized to work only on the following areas.
 
 The following work MUST NOT be implemented during this task.
 
-## Email Transport / Delivery
+## Refresh Tokens
 
-* Do NOT implement or configure an email-sending service (SMTP, mail transport library, etc.). `stack.md` defines no email transport and the project out-of-scope list excludes email notifications.
-* Do NOT claim in registration responses that a verification email was sent. Task 1.1 deliberately returns `"Registration successful"`.
-
-## Resend Verification
-
-* Do NOT implement a "request another verification email" / resend-verification endpoint. It is an acceptance criterion of the Email Verification feature in `features.md` but is NOT authorized by this task and is deferred.
-
-## Authentication and Authorization
-
-* Do NOT implement login, logout, JWT, guards, or protected routes. These belong to Task 1.3.
+* Do NOT implement `POST /auth/refresh-token`. Deferred (approved decision, 2026-09-07).
 
 ## User Profile
 
-* Do NOT implement profile columns, username, full name, bio, or profile completion. These belong to Task 1.4.
+* Do NOT implement username, full name, bio, profile completion, `/users/me`, or profile endpoints. These belong to Task 1.4.
 
-## Features Outside This Task
+## Frontend
 
-* Do NOT implement password reset, OAuth, account deletion, email change, contact requests, messaging, media, or any Phase 2/3/4 feature.
+* Do NOT implement frontend login/logout UI, auth stores, protected pages, or frontend redirects. The frontend has no auth infrastructure installed; this task is **backend-only** (approved decision, 2026-09-07).
+
+## Email Transport / Resend Verification
+
+* Do NOT implement email sending or a resend-verification endpoint.
+
+## Accounts
+
+* Do NOT implement email change, account deletion, or password reset.
+
+## Phase 2/3/4 Features
+
+* Do NOT implement contact requests, chats, messages, search, media, permission enforcement for messaging, or internationalization.
+
+## Infrastructure and Dependencies
+
 * Do NOT introduce Redis, Kafka, RabbitMQ, NATS, Kubernetes, or any unapproved infrastructure.
-* Do NOT add dependencies without approval.
+* Do NOT add dependencies beyond the approved Passport-JWT set (`@nestjs/passport`, `passport`, `passport-jwt` and their required type packages).
 
 ---
 
@@ -126,24 +165,26 @@ The following work MUST NOT be implemented during this task.
 The implementation MUST remain consistent with:
 
 ```text
-1-overview-project.md    — email verification is mandatory before authenticated access
-2-features.md            — Email Verification feature acceptance criteria
-3-architecture.md        — data model, POST /auth/verify-email, error handling, shared types
-4-stack.md               — approved technologies only
+1-overview-project.md    — verified account required for authenticated access
+2-features.md            — User Login / User Logout acceptance criteria
+3-architecture.md        — data model, POST /auth/login + /auth/logout, JWT strategy/guard layout,
+                           httpOnly cookie, error handling, shared types
+4-stack.md               — JWT + bcryptjs approved; new deps only via approved decisions
 5-rules.md               — coding, TypeScript, error handling, security, testing, Git rules
-7-done.md                — Task 1.1 record and Task 1.2 scope
+7-done.md                — Task 1.1 and Task 1.2 records and Task 1.3 scope
 ```
 
-## Task 1.1 Base
+## Task 1.1 / 1.2 Base
 
 Reuse the existing registration/auth implementation:
 
 ```text
 apps/backend/src/modules/auth/auth.controller.ts
 apps/backend/src/modules/auth/auth.service.ts
+apps/backend/src/modules/auth/auth.module.ts
 apps/backend/src/modules/auth/dto/register.dto.ts
+apps/backend/src/modules/auth/dto/verify-email.dto.ts
 apps/backend/src/modules/auth/entities/user.entity.ts
-apps/backend/src/database/migrations/1788710400000-CreateUsersTable.ts
 packages/types/src/auth.types.ts
 packages/constants/src/validation.constants.ts
 packages/constants/src/error.constants.ts
@@ -167,15 +208,16 @@ Do not silently choose an approach.
 
 The task is complete only when:
 
-* a verification token is generated at registration and stored securely,
-* `POST /auth/verify-email` validates the token and flips `is_verified` from `false` to `true`,
-* expired and already-used tokens are rejected,
+* `POST /auth/login` validates credentials and returns `{ user, token }` + sets an httpOnly cookie,
+* unverified users and invalid credentials are rejected with `401 UNAUTHORIZED`,
+* `POST /auth/logout` successfully clears the session,
+* a Passport-JWT strategy + guard protect at least the auth-state endpoint,
 * shared types/constants are used where applicable,
-* tests cover the success and failure cases,
-* type-check, lint, tests, format-check, and the migration pass,
+* tests cover the login success and failure cases (invalid credentials, unverified user), and logout,
+* type-check, lint, tests, format-check pass,
 * the endpoint is verified against a live backend,
 * no unauthorized features were implemented,
-* no unapproved infrastructure or dependencies were introduced,
+* no unapproved infrastructure or dependencies were introduced (beyond the approved Passport-JWT set),
 * no secrets were committed,
 * the repository remains in a coherent runnable state.
 
@@ -231,8 +273,8 @@ No unauthorized scope changes.
 
 # Golden Rule
 
-> Verify the email address, record it, report it, and stop.
+> Implement login and logout, verify them, record them, report them, and stop.
 
 Do not implement future features simply because the architecture anticipates them.
 
-Do not start Task 1.3.
+Do not start Task 1.4.

@@ -3,7 +3,9 @@ import {
   ConflictException,
   Injectable,
   InternalServerErrorException,
+  UnauthorizedException,
 } from '@nestjs/common'
+import { JwtService } from '@nestjs/jwt'
 import { createHash, randomBytes } from 'node:crypto'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Repository } from 'typeorm'
@@ -14,10 +16,18 @@ import {
   VERIFICATION_TOKEN_EXPIRATION_HOURS,
   VERIFICATION_TOKEN_LENGTH,
 } from '@email-chat-pro/constants'
-import type { RegisterResponse, VerifyEmailResponse } from '@email-chat-pro/types'
+import type {
+  LoginResponse,
+  LogoutResponse,
+  RegisterResponse,
+  User as SharedUser,
+  VerifyEmailResponse,
+} from '@email-chat-pro/types'
+import { LoginDto } from './dto/login.dto'
 import { RegisterDto } from './dto/register.dto'
 import { VerifyEmailDto } from './dto/verify-email.dto'
 import { User } from './entities/user.entity'
+import type { JwtPayload } from './strategies/jwt.strategy'
 
 /** bcrypt salt rounds defined in architecture.md §Password Validation. */
 const BCRYPT_SALT_ROUNDS = 10
@@ -41,6 +51,7 @@ export class AuthService {
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    private readonly jwtService: JwtService,
   ) {}
 
   /**
@@ -150,6 +161,62 @@ export class AuthService {
     await this.usersRepository.save(user)
 
     return { message: 'Email verified successfully' }
+  }
+
+  /**
+   * Authenticates a verified user with email + password (Task 1.3).
+   *
+   * - Unknown/deleted/inactive accounts and wrong passwords all return the same
+   *   generic 401 so responses do not reveal whether an email is registered.
+   * - Unverified accounts CANNOT authenticate (features.md — "Unverified users
+   *   cannot authenticate successfully"); they get a distinct 401.
+   * - On success a JWT is signed (payload `{ sub, email }`) and returned, and
+   *   the controller also sets it as an httpOnly cookie.
+   */
+  async login(dto: LoginDto): Promise<LoginResponse> {
+    const email = dto.email.toLowerCase()
+    const user = await this.usersRepository.findOne({ where: { email } })
+
+    if (!user || user.deletedAt !== null || !user.isActive) {
+      throw this.unauthorized(ERROR_MESSAGES.INVALID_CREDENTIALS)
+    }
+
+    const passwordMatches = await bcrypt.compare(dto.password, user.passwordHash)
+    if (!passwordMatches) {
+      throw this.unauthorized(ERROR_MESSAGES.INVALID_CREDENTIALS)
+    }
+
+    if (!user.isVerified) {
+      throw this.unauthorized(ERROR_MESSAGES.EMAIL_NOT_VERIFIED)
+    }
+
+    const payload: JwtPayload = { sub: user.id, email: user.email }
+    const token = await this.jwtService.signAsync(payload)
+
+    return { token, user: this.toUserDto(user) }
+  }
+
+  /** Ends the current session (Task 1.3). The controller clears the httpOnly cookie. */
+  async logout(): Promise<LogoutResponse> {
+    return { message: ERROR_MESSAGES.LOGGED_OUT }
+  }
+
+  /** Maps the authenticated entity to the shared user contract. */
+  toUserDto(user: User): SharedUser {
+    return {
+      id: user.id,
+      email: user.email,
+      isVerified: user.isVerified,
+      isActive: user.isActive,
+      createdAt: user.createdAt.toISOString(),
+    }
+  }
+
+  private unauthorized(message: string): UnauthorizedException {
+    return new UnauthorizedException({
+      code: ERROR_CODES.UNAUTHORIZED,
+      message,
+    })
   }
 
   /** Generates a cryptographically secure hex token (64 chars = 256 bits). */

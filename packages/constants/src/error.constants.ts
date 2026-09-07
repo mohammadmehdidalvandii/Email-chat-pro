@@ -33,5 +33,8 @@ export const ERROR_MESSAGES = {
     'Password must be 8-255 characters and include an uppercase letter, a lowercase letter, a digit, and a special character (!@#$%^&*)',
   VERIFICATION_TOKEN_REQUIRED: 'Verification token is required',
   VERIFICATION_TOKEN_INVALID: 'Verification token is invalid or expired',
+  INVALID_CREDENTIALS: 'Invalid email or password',
+  EMAIL_NOT_VERIFIED: 'Email is not verified. Please verify your email before logging in.',
+  LOGGED_OUT: 'Logged out',
   INTERNAL: 'An unexpected error occurred',
 } as const
