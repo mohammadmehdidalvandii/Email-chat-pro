@@ -8,6 +8,9 @@
   "files": [
     "dist"
   ],
+  "dependencies": {
+    "@email-chat-pro/constants": "*"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "type-check": "tsc --noEmit -p tsconfig.json"

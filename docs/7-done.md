@@ -197,7 +197,9 @@ generators were run. No Phase 1 work was started. current-task.md was not modifi
 
 ## Task 1.1 — Registration
 
-**Status:** Not Started
+**Status:** Completed with Known Issues
+
+**Date:** 2026-09-07
 
 **Scope:**
 
@@ -208,16 +210,67 @@ generators were run. No Phase 1 work was started. current-task.md was not modifi
 * User creation
 * Registration error handling
 
+**Implemented / Verified State:**
+
+- `POST /api/v1/auth/register` accepts `{ email, password }` and creates an account.
+- Email validation: RFC 5322 simplified regex, 5–255 characters, normalized to lowercase before storage. Shared rules in `@email-chat-pro/constants` (`validation.constants.ts`) and enforced by both `class-validator` (DTO) and a DB `CHECK` constraint.
+- Password validation: 8–255 characters, must include an uppercase letter, a lowercase letter, a digit, and a special character (`!@#$%^&*`). Shared rules in `@email-chat-pro/constants` and enforced by `class-validator`.
+- Password hashing: bcryptjs with 10 salt rounds. The plaintext password is never stored or returned; only `password_hash` is persisted.
+- Email uniqueness enforced at the database level via a `UNIQUE` constraint on `users.email` (migration `CreateUsersTable1788710400000`), with a service-level pre-check and a `23505` unique-violation race handler that both map to `409 CONFLICT`.
+- New users are created in the pending/unverified state: `is_verified = false`, `is_active = true`.
+- All responses use the shared `ApiResponse<T>` envelope (`{ success, data?, error?, timestamp }`) with the global `HttpExceptionFilter` producing the standardized error shape. Success returns `201 Created`.
+- Shared contracts: `RegisterInput` / `RegisterResponse` in `@email-chat-pro/types` (`auth.types.ts`).
+- The `users` table contains only registration columns; profile columns (username, full_name, bio, avatar_url, profile_completed, last_seen_at) are deferred to Task 1.4 per the approved decision.
+
 **Verification:**
 
 ```text
-Not Started
+Executed 2026-09-07.
+
+- npm run type-check:  PASS (all 5 workspaces)
+- npm run lint:        PASS (backend + frontend)
+- npm test:            PASS (3 suites / 9 tests:
+                        app.controller.spec, auth.service.spec, auth.controller.spec)
+- migration:run:       PASS (users table created; UNIQUE + CHECK constraints present)
+- Endpoint (live, backend on port 4000):
+  - POST /auth/register {valid}          -> 201, success:true, data{id,email,message}
+  - POST /auth/register {duplicate}      -> 409 CONFLICT "Email already registered"
+  - POST /auth/register {invalid email}  -> 400 VALIDATION_ERROR
+  - POST /auth/register {weak password}  -> 400 VALIDATION_ERROR
+  - uppercase email "CAROL@Example.com"  -> normalized to carol@example.com (201)
+- DB persistence: email stored lowercase, password_hash is 60-char bcrypt ($2b$)
+  prefix, no plaintext, is_verified=false, is_active=true.
 ```
 
 **Files Changed:**
 
 ```text
-Not Started
+Modified:
+apps/backend/package.json               (+ @email-chat-pro/constants dep; migration scripts)
+apps/backend/src/app.module.ts          (register AuthModule)
+apps/backend/src/main.ts                (ValidationPipe + HttpExceptionFilter)
+packages/constants/src/index.ts         (export error + validation constants)
+packages/types/src/index.ts             (export auth.types)
+packages/utils/package.json             (+ @email-chat-pro/constants dep)
+packages/utils/src/validators.ts        (isValidPassword; shared constants)
+package-lock.json                       (reify Task 1.1 deps: bcryptjs,
+                                         class-validator, class-transformer,
+                                         utils->constants)
+
+Created:
+packages/constants/src/error.constants.ts
+packages/constants/src/validation.constants.ts
+packages/types/src/auth.types.ts
+apps/backend/src/common/filters/http-exception.filter.ts
+apps/backend/src/database/data-source.ts
+apps/backend/src/database/migrations/1788710400000-CreateUsersTable.ts
+apps/backend/src/modules/auth/auth.controller.ts
+apps/backend/src/modules/auth/auth.controller.spec.ts
+apps/backend/src/modules/auth/auth.module.ts
+apps/backend/src/modules/auth/auth.service.ts
+apps/backend/src/modules/auth/auth.service.spec.ts
+apps/backend/src/modules/auth/dto/register.dto.ts
+apps/backend/src/modules/auth/entities/user.entity.ts
 ```
 
 ---
@@ -702,6 +755,30 @@ Unauthorized scope changes:
 - None
 ```
 
+```text
+Task: 1.1
+Date: 2026-09-07
+
+Environment:
+- Node.js v24.17.0
+- npm 11.13.0
+- Docker 29.5.3
+- PostgreSQL 16 (email-chat-pro-db container)
+
+Checks:
+- npm run type-check:  PASS (types, constants, utils, backend, frontend)
+- npm run lint:        PASS (backend + frontend)
+- npm test:            PASS (3 suites / 9 tests)
+- npm run build:apps:  PARTIAL (backend PASS; frontend FAILED — see Known Issues)
+- migration:run:       PASS (users table created)
+- Endpoint live tests: PASS (201 valid, 409 duplicate, 400 invalid email,
+                       400 weak password, 201 uppercase-email normalization)
+- DB persistence:      PASS (lowercase email, bcrypt hash, is_verified=false)
+
+Unauthorized scope changes:
+- None
+```
+
 ---
 
 # Known Issues
@@ -778,6 +855,60 @@ Current Status: Expected for Phase 0. No test tooling was added, since
        inventing scripts for uninstalled tools is not authorized.
 Next Action: Decide test tooling for the frontend and shared packages when a
        later task requires it.
+```
+
+## Open Issues After Task 1.1
+
+```text
+Issue: The frontend production build fails during static-page generation with
+       "Error: <Html> should not be imported outside of pages/_document" while
+       prerendering /404 and /_error (Next.js build worker exits code 1). The
+       reference originates in Next.js internal chunk 383.js, not in any Task
+       1.1 change; the frontend source is untouched and no next-related
+       dependency changed.
+Impact: `npm run build:apps` is only PARTIALLY passing (backend builds;
+       frontend fails). It blocks nothing in the backend-only Task 1.1, but a
+       deployable frontend build is not currently achievable.
+Discovered During: Task 1.1 verification (`npm run build:apps`), reproduced
+       deterministically in isolation.
+Current Status: Not remediated. Fixing requires Next.js/frontend-environment
+       investigation that is outside the authorized scope of Task 1.1.
+Next Action: Investigate the Next.js version/build-environment issue as a
+       separate authorized task.
+```
+
+```text
+Issue: During Task 1.1 verification, the local environment had two PostgreSQL
+       instances contending for port 5432: a local Windows PostgreSQL service
+       (postgresql-x64-18, postgres.exe) and the Docker container
+       email-chat-pro-db. Host TCP connections reached the local service, which
+       did not accept the documented credentials.
+Impact: Migration and runtime connection initially failed with "password
+       authentication failed for user email_chat_dev" (28P01).
+Discovered During: Task 1.1 verification (migration run / endpoint tests).
+Current Status: Resolved by an approved intervention — the local PostgreSQL
+       service was stopped (service left Stopped; its data remains on disk) and
+       the Docker email_chat_dev password was reset via the container trust
+       socket to match apps/backend/.env. Docker's postgres now answers on 5432
+       and the app connects successfully.
+Next Action: If the local PostgreSQL service is needed later, restart it and
+       ensure only one instance owns port 5432 (e.g., re-map one of them).
+```
+
+```text
+Issue: The default DATABASE_URL fallback in apps/backend/src/database/
+       data-source.ts and the compose default use the placeholder password
+       "email_chat_dev_password", while apps/backend/.env (git-ignored, real)
+       holds a different 23-character password. The migration CLI does not load
+       .env, so `npm run migration:run` silently falls back to the placeholder
+       and fails unless DATABASE_URL is exported from .env.
+Impact: Running migrations requires the developer to export DATABASE_URL (or
+       load .env); otherwise the command fails against a real dev DB.
+Discovered During: Task 1.1 verification.
+Current Status: Not changed in code (out of Task 1.1 scope). The migration was
+       run with DATABASE_URL exported from .env.
+Next Action: Optional — load .env in the migration flow, or document the export
+       step, if approved.
 ```
 
 Do not silently remove or rewrite an issue simply because it is inconvenient.
