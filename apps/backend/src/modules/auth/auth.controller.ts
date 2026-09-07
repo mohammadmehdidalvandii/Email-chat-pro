@@ -1,7 +1,8 @@
 import { Body, Controller, HttpCode, HttpStatus, Post } from '@nestjs/common'
-import type { ApiResponse, RegisterResponse } from '@email-chat-pro/types'
+import type { ApiResponse, RegisterResponse, VerifyEmailResponse } from '@email-chat-pro/types'
 import { AuthService } from './auth.service'
 import { RegisterDto } from './dto/register.dto'
+import { VerifyEmailDto } from './dto/verify-email.dto'
 
 /** Authentication endpoints (architecture.md §API Endpoints — Auth). */
 @Controller('auth')
@@ -12,6 +13,17 @@ export class AuthController {
   @HttpCode(HttpStatus.CREATED)
   async register(@Body() dto: RegisterDto): Promise<ApiResponse<RegisterResponse>> {
     const data = await this.authService.register(dto)
+    return {
+      success: true,
+      data,
+      timestamp: new Date().toISOString(),
+    }
+  }
+
+  @Post('verify-email')
+  @HttpCode(HttpStatus.OK)
+  async verifyEmail(@Body() dto: VerifyEmailDto): Promise<ApiResponse<VerifyEmailResponse>> {
+    const data = await this.authService.verifyEmail(dto)
     return {
       success: true,
       data,

@@ -14,30 +14,21 @@ When the task is completed and verified, the completed work MUST be recorded in 
 
 # Current Phase
 
-## Phase 0 — Infrastructure and Project Setup
+## Phase 1 — Authentication and User Profile
 
-The current task is to establish and verify the project foundation for the Email-Chat-Pro monorepo.
+The current task is **Task 1.2 — Email Verification**.
 
-The goal is to create or complete the minimum technical foundation required for later development without implementing product features prematurely.
+Task 1.1 (Registration) is completed and verified (`docs/7-done.md`).
 
 ---
 
 # Current Objective
 
-Establish the project structure and local development infrastructure for:
+Implement email verification for accounts registered under Task 1.1.
 
-* Frontend application
-* Backend application
-* Shared types package
-* Shared constants package
-* Shared utilities package
-* npm workspace configuration
-* PostgreSQL local development environment
-* Basic TypeScript configuration
-* Basic development scripts
-* Environment configuration structure
+The goal is to verify that a registered email address belongs to the user who registered it, and to transition the account from the unverified/pending state (`is_verified = false`) to the verified state (`is_verified = true`) after successful verification.
 
-The project must be ready for the next development phase without implementing authentication, messaging, contacts, or other product features.
+Email verification is **mandatory before authenticated application features are accessible** (project invariant). Authentication guards and protected routes belong to Task 1.3 and are NOT part of this task.
 
 ---
 
@@ -45,357 +36,57 @@ The project must be ready for the next development phase without implementing au
 
 Claude Code is authorized to work only on the following areas.
 
-## 1. Repository Inspection
+## 1. Verification Token Generation
 
-Before making changes:
+* A unique, cryptographically secure verification token MUST be generated for each new account.
+* Token generation is **initiated at registration** (inside the existing `register()` flow).
+* The plaintext token MUST be stored securely (a hash of the token at rest); the raw token MUST NOT be returned in API responses or written to logs.
+* Token generation MUST use the approved stack (`node:crypto`) and MUST NOT introduce a new dependency.
 
-* Inspect the existing repository.
-* Inspect the existing directory structure.
-* Inspect `package.json` files.
-* Inspect existing TypeScript configuration.
-* Inspect existing application configuration.
-* Inspect existing Docker configuration.
-* Inspect existing source files.
-* Inspect existing scripts.
-* Inspect existing dependencies.
+## 2. Verification Token Expiration and Secure Handling
 
-Determine what already exists before creating anything.
+* Verification tokens MUST have a defined expiration period.
+* The default expiration is **24 hours**, defined as a shared constant in `packages/constants` so it is easily adjustable.
+* Expired tokens MUST be rejected.
+* Already-used tokens MUST be rejected (the token is consumed/cleared on successful verification).
+* The token, its hash, and expiry MUST never be exposed in logs, responses, or source code.
 
-### Important
+## 3. Verify-Email Endpoint
 
-If a required application, package, configuration, or directory already exists:
+* Implement `POST /auth/verify-email` per `architecture.md` §API Endpoints:
 
-**modify or complete it instead of recreating or reinitializing it.**
+  ```text
+  POST /auth/verify-email
+    Request: { "token": "verification_token" }
+    Response: 200 { "message": "Email verified successfully" }
+  ```
 
-Do not blindly run project generators.
+* The endpoint MUST validate the token and transition `is_verified` from `false` to `true` on success.
+* The endpoint MUST return the standardized `ApiResponse<T>` envelope and use the shared error architecture.
 
----
+## 4. Verification State
 
-# 2. Monorepo Configuration
+* Change `is_verified` from `false` to `true` only after successful verification.
+* Record when verification occurred (`verified_at`).
+* Clear the stored verification token and expiry after successful verification.
 
-Establish or verify npm Workspaces.
+## 5. Access Restrictions for Unverified Accounts
 
-The intended workspace structure is:
+* Implement access restrictions for unverified users **only where explicitly defined by the project context**.
+* No protected routes, guards, or JWT exist yet (Task 1.3). Nothing in the current context defines an enforceable restriction before authentication exists, so no speculative guard infrastructure may be introduced.
+* The verification state (`is_verified`) is the mechanism that future tasks will use to enforce verification-based restrictions.
 
-```text
-apps/
-  frontend/
-  backend/
+## 6. Shared Packages
 
-packages/
-  types/
-  constants/
-  utils/
-```
+* Add shared types to `packages/types` where the frontend and backend share a contract (e.g., the verify-email request/response).
+* Add shared constants to `packages/constants` where they genuinely need to be shared (e.g., token length, expiration, verification error code/message).
+* Do not move backend logic into `packages/utils`.
 
-The root project should provide the workspace configuration required for these packages.
+## 7. Tests
 
-Do not introduce another package manager unless explicitly approved.
-
-Do not introduce a monorepo framework unless explicitly approved.
-
----
-
-# 3. Frontend Foundation
-
-Establish or verify the frontend application using:
-
-* Next.js
-* React
-* TypeScript
-* Tailwind CSS
-* App Router
-
-The frontend must be prepared for future development.
-
-Only foundation-level configuration is authorized.
-
-Do NOT implement:
-
-* authentication pages
-* login
-* registration
-* profile pages
-* chat UI
-* contact UI
-* messaging UI
-* product-specific business logic
-
-unless explicitly required by an existing repository state and confirmed as necessary for the foundation.
-
----
-
-# 4. Backend Foundation
-
-Establish or verify the backend application using:
-
-* NestJS
-* Node.js
-* TypeScript
-
-The backend foundation should be prepared for future modules.
-
-The architecture must remain compatible with:
-
-```text
-Auth
-Users
-Contacts
-Chats
-Messages
-WebSocket
-```
-
-At this stage, only foundational setup is authorized.
-
-Do NOT implement:
-
-* registration logic
-* login logic
-* JWT authentication flows
-* email verification
-* contact requests
-* messaging
-* chat business logic
-
-These belong to later tasks.
-
----
-
-# 5. Shared Packages
-
-Establish or verify:
-
-```text
-packages/types
-packages/constants
-packages/utils
-```
-
-## packages/types
-
-Prepare the package for shared API contracts and shared TypeScript types.
-
-This package is the **Single Source of Truth** for contracts shared between frontend and backend.
-
-Do not duplicate shared API contracts inside applications.
-
-Only foundation-level types are authorized at this stage.
-
-Do not invent product contracts that have not yet been approved.
-
----
-
-## packages/constants
-
-Prepare the package for shared constants.
-
-Examples of future responsibilities include:
-
-* API constants
-* error codes
-* validation constants
-* status constants
-* WebSocket event names
-
-Only constants required for the current foundation may be created.
-
-Do not invent unnecessary constants.
-
----
-
-## packages/utils
-
-Prepare the package for reusable, environment-independent utilities.
-
-Utilities must remain:
-
-* reusable
-* deterministic where appropriate
-* independent from frontend and backend frameworks
-
-Do not place application-specific business logic here.
-
----
-
-# 6. PostgreSQL Development Environment
-
-Establish or verify the local PostgreSQL environment using:
-
-* PostgreSQL
-* Docker
-* Docker Compose
-
-The intended local database port is:
-
-```text
-5432
-```
-
-The database environment must be suitable for local development.
-
-Do not introduce:
-
-* Redis
-* Kafka
-* RabbitMQ
-* NATS
-* Kubernetes
-* distributed cache
-* message broker
-* WebSocket clustering
-
-These are explicitly outside the current scope.
-
----
-
-# 7. Environment Configuration
-
-Establish the environment-variable structure required for local development.
-
-Sensitive values MUST NOT be committed to Git.
-
-Environment configuration may include placeholders for future values such as:
-
-```text
-DATABASE_URL
-JWT_SECRET
-JWT_EXPIRES_IN
-CLOUDINARY_CLOUD_NAME
-CLOUDINARY_API_KEY
-CLOUDINARY_API_SECRET
-```
-
-However:
-
-**Do not implement or configure features that are not part of the current task merely because an environment variable exists.**
-
-Provide appropriate example/environment-template files when needed.
-
-Never place real secrets in source code or committed configuration.
-
----
-
-# 8. Ports
-
-The intended development ports are:
-
-```text
-Frontend:   3000
-Backend:    4000
-PostgreSQL: 5432
-```
-
-If the existing repository already uses these ports, preserve them.
-
-If a conflict exists, report it before making an architectural change.
-
-Do not silently change the project's intended ports.
-
----
-
-# 9. API Foundation
-
-Prepare the backend for the API base path:
-
-```text
-/api/v1
-```
-
-The intended local API base URL is:
-
-```text
-http://localhost:4000/api/v1
-```
-
-Only foundational configuration is authorized.
-
-Do not implement product endpoints unless explicitly required by the current repository state and task.
-
----
-
-# 10. Basic Development Tooling
-
-Verify or establish the minimum development scripts required to work with the monorepo.
-
-Examples may include:
-
-```text
-dev
-build
-lint
-type-check
-test
-```
-
-Only create scripts that are appropriate for the technologies actually present in the repository.
-
-Do not invent scripts that reference tools that are not installed.
-
----
-
-# 11. TypeScript Foundation
-
-TypeScript configuration should be suitable for strict development.
-
-The intended standard is:
-
-```text
-strict: true
-```
-
-Frontend, backend, and shared packages should use compatible TypeScript configuration.
-
-Avoid unnecessary configuration duplication where shared configuration is appropriate.
-
-Do not weaken TypeScript strictness to hide errors.
-
----
-
-# 12. Dependency Installation
-
-Install only dependencies required by the approved stack and the current foundation.
-
-Approved technologies are defined in:
-
-```text
-stack.md
-```
-
-Do not install libraries merely because they might be useful later.
-
-Do not replace an approved technology with another technology without explicit approval.
-
----
-
-# 13. Docker Configuration
-
-Docker Compose should provide the local PostgreSQL development environment.
-
-The configuration must be simple and development-focused.
-
-Do not create production Kubernetes/Docker orchestration.
-
-Do not add unnecessary infrastructure services.
-
----
-
-# 14. Initial Verification
-
-After implementation, Claude Code MUST verify the foundation.
-
-At minimum, inspect and run the repository's available validation commands for:
-
-* dependency installation
-* TypeScript
-* linting
-* build
-* tests
-* Docker configuration
-
-Only run commands that actually exist in the repository.
-
-If a command does not exist, do not invent it.
+* Add tests for the verification success case.
+* Add tests for the failure cases: unknown/invalid token, expired token, already-used token.
+* Preserve the existing Task 1.1 tests.
 
 ---
 
@@ -403,174 +94,60 @@ If a command does not exist, do not invent it.
 
 The following work MUST NOT be implemented during this task.
 
-## Authentication
+## Email Transport / Delivery
 
-Do not implement:
+* Do NOT implement or configure an email-sending service (SMTP, mail transport library, etc.). `stack.md` defines no email transport and the project out-of-scope list excludes email notifications.
+* Do NOT claim in registration responses that a verification email was sent. Task 1.1 deliberately returns `"Registration successful"`.
 
-* registration
-* login
-* logout
-* JWT authentication flow
-* password hashing logic
-* email verification
-* email change
-* account deletion
-* protected routes
+## Resend Verification
 
----
+* Do NOT implement a "request another verification email" / resend-verification endpoint. It is an acceptance criterion of the Email Verification feature in `features.md` but is NOT authorized by this task and is deferred.
 
-## User Features
+## Authentication and Authorization
 
-Do not implement:
+* Do NOT implement login, logout, JWT, guards, or protected routes. These belong to Task 1.3.
 
-* profile management
-* username search
-* profile editing
-* avatar upload
+## User Profile
+
+* Do NOT implement profile columns, username, full name, bio, or profile completion. These belong to Task 1.4.
+
+## Features Outside This Task
+
+* Do NOT implement password reset, OAuth, account deletion, email change, contact requests, messaging, media, or any Phase 2/3/4 feature.
+* Do NOT introduce Redis, Kafka, RabbitMQ, NATS, Kubernetes, or any unapproved infrastructure.
+* Do NOT add dependencies without approval.
 
 ---
 
-## Contacts
+# Implementation References
 
-Do not implement:
-
-* contact requests
-* accepting requests
-* declining requests
-* contact lists
-* contact authorization logic
-
----
-
-## Messaging
-
-Do not implement:
-
-* chat creation
-* message creation
-* message persistence
-* message history
-* conversation lists
-* real-time messaging
-
----
-
-## WebSocket
-
-Do not implement product-level WebSocket behavior.
-
-Socket.IO may be prepared at the foundation level if required by the existing architecture, but no messaging behavior should be implemented.
-
----
-
-## Media
-
-Do not implement:
-
-* Cloudinary uploads
-* image messages
-* video messages
-
----
-
-## Advanced Infrastructure
-
-Do not introduce:
-
-* Redis
-* Kafka
-* RabbitMQ
-* NATS
-* Kubernetes
-* distributed caching
-* WebSocket clustering
-* message brokers
-* service discovery
-* microservices
-
----
-
-## Product Features Outside Phase 0
-
-Do not implement any feature that belongs to Phase 1, Phase 2, Phase 3, or Phase 4 unless explicitly moved into this task through an approved change.
-
----
-
-# Repository Creation Rule
-
-Claude Code MUST inspect the repository before creating files or directories.
-
-If the required structure does not exist, Claude Code may create it.
-
-For example, if this structure is missing:
-
-```text
-apps/frontend
-apps/backend
-packages/types
-packages/constants
-packages/utils
-```
-
-Claude Code may create the missing directories and files.
-
-However:
-
-**Claude Code MUST NOT reinitialize the entire project simply because the desired structure is incomplete.**
-
-Do not blindly execute:
-
-```text
-create-next-app
-nest new
-npm init
-```
-
-against an existing project.
-
-Use the existing repository as the source of truth.
-
----
-
-# Change Minimization
-
-Changes must remain limited to the current task.
-
-Do not perform unrelated:
-
-* refactors
-* dependency upgrades
-* formatting changes
-* architectural changes
-* naming changes
-* file moves
-* feature implementations
-
-If an unrelated issue is discovered:
-
-1. Do not silently fix it.
-2. Report it.
-3. Continue only if it does not block the current task.
-
----
-
-# Architecture Protection
+## Approved Context
 
 The implementation MUST remain consistent with:
 
 ```text
-overview-project.md
-features.md
-architecture.md
-stack.md
-rules.md
+1-overview-project.md    — email verification is mandatory before authenticated access
+2-features.md            — Email Verification feature acceptance criteria
+3-architecture.md        — data model, POST /auth/verify-email, error handling, shared types
+4-stack.md               — approved technologies only
+5-rules.md               — coding, TypeScript, error handling, security, testing, Git rules
+7-done.md                — Task 1.1 record and Task 1.2 scope
 ```
 
-If these documents conflict:
+## Task 1.1 Base
 
-**STOP and report the conflict.**
+Reuse the existing registration/auth implementation:
 
-Do not resolve architectural conflicts by guessing.
+```text
+apps/backend/src/modules/auth/auth.controller.ts
+apps/backend/src/modules/auth/auth.service.ts
+apps/backend/src/modules/auth/dto/register.dto.ts
+apps/backend/src/modules/auth/entities/user.entity.ts
+apps/backend/src/database/migrations/1788710400000-CreateUsersTable.ts
+packages/types/src/auth.types.ts
+packages/constants/src/validation.constants.ts
+packages/constants/src/error.constants.ts
+```
 
 ---
 
@@ -590,22 +167,35 @@ Do not silently choose an approach.
 
 The task is complete only when:
 
-* npm workspace structure is established or verified
-* frontend foundation is established or verified
-* backend foundation is established or verified
-* shared packages are established or verified
-* PostgreSQL Docker environment is established or verified
-* required environment structure exists
-* intended ports are configured
-* API base path foundation is configured
-* TypeScript foundation is valid
-* required development scripts are available
-* dependencies are consistent with `stack.md`
-* validation commands have been executed where available
-* no unauthorized product features were implemented
-* no unapproved infrastructure was introduced
-* no secrets were committed
-* the repository remains in a coherent runnable state
+* a verification token is generated at registration and stored securely,
+* `POST /auth/verify-email` validates the token and flips `is_verified` from `false` to `true`,
+* expired and already-used tokens are rejected,
+* shared types/constants are used where applicable,
+* tests cover the success and failure cases,
+* type-check, lint, tests, format-check, and the migration pass,
+* the endpoint is verified against a live backend,
+* no unauthorized features were implemented,
+* no unapproved infrastructure or dependencies were introduced,
+* no secrets were committed,
+* the repository remains in a coherent runnable state.
+
+---
+
+# Verification Requirements
+
+Run the repository's configured checks:
+
+```text
+npm run type-check
+npm run lint
+npm test
+npm run format:check
+npm run migration:run   (with DATABASE_URL exported from apps/backend/.env)
+```
+
+Then verify the endpoint against a live backend.
+
+Do not invent commands that are not configured in the repository.
 
 ---
 
@@ -615,7 +205,7 @@ At the end of the task, Claude Code MUST report:
 
 ## 1. What changed
 
-List the files, directories, configuration, and infrastructure that were created or modified.
+List the files and configuration that were created or modified.
 
 ## 2. What was verified
 
@@ -623,22 +213,13 @@ List the commands and checks that were successfully executed.
 
 ## 3. Problems
 
-Report any:
-
-* existing errors
-* blocked commands
-* dependency conflicts
-* configuration problems
-* Docker problems
-* TypeScript problems
-* lint problems
-* test problems
+Report any existing errors, blocked commands, or failed checks.
 
 Do not hide failures.
 
 ## 4. Scope Check
 
-Explicitly confirm whether any work outside `current-task.md` was performed.
+Explicitly confirm whether any work outside this file was performed.
 
 The expected answer is:
 
@@ -646,25 +227,12 @@ The expected answer is:
 No unauthorized scope changes.
 ```
 
-if nothing outside the task was implemented.
-
----
-
-# Next Step
-
-After this task is successfully completed and verified:
-
-1. Record the completed work in `done.md`.
-2. Review the repository state.
-3. Stop.
-4. Wait for the next approved task.
-
-Do not automatically continue into Phase 1.
-
 ---
 
 # Golden Rule
 
-> Build the foundation, verify it, report it, and stop.
+> Verify the email address, record it, report it, and stop.
 
 Do not implement future features simply because the architecture anticipates them.
+
+Do not start Task 1.3.

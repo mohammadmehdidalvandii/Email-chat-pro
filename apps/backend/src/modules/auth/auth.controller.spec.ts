@@ -8,6 +8,7 @@ describe('AuthController', () => {
 
   const authService = {
     register: jest.fn(),
+    verifyEmail: jest.fn(),
   }
 
   beforeEach(async () => {
@@ -40,6 +41,21 @@ describe('AuthController', () => {
         email: 'user@example.com',
         message: 'Registration successful',
       })
+      expect(response.timestamp).toEqual(expect.any(String))
+      expect(response.error).toBeUndefined()
+    })
+  })
+
+  describe('verifyEmail', () => {
+    it('wraps the verification result in the standardized ApiResponse envelope', async () => {
+      authService.verifyEmail.mockResolvedValue({ message: 'Email verified successfully' })
+
+      const token = 'a'.repeat(64)
+      const response = await controller.verifyEmail({ token })
+
+      expect(authService.verifyEmail).toHaveBeenCalledWith({ token })
+      expect(response.success).toBe(true)
+      expect(response.data).toEqual({ message: 'Email verified successfully' })
       expect(response.timestamp).toEqual(expect.any(String))
       expect(response.error).toBeUndefined()
     })

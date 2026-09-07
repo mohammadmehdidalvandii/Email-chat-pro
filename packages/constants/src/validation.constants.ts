@@ -1,9 +1,10 @@
 /**
  * Shared validation rules (architecture.md: packages/constants/validation.ts).
  *
- * These are the canonical rules for the registration flow (Task 1.1). They are
- * referenced by packages/utils validators and by the backend DTO validation so
- * that a single source of truth is used across the stack.
+ * These are the canonical rules for registration (Task 1.1) and email
+ * verification (Task 1.2). They are referenced by packages/utils validators and
+ * by the backend DTO validation so that a single source of truth is used across
+ * the stack.
  */
 
 /** RFC 5322 simplified email pattern defined in architecture.md. */
@@ -30,3 +31,14 @@ export const PASSWORD_SPECIAL_CHARS = '!@#$%^&*'
  * from {@link PASSWORD_SPECIAL_CHARS}.
  */
 export const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[!@#$%^&*]).{8,255}$/
+
+/** Length (hex characters) of a generated email verification token (Task 1.2). */
+export const VERIFICATION_TOKEN_LENGTH = 64
+
+/**
+ * Default lifetime (hours) of an email verification token (Task 1.2).
+ *
+ * features.md requires a defined expiration period but does not specify a value;
+ * 24 hours is the approved default and is intentionally fast to change.
+ */
+export const VERIFICATION_TOKEN_EXPIRATION_HOURS = 24

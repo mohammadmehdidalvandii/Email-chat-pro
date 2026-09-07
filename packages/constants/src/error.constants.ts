@@ -7,6 +7,8 @@
 export const ERROR_CODES = {
   /** Request validation failed (HTTP 400). */
   VALIDATION_ERROR: 'VALIDATION_ERROR',
+  /** The verification token is unknown, expired, or already used (HTTP 400). */
+  VERIFICATION_TOKEN_INVALID: 'VERIFICATION_TOKEN_INVALID',
   /** Authentication failed (HTTP 401). */
   UNAUTHORIZED: 'UNAUTHORIZED',
   /** The authenticated user cannot access the resource (HTTP 403). */
@@ -21,7 +23,7 @@ export const ERROR_CODES = {
   INTERNAL_ERROR: 'INTERNAL_ERROR',
 } as const
 
-/** Human-readable messages for registration-related errors. */
+/** Human-readable messages for registration- and verification-related errors. */
 export const ERROR_MESSAGES = {
   EMAIL_REQUIRED: 'Email is required',
   EMAIL_INVALID: 'Email must be a valid email address',
@@ -29,5 +31,7 @@ export const ERROR_MESSAGES = {
   PASSWORD_REQUIRED: 'Password is required',
   PASSWORD_WEAK:
     'Password must be 8-255 characters and include an uppercase letter, a lowercase letter, a digit, and a special character (!@#$%^&*)',
+  VERIFICATION_TOKEN_REQUIRED: 'Verification token is required',
+  VERIFICATION_TOKEN_INVALID: 'Verification token is invalid or expired',
   INTERNAL: 'An unexpected error occurred',
 } as const

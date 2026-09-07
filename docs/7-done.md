@@ -277,7 +277,9 @@ apps/backend/src/modules/auth/entities/user.entity.ts
 
 ## Task 1.2 — Email Verification
 
-**Status:** Not Started
+**Status:** Completed with Known Issues
+
+**Date:** 2026-09-07
 
 **Scope:**
 
@@ -286,16 +288,73 @@ apps/backend/src/modules/auth/entities/user.entity.ts
 * Verification validation
 * Access restrictions for unverified accounts
 
+**Implemented / Verified State:**
+
+- Verification token generation is initiated **at registration**. A CSPRNG token (`randomBytes(32)` → 64 hex chars, 256 bits) is generated for every new account per `current-task.md` (approved decision: token at registration only, no resend endpoint, no email transport in Task 1.2).
+- The plaintext token is **never stored**: only its SHA-256 hash is persisted in `users.verification_token_hash`. The token is never returned in responses or written to logs.
+- Tokens expire after **24 hours** (shared constant `VERIFICATION_TOKEN_EXPIRATION_HOURS` in `@email-chat-pro/constants`). The expiry is stored in `users.verification_token_expires_at`.
+- `POST /api/v1/auth/verify-email` accepts `{ "token" }` (per `architecture.md §API Endpoints`; shared contract `VerifyEmailInput`). On success it returns `200` with `data: { message: "Email verified successfully" }` (`VerifyEmailResponse`) and:
+  - flips `is_verified` from `false` to `true`,
+  - records `verified_at`,
+  - clears `verification_token_hash` and `verification_token_expires_at` so the token cannot be reused.
+- Rejections (all HTTP 400, standardized `ApiResponse` envelope):
+  - unknown token, expired token, or already-used token → `VERIFICATION_TOKEN_INVALID` ("Verification token is invalid or expired"); unknown and used tokens produce the same generic error so responses do not reveal whether a particular hash exists.
+  - malformed / missing token → `VALIDATION_ERROR` (`class-validator` on the DTO, token length enforced against shared `VERIFICATION_TOKEN_LENGTH`).
+- Access restrictions for unverified users: **none implemented** — no protected routes, guards, or JWT exist yet (Task 1.3), and per `current-task.md` nothing in the current context defines an enforceable restriction before authentication exists. `is_verified` is the state that Task 1.3+ will enforce.
+- Shared contracts: `VerifyEmailInput` / `VerifyEmailResponse` in `@email-chat-pro/types`; `VERIFICATION_TOKEN_LENGTH`, `VERIFICATION_TOKEN_EXPIRATION_HOURS`, `ERROR_CODES.VERIFICATION_TOKEN_INVALID`, `ERROR_MESSAGES.VERIFICATION_TOKEN_REQUIRED` / `VERIFICATION_TOKEN_INVALID` in `@email-chat-pro/constants`. No new dependency was introduced (uses `node:crypto`).
+- `register()` behavior is unchanged for callers: it still returns 201 with `{ id, email, message: "Registration successful" }` and does not claim a verification email was sent (there is no email transport).
+
 **Verification:**
 
 ```text
-Not Started
+Executed 2026-09-07.
+
+- npm run type-check:  PASS (all 5 workspaces)
+- npm run lint:        PASS (backend + frontend)
+- npm test:            PASS (3 suites / 16 tests:
+                        app.controller.spec, auth.service.spec (13),
+                        auth.controller.spec (2))
+- npm run format:check PASS
+- migration:run:       PASS (AddVerificationColumns1788883200000 applied;
+                        schema shows verification_token_hash varchar(64),
+                        verification_token_expires_at timestamp,
+                        verified_at timestamp, all nullable)
+- Endpoint (live, backend on port 4000):
+  1. register new account                        -> 201
+  2. DB: verification_token_hash present (64-hex),
+     verification_token_expires_at ~24h ahead   -> confirmed
+  3. verify-email with valid token               -> 200 "Email verified successfully"
+  4. DB after success: is_verified=true,
+     verified_at set, hash cleared, expiry
+     cleared                                    -> confirmed
+  5. reusing the same token (already used)       -> 400 VERIFICATION_TOKEN_INVALID
+  6. unknown token                               -> 400 VERIFICATION_TOKEN_INVALID
+  7. expired token                               -> 400 VERIFICATION_TOKEN_INVALID
+  8. malformed token length                      -> 400 VALIDATION_ERROR
+  9. missing token body                          -> 400 VALIDATION_ERROR
+- Note: verification_token_expires_at is `timestamp without time zone`
+  (matching the existing created_at/updated_at pattern). The 24h expiry is
+  internally consistent within the application session; a psql comparison in a
+  different timezone session will show an offset because the column has no TZ.
 ```
 
 **Files Changed:**
 
 ```text
-Not Started
+Modified:
+packages/constants/src/error.constants.ts       (VERIFICATION_TOKEN_* error code/messages)
+packages/constants/src/validation.constants.ts  (VERIFICATION_TOKEN_LENGTH, EXPIRATION_HOURS)
+packages/types/src/auth.types.ts                (VerifyEmailInput, VerifyEmailResponse)
+apps/backend/src/modules/auth/entities/user.entity.ts (3 verification columns)
+apps/backend/src/modules/auth/auth.service.ts   (token gen at register; verifyEmail + expiry/secure handling)
+apps/backend/src/modules/auth/auth.controller.ts (POST verify-email endpoint)
+apps/backend/src/modules/auth/auth.service.spec.ts  (verify success/failure/expiry/reuse tests)
+apps/backend/src/modules/auth/auth.controller.spec.ts (verify-email envelope test)
+docs/6-current-task.md                          (updated to the Task 1.2 execution boundary)
+
+Created:
+apps/backend/src/database/migrations/1788883200000-AddVerificationColumns.ts
+apps/backend/src/modules/auth/dto/verify-email.dto.ts
 ```
 
 ---
@@ -779,6 +838,34 @@ Unauthorized scope changes:
 - None
 ```
 
+```text
+Task: 1.2
+Date: 2026-09-07
+
+Environment:
+- Node.js v24.17.0
+- npm 11.13.0
+- Docker 29.5.3
+- PostgreSQL 16 (email-chat-pro-db container, port 5432)
+
+Checks:
+- npm run type-check:  PASS (types, constants, utils, backend, frontend)
+- npm run lint:        PASS (backend + frontend)
+- npm test:            PASS (3 suites / 16 tests)
+- npm run build:apps:  PARTIAL (backend PASS; frontend FAILED — see Known Issues, unchanged from Task 1.1)
+- npm run format:check PASS
+- migration:run:       PASS (AddVerificationColumns1788883200000 applied; columns verified via information_schema)
+- Endpoint live tests: PASS (201 register; token stored hashed + ~24h expiry;
+                       200 valid verify; 400 already-used; 400 unknown;
+                       400 expired; 400 malformed; 400 missing token; DB
+                       state after success verified)
+- DB persistence:      PASS (is_verified flips true on success; verified_at set;
+                       hash + expiry cleared; all confirmed at rest)
+
+Unauthorized scope changes:
+- None
+```
+
 ---
 
 # Known Issues
@@ -911,6 +998,55 @@ Next Action: Optional — load .env in the migration flow, or document the expor
        step, if approved.
 ```
 
+## Open Issues After Task 1.2
+
+```text
+Issue: There is no email transport in the approved stack (stack.md defines
+       none; overview-project.md excludes email notifications). A verification
+       token is generated and its hash stored at registration, but with no
+       email channel the plaintext token cannot be delivered to the user, so
+       the verification flow is not usable end-to-end by a real user yet.
+       Task 1.1's register response intentionally does not claim an email was
+       sent; the approved Task 1.2 decision was token generation at
+       registration only, with no email sending in this task.
+Impact: Authentication blocking on is_verified cannot be exercised by real
+       users until a delivery channel exists. Backend behavior, shared
+       contracts, and the verify-email endpoint are complete and verified.
+Discovered During: Task 1.2 live verification (no way to obtain the token
+       except directly from the database or a seeded hash).
+Current Status: Known limitation, per the approved Task 1.2 scope.
+Next Action: Decide the email-delivery mechanism (library + provider) as a
+       separate authorized change before the account lifecycle is exposed to
+       real users.
+```
+
+```text
+Issue: "Users can request another verification email" is an acceptance
+       criterion of the Email Verification feature in features.md, but no
+       resend/regenerate endpoint was authorized or implemented in Task 1.2.
+Impact: A user who loses or expires their token has no self-service path
+       (short of re-registering). Not blocking for Task 1.2.
+Discovered During: Task 1.2 scope review.
+Current Status: Deferred by the approved Task 1.2 decision (verify-email
+       endpoint only; no resend).
+Next Action: Implement a resend-verification endpoint in a later authorized
+       task if approved.
+```
+
+```text
+Issue: In the verify-email request-validation error path, the global
+       HttpExceptionFilter joins multiple class-validator messages with ", "
+       (e.g. a missing token returns "Verification token is invalid or
+       expired, Verification token is required").
+Impact: Cosmetic only. Status/code are correct (400 VALIDATION_ERROR); the
+       combined message is slightly awkward. Pre-existing filter behavior,
+       surfaced here for the first time by a DTO with two decorators.
+Discovered During: Task 1.2 live verification (missing-token case).
+Current Status: Not changed — the filter is outside the Task 1.2 scope.
+Next Action: If approved, refine the filter to return the first (or primary)
+       validation message.
+```
+
 Do not silently remove or rewrite an issue simply because it is inconvenient.
 
 ---
@@ -980,6 +1116,23 @@ Change: Task 0.1 status moved from Pending to "Completed with Known Issues",
        with actual verification results, changed-file list, verification
        record, and open issues.
 Reason: Required by the Task 0.1 completion workflow.
+Approved By: Mohammad Mehdi.
+```
+
+```text
+Context Change: Execution boundary advanced to Task 1.2.
+File: docs/6-current-task.md
+Change: Replaced the stale Phase 0 task definition with the Task 1.2 (Email
+       Verification) execution boundary — authorized scope, explicitly
+       not-authorized items, and verification requirements. It encodes the
+       approved decisions: token generation at registration only, verify-email
+       endpoint only (no resend endpoint, no email transport), 24-hour token
+       expiration, and no access-restriction guard until JWT/protected routes
+       exist (Task 1.3).
+Reason: Task 1.1 completed and verified (recorded above); the normal lifecycle
+       requires current-task.md to describe the next approved task. The user
+       approved this update (AskUserQuestion, 2026-09-07) before Task 1.2 was
+       implemented.
 Approved By: Mohammad Mehdi.
 ```
 
