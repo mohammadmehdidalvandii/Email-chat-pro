@@ -23,7 +23,7 @@ export const ERROR_CODES = {
   INTERNAL_ERROR: 'INTERNAL_ERROR',
 } as const
 
-/** Human-readable messages for registration- and verification-related errors. */
+/** Human-readable messages for registration-, verification-, and profile-related errors. */
 export const ERROR_MESSAGES = {
   EMAIL_REQUIRED: 'Email is required',
   EMAIL_INVALID: 'Email must be a valid email address',
@@ -37,4 +37,14 @@ export const ERROR_MESSAGES = {
   EMAIL_NOT_VERIFIED: 'Email is not verified. Please verify your email before logging in.',
   LOGGED_OUT: 'Logged out',
   INTERNAL: 'An unexpected error occurred',
+  // Task 1.4 — Profile
+  USERNAME_REQUIRED: 'Username is required',
+  USERNAME_TAKEN: 'Username is already taken',
+  USERNAME_INVALID:
+    'Username must be 3-30 characters and contain only letters, numbers, underscores, and hyphens',
+  USERNAME_TOO_SHORT: 'Username must be at least 3 characters',
+  USERNAME_TOO_LONG: 'Username must be no more than 30 characters',
+  FULL_NAME_TOO_LONG: 'Full name must be no more than 100 characters',
+  BIO_TOO_LONG: 'Bio must be no more than 500 characters',
+  AVATAR_URL_TOO_LONG: 'Avatar URL must be no more than 500 characters',
 } as const

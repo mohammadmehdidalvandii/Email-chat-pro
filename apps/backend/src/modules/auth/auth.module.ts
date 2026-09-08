@@ -27,5 +27,8 @@ import { JwtStrategy } from './strategies/jwt.strategy'
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, JwtAuthGuard],
+  // JwtAuthGuard (and the strategy it relies on) is exported so other modules
+  // (e.g. users) can protect their endpoints with the same guard (Task 1.4).
+  exports: [JwtAuthGuard, JwtStrategy, AuthService],
 })
 export class AuthModule {}

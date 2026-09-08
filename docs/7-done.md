@@ -453,7 +453,9 @@ packages/types/src/user.types.ts                       (User type for shared con
 
 ## Task 1.4 — User Profile
 
-**Status:** Not Started
+**Status:** Completed with Known Issues
+
+**Date:** 2026-09-08
 
 **Scope:**
 
@@ -465,16 +467,73 @@ packages/types/src/user.types.ts                       (User type for shared con
 * Bio
 * Profile state
 
+**Implemented / Verified State:**
+
+- **Database migration** (`AddProfileColumns1788969600000`): adds `username` (varchar 30), `full_name` (varchar 100), `bio` (text), `avatar_url` (varchar 500), `profile_completed` (boolean, default false), and `last_seen_at` (timestamp, default now()) to the `users` table. Includes `CHECK` constraints for username length (3–30) and format (`^[a-zA-Z0-9_-]+$`), and a functional unique index `uq_users_username ON LOWER(username)` for case-insensitive uniqueness.
+- **User entity** (`user.entity.ts`): updated with all profile columns matching the migration. All new columns are nullable (except `profile_completed` which defaults to false and `last_seen_at` which defaults to now).
+- **Shared types** (`packages/types/user.types.ts`): `User` interface extended with `username?`, `fullName?`, `bio?`, `avatarUrl?`, `profileCompleted`, `lastSeenAt?`. New `UpdateProfileInput` request type and `ProfileResponse` type alias added.
+- **Shared constants** (`packages/constants/validation.constants.ts`): `USERNAME_REGEX`, `USERNAME_MIN_LENGTH` (3), `USERNAME_MAX_LENGTH` (30), `FULL_NAME_MAX_LENGTH` (100), `BIO_MAX_LENGTH` (500), `AVATAR_URL_MAX_LENGTH` (500) added.
+- **Shared error messages** (`packages/constants/error.constants.ts`): `USERNAME_REQUIRED`, `USERNAME_TAKEN`, `USERNAME_INVALID`, `USERNAME_TOO_SHORT`, `USERNAME_TOO_LONG`, `FULL_NAME_TOO_LONG`, `BIO_TOO_LONG`, `AVATAR_URL_TOO_LONG` added.
+- **AuthService.toUserDto()**: extended to map all profile fields. Null entity values become `undefined` in the shared contract; `profileCompleted` is always present; `lastSeenAt` is ISO-stringified.
+- **AuthModule**: exports `JwtAuthGuard`, `JwtStrategy`, and `AuthService` so the UsersModule can reuse them without circular dependencies.
+- **UsersModule** (new): imports `TypeOrmModule.forFeature([User])` and `AuthModule`; owns `UsersController` and `UsersService`.
+- **UsersService** (`users.service.ts`): `updateProfile(user, dto)` applies partial updates, enforces case-insensitive username uniqueness via `Raw` SQL (`LOWER()`), normalizes empty/whitespace-only optional fields to `null`, and sets `profileCompleted = Boolean(username && fullName)`. Handles DB unique-violation race condition (`23505`).
+- **UsersController** (`users.controller.ts`):
+  - `GET /users/me` → returns `ApiResponse<ProfileResponse>` with the authenticated user's profile (`JwtAuthGuard` protected).
+  - `PATCH /users/me` → calls `UsersService.updateProfile()`, returns updated user via `AuthService.toUserDto()`.
+- **UpdateProfileDto** (`dto/update-profile.dto.ts`): all-optional fields validated by `class-validator` using shared constants. Username enforces `@Matches(USERNAME_REGEX)`, `@MinLength(3)`, `@MaxLength(30)`.
+- **AppModule**: `UsersModule` added to imports.
+- **Tests**: 35/35 passing — `users.service.spec.ts` (7 tests: set fields, profileCompleted logic, own-username re-submit, case-insensitive conflict, 23505 race, normalize empty strings, rethrow non-unique), `users.controller.spec.ts` (2 tests: getMe envelope, updateMe delegation), `auth.service.spec.ts` login fixture updated with profile fields.
+
 **Verification:**
 
 ```text
-Not Started
+Executed 2026-09-08.
+
+- npm run type-check:  PASS (all 5 workspaces)
+- npm run lint:        PASS (backend + frontend)
+- npm test:            PASS (5 suites / 35 tests)
+- npm run format:check PASS
+- migration:run:       PASS (AddProfileColumns1788969600000 applied;
+                          username CHECK constraints, LOWER() unique index,
+                          profile_completed, last_seen_at confirmed)
+- Live endpoint tests: PASS
+  - GET /users/me (valid JWT)            -> 200, profile with all fields
+  - GET /users/me (no token)             -> 401
+  - PATCH /users/me {username,fullName}  -> 200, profileCompleted=true
+  - PATCH /users/me {bio}               -> 200, bio updated
+  - PATCH /users/me {username} taken     -> 409 USERNAME_TAKEN
+  - PATCH /users/me {username} invalid   -> 400 VALIDATION_ERROR
+  - PATCH /users/me (own username)       -> 200 (no conflict)
+  - Case-insensitive username conflict   -> 409 USERNAME_TAKEN
+  - DB constraints:                      confirmed
+    - username length CHECK enforced
+    - username format CHECK enforced
+    - LOWER() unique index enforced
+    - profile_completed updates correctly
 ```
 
 **Files Changed:**
 
 ```text
-Not Started
+Modified:
+apps/backend/src/app.module.ts                            (+ UsersModule import)
+apps/backend/src/modules/auth/auth.module.ts              (+ exports for cross-module reuse)
+apps/backend/src/modules/auth/auth.service.spec.ts        (+ profile fields in login fixture/assertions)
+apps/backend/src/modules/auth/auth.service.ts             (+ profile fields in toUserDto)
+apps/backend/src/modules/auth/entities/user.entity.ts     (+ 6 profile columns)
+packages/constants/src/error.constants.ts                 (+ 8 profile error messages)
+packages/constants/src/validation.constants.ts            (+ 6 profile validation constants)
+packages/types/src/user.types.ts                          (+ profile fields, UpdateProfileInput, ProfileResponse)
+
+Created:
+apps/backend/src/database/migrations/1788969600000-AddProfileColumns.ts
+apps/backend/src/modules/users/dto/update-profile.dto.ts
+apps/backend/src/modules/users/users.controller.spec.ts
+apps/backend/src/modules/users/users.controller.ts
+apps/backend/src/modules/users/users.module.ts
+apps/backend/src/modules/users/users.service.spec.ts
+apps/backend/src/modules/users/users.service.ts
 ```
 
 ---
@@ -959,6 +1018,33 @@ Unauthorized scope changes:
 - None
 ```
 
+```text
+Task: 1.4
+Date: 2026-09-08
+
+Environment:
+- Node.js v24.17.0
+- npm 11.13.0
+- Docker 29.5.3
+- PostgreSQL 16 (email-chat-pro-db container, port 5432)
+
+Checks:
+- npm run type-check:  PASS (types, constants, utils, backend, frontend)
+- npm run lint:        PASS (backend + frontend)
+- npm test:            PASS (5 suites / 35 tests)
+- npm run format:check PASS
+- migration:run:       PASS (AddProfileColumns1788969600000 applied;
+                       username CHECK constraints, LOWER() unique index,
+                       profile_completed, last_seen_at confirmed)
+- Live endpoint tests: PASS (GET /users/me 200; GET /users/me no-token 401;
+                       PATCH /users/me 200; PATCH username taken 409;
+                       PATCH username invalid 400; own username re-submit 200;
+                       case-insensitive conflict 409; DB constraints confirmed)
+
+Unauthorized scope changes:
+- None
+```
+
 ---
 
 # Known Issues
@@ -1260,6 +1346,18 @@ Change: Task 0.1 status moved from Pending to "Completed with Known Issues",
        with actual verification results, changed-file list, verification
        record, and open issues.
 Reason: Required by the Task 0.1 completion workflow.
+Approved By: Mohammad Mehdi.
+```
+
+```text
+Context Change: Execution boundary advanced to Task 1.5.
+File: docs/6-current-task.md
+Change: Replaced the Task 1.3 (Login and Logout) execution boundary with the
+       Task 1.5 (Account Deletion) execution boundary — authorized scope,
+       explicitly not-authorized items, and verification requirements. Task 1.4
+       (User Profile) is recorded as completed in done.md.
+Reason: Task 1.4 completed and verified (recorded in done.md); the normal
+       lifecycle requires current-task.md to describe the next approved task.
 Approved By: Mohammad Mehdi.
 ```
 

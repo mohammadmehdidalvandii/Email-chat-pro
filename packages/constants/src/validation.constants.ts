@@ -1,10 +1,10 @@
 /**
  * Shared validation rules (architecture.md: packages/constants/validation.ts).
  *
- * These are the canonical rules for registration (Task 1.1) and email
- * verification (Task 1.2). They are referenced by packages/utils validators and
- * by the backend DTO validation so that a single source of truth is used across
- * the stack.
+ * These are the canonical rules for registration (Task 1.1), email verification
+ * (Task 1.2), and profile setup (Task 1.4). They are referenced by
+ * packages/utils validators and by the backend DTO validation so that a single
+ * source of truth is used across the stack.
  */
 
 /** RFC 5322 simplified email pattern defined in architecture.md. */
@@ -42,3 +42,25 @@ export const VERIFICATION_TOKEN_LENGTH = 64
  * 24 hours is the approved default and is intentionally fast to change.
  */
 export const VERIFICATION_TOKEN_EXPIRATION_HOURS = 24
+
+// ---------------------------------------------------------------------------
+// Task 1.4 — Profile validation (architecture.md §Data Model — users table)
+// ---------------------------------------------------------------------------
+
+/** Username pattern: letters, digits, underscores, and hyphens only (architecture.md). */
+export const USERNAME_REGEX = /^[a-zA-Z0-9_-]+$/
+
+/** Minimum username length (architecture.md — CHECK constraint). */
+export const USERNAME_MIN_LENGTH = 3
+
+/** Maximum username length (architecture.md — CHECK constraint). */
+export const USERNAME_MAX_LENGTH = 30
+
+/** Maximum full_name length (architecture.md — VARCHAR(100)). */
+export const FULL_NAME_MAX_LENGTH = 100
+
+/** Maximum bio length. */
+export const BIO_MAX_LENGTH = 500
+
+/** Maximum avatar_url length (architecture.md — VARCHAR(500)). */
+export const AVATAR_URL_MAX_LENGTH = 500

@@ -201,13 +201,22 @@ export class AuthService {
     return { message: ERROR_MESSAGES.LOGGED_OUT }
   }
 
-  /** Maps the authenticated entity to the shared user contract. */
+  /**
+   * Maps the authenticated entity to the shared user contract (Task 1.4).
+   * Optional profile fields are included when set (null → omitted).
+   */
   toUserDto(user: User): SharedUser {
     return {
       id: user.id,
       email: user.email,
       isVerified: user.isVerified,
       isActive: user.isActive,
+      username: user.username ?? undefined,
+      fullName: user.fullName ?? undefined,
+      bio: user.bio ?? undefined,
+      avatarUrl: user.avatarUrl ?? undefined,
+      profileCompleted: user.profileCompleted,
+      lastSeenAt: user.lastSeenAt?.toISOString(),
       createdAt: user.createdAt.toISOString(),
     }
   }

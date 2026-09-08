@@ -11,9 +11,10 @@ import {
  * Users table (architecture.md §Data Model — Users).
  *
  * Task 1.1 registration creates accounts with email + password; Task 1.2 email
- * verification adds the verification columns. Profile columns (username,
- * full_name, bio, avatar_url, profile_completed, last_seen_at) are deferred to
- * the Profile Setup task (Task 1.4) per the approved project decision.
+ * verification adds the verification columns; Task 1.4 adds the profile
+ * columns (username, full_name, bio, avatar_url, profile_completed,
+ * last_seen_at). Username uniqueness is case-insensitive (functional unique
+ * index on LOWER(username) created by the Task 1.4 migration).
  */
 @Entity('users')
 export class User {
@@ -40,6 +41,34 @@ export class User {
   /** When the email address was successfully verified. */
   @Column({ type: 'timestamp', name: 'verified_at', nullable: true })
   verifiedAt!: Date | null
+
+  /** Unique case-insensitive handle (validation + index enforced by the Task 1.4 migration). */
+  @Column({ type: 'varchar', length: 30, name: 'username', nullable: true })
+  username!: string | null
+
+  /** User-provided display name. */
+  @Column({ type: 'varchar', length: 100, name: 'full_name', nullable: true })
+  fullName!: string | null
+
+  /** Short free-text biography. */
+  @Column({ type: 'text', name: 'bio', nullable: true })
+  bio!: string | null
+
+  /** URL of the user's avatar. */
+  @Column({ type: 'varchar', length: 500, name: 'avatar_url', nullable: true })
+  avatarUrl!: string | null
+
+  /** Whether the user has completed their profile setup. */
+  @Column({ type: 'boolean', name: 'profile_completed', default: false })
+  profileCompleted!: boolean
+
+  /** When the user was last seen online. */
+  @Column({
+    type: 'timestamp',
+    name: 'last_seen_at',
+    default: () => 'CURRENT_TIMESTAMP',
+  })
+  lastSeenAt!: Date
 
   @Column({ type: 'boolean', name: 'is_active', default: true })
   isActive!: boolean

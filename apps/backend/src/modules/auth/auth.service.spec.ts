@@ -270,6 +270,8 @@ describe('AuthService', () => {
       isVerified: true,
       isActive: true,
       deletedAt: null,
+      profileCompleted: false,
+      lastSeenAt: new Date('2026-01-01T00:00:00Z'),
       createdAt: new Date('2026-01-01T00:00:00Z'),
     }
 
@@ -301,6 +303,12 @@ describe('AuthService', () => {
           email: 'user@example.com',
           isVerified: true,
           isActive: true,
+          username: undefined,
+          fullName: undefined,
+          bio: undefined,
+          avatarUrl: undefined,
+          profileCompleted: false,
+          lastSeenAt: '2026-01-01T00:00:00.000Z',
           createdAt: '2026-01-01T00:00:00.000Z',
         },
       })

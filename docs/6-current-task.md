@@ -16,19 +16,17 @@ When the task is completed and verified, the completed work MUST be recorded in 
 
 ## Phase 1 — Authentication and User Profile
 
-The current task is **Task 1.3 — Login and Logout**.
+The current task is **Task 1.5 — Account Deletion**.
 
-Tasks 1.1 (Registration) and 1.2 (Email Verification) are completed and verified (`docs/7-done.md`).
+Tasks 1.1 (Registration), 1.2 (Email Verification), 1.3 (Login and Logout), and 1.4 (User Profile) are completed and verified (`docs/7-done.md`).
 
 ---
 
 # Current Objective
 
-Implement login and logout so a verified user can authenticate with their credentials, receive a JWT, and end their session.
+Implement account deletion so authenticated users can permanently delete their account. Deletion must anonymize user identity while preserving historical message data for the benefit of other participants.
 
-Login is the first point where the project's **verified-account invariant** is enforced: an unverified user MUST NOT be able to authenticate successfully (`features.md` — User Login, acceptance criterion: "Unverified users cannot authenticate successfully").
-
-Protected routes, JWT guards, and the "me" endpoints are the foundation for profile (Task 1.4) and messaging phases.
+Account deletion is a critical security action: the deleted account must not be able to authenticate again, existing sessions must become invalid, and the user's profile data must be cleared — but messages must remain intact with a "Deleted User" attribution.
 
 ---
 
@@ -36,90 +34,81 @@ Protected routes, JWT guards, and the "me" endpoints are the foundation for prof
 
 Claude Code is authorized to work only on the following areas.
 
-## 1. Login
+## 1. Account Deletion Endpoint
 
-* Implement `POST /auth/login` per `architecture.md` §API Endpoints:
+* Implement `DELETE /users/me` per `architecture.md` §API Endpoints:
 
   ```text
-  POST /auth/login
-    Request: { "email": "user@example.com", "password": "SecurePass123!" }
+  DELETE /users/me
+    Authentication: Required (JWT)
+    Request:
+      {
+        "password": "current_password"
+      }
     Response: 200
       {
         "success": true,
-        "data": {
-          "user": { ... User object ... },
-          "token": "jwt_token"
-        }
-      }
-    Sets: httpOnly cookie with JWT token
-  ```
-
-* Validate credentials securely with bcryptjs against the stored `password_hash`.
-* An **unverified account MUST NOT authenticate successfully** (`features.md` — User Login). The endpoint MUST return a `401` authentication error for unverified users.
-* Invalid credentials MUST return a generic `401 UNAUTHORIZED` without revealing which part (email or password) was wrong.
-* The login response MUST use the standardized `ApiResponse<T>` envelope and shared error architecture.
-
-## 2. JWT-Based Authentication
-
-* Use **Passport-JWT** (approved decision, 2026-09-07). This adds `@nestjs/passport`, `passport`, and `passport-jwt` to the backend.
-* Implement the backend layout per `architecture.md`:
-
-  ```text
-  strategies/jwt.strategy.ts
-  guards/jwt.guard.ts
-  ```
-
-* The JWT secret and expiration MUST come from environment configuration (never hard-coded, never committed).
-* JWT expiration is a shared constant in `packages/constants` where appropriate.
-* No refresh-token flow. `POST /auth/refresh-token` is **deferred** (approved decision, 2026-09-07) and MUST NOT be implemented in this task.
-
-## 3. Authentication State
-
-* The JWT guard protects a minimal authenticated endpoint that proves the authentication state works (e.g. the login response returns `{ user, token }` per the architecture contract).
-* `@nestjs/jwt` (or equivalent approved JWT dependency) provides signing/verification. The guard validates the `Authorization: Bearer <token>` header.
-* Do NOT implement user profile endpoints, `/users/me`, or profile data. Those belong to Task 1.4.
-
-## 4. Logout
-
-* Implement `POST /auth/logout` per `architecture.md` §API Endpoints:
-
-  ```text
-  POST /auth/logout
-    Response: 200
-      {
-        "success": true,
-        "data": { "message": "Logged out" }
+        "data": { "message": "Account deleted" }
       }
   ```
 
-* Logout clears the authentication session (clears the httpOnly JWT cookie / invalidates the token on the client).
-* Logout does NOT delete user data or conversations.
+* The endpoint MUST require a valid JWT (`JwtAuthGuard`).
+* The endpoint MUST require the user's current password for confirmation (`features.md` — "Deletion requires explicit confirmation").
+* The password MUST be verified against the stored `password_hash` before deletion proceeds.
+* Invalid password MUST return a `401 UNAUTHORIZED` error.
 
-## 5. Access Restrictions for Unverified Accounts
+## 2. Deletion Behavior (Anonymization)
 
-* Enforce that unverified users cannot authenticate (see Login).
-* JWT-registered protected routes enforce verified-account access where the current task defines a protected endpoint. No broader profile/route guard scope is added here.
+Per `architecture.md` §Account Deletion (Anonymization), when a user deletes their account:
+
+1. Set `deleted_at = NOW()`.
+2. Set `is_active = FALSE`.
+3. Rename `username` to `deleted#{original_id}` (e.g., `deleted#550e8400-e29b-41d4-a716-446655440000`).
+4. Clear `full_name`, `bio`, `avatar_url` (set to NULL).
+5. Clear `password_hash` (prevents login).
+6. Do NOT delete the `users` row — it must remain for foreign-key integrity with messages.
+7. Do NOT delete any messages — historical messages are preserved.
+
+This is an **anonymization**, not a hard delete. The row stays for referential integrity; the user identity is removed; messages remain with their original `sender_id`.
+
+## 3. Session Invalidation
+
+* After deletion, the user's existing JWT tokens must not be accepted by protected endpoints.
+* The `GET /auth/session` endpoint (and all `JwtAuthGuard`-protected endpoints) MUST reject deleted users (`deletedAt !== null` OR `isActive === false`) with a `401 UNAUTHORIZED` response.
+* The login endpoint (`POST /auth/login`) already rejects deleted/inactive accounts (Task 1.3). Verify this still works after deletion.
+
+## 4. Deleted User Display
+
+* In the shared `User` type and API responses, a deleted user should be distinguishable from an active user. The `isActive: false` and `deletedAt` fields communicate this state.
+* The `toUserDto()` mapper must handle deleted users correctly (the existing mapper already maps `isActive` and does not include `deletedAt` in the shared contract — this behavior is correct and should be preserved).
+
+## 5. Username Uniqueness After Deletion
+
+* The `deleted#{uuid}` format ensures the old username is freed while the anonymized handle cannot collide with any valid username (which must match `^[a-zA-Z0-9_-]+$` and cannot contain `#`).
+* The `LOWER()` unique index handles the `deleted#` prefix case-insensitively, which is fine since no valid username starts with `deleted#`.
 
 ## 6. Shared Packages
 
-* Add shared login/logout request and response types to `packages/types` (single source of truth for the frontend/backend contract defined by the architecture).
-* Add shared auth constants (e.g. JWT expiration, login error messages/codes) to `packages/constants` where they genuinely need to be shared.
+* Add shared account deletion types to `packages/types` where applicable.
+* Add shared account deletion error messages to `packages/constants` where applicable.
 * Do not move backend logic into `packages/utils`.
 
-## 7. Environment Configuration
-
-* The JWT secret and expiration are read from environment variables at runtime.
-* `.env.example` receives only placeholders. Real secrets remain in the untracked `apps/backend/.env`.
-* Document any new environment variables in the appropriate context file as a factual record.
-
-## 8. Tests
+## 7. Tests
 
 * Add tests for:
-  * login success (valid credentials, verified user → 200, user + token returned),
-  * login with invalid credentials → 401,
-  * login by an unverified user → 401,
-  * logout success (→ 200, session cleared).
-* Preserve all existing Task 1.1 and Task 1.2 tests.
+  * successful account deletion (valid password → 200, DB state confirmed),
+  * deletion with wrong password → 401,
+  * deletion without authentication → 401,
+  * post-deletion login attempt → 401,
+  * post-deletion session check → 401,
+  * DB state after deletion: `deleted_at` set, `is_active` false, `password_hash` cleared, `username` anonymized, profile fields cleared, messages preserved.
+* Preserve all existing Task 1.1–1.4 tests.
+
+## 8. UserController Route Registration
+
+* The `DELETE /users/me` route is added to `UsersController` (the existing users controller already handles `GET /users/me` and `PATCH /users/me` from Task 1.4).
+* The route is protected by `@UseGuards(JwtAuthGuard)`.
+* The endpoint requires the `DeleteAccountDto` body with password confirmation.
 
 ---
 
@@ -127,25 +116,25 @@ Claude Code is authorized to work only on the following areas.
 
 The following work MUST NOT be implemented during this task.
 
-## Refresh Tokens
+## Email Change
 
-* Do NOT implement `POST /auth/refresh-token`. Deferred (approved decision, 2026-09-07).
+* Do NOT implement email change (`POST /users/me/change-email`). This belongs to a separate authorized task.
 
-## User Profile
+## Password Reset
 
-* Do NOT implement username, full name, bio, profile completion, `/users/me`, or profile endpoints. These belong to Task 1.4.
+* Do NOT implement password reset. Out of scope for Phase 1.
+
+## Hard Delete
+
+* Do NOT permanently delete the `users` row. The deletion is an anonymization/soft-delete per `architecture.md`. Messages reference `sender_id` via foreign key.
+
+## Message Deletion
+
+* Do NOT delete or modify any messages during account deletion. Historical messages are preserved.
 
 ## Frontend
 
-* Do NOT implement frontend login/logout UI, auth stores, protected pages, or frontend redirects. The frontend has no auth infrastructure installed; this task is **backend-only** (approved decision, 2026-09-07).
-
-## Email Transport / Resend Verification
-
-* Do NOT implement email sending or a resend-verification endpoint.
-
-## Accounts
-
-* Do NOT implement email change, account deletion, or password reset.
+* Do NOT implement frontend account deletion UI. This task is **backend-only** (consistent with Task 1.3 and Task 1.4).
 
 ## Phase 2/3/4 Features
 
@@ -154,7 +143,7 @@ The following work MUST NOT be implemented during this task.
 ## Infrastructure and Dependencies
 
 * Do NOT introduce Redis, Kafka, RabbitMQ, NATS, Kubernetes, or any unapproved infrastructure.
-* Do NOT add dependencies beyond the approved Passport-JWT set (`@nestjs/passport`, `passport`, `passport-jwt` and their required type packages).
+* Do NOT add new dependencies. Account deletion uses only existing dependencies.
 
 ---
 
@@ -165,29 +154,25 @@ The following work MUST NOT be implemented during this task.
 The implementation MUST remain consistent with:
 
 ```text
-1-overview-project.md    — verified account required for authenticated access
-2-features.md            — User Login / User Logout acceptance criteria
-3-architecture.md        — data model, POST /auth/login + /auth/logout, JWT strategy/guard layout,
-                           httpOnly cookie, error handling, shared types
-4-stack.md               — JWT + bcryptjs approved; new deps only via approved decisions
+1-overview-project.md    — soft-delete preserves message history
+2-features.md            — Account Deletion acceptance criteria
+3-architecture.md        — Account Deletion (Anonymization) procedure, User data model,
+                           DELETE /users/me endpoint
+4-stack.md               — no new dependencies for account deletion
 5-rules.md               — coding, TypeScript, error handling, security, testing, Git rules
-7-done.md                — Task 1.1 and Task 1.2 records and Task 1.3 scope
+7-done.md                — Task 1.1 through Task 1.4 records
 ```
 
-## Task 1.1 / 1.2 Base
-
-Reuse the existing registration/auth implementation:
+## Existing Code to Reuse
 
 ```text
-apps/backend/src/modules/auth/auth.controller.ts
-apps/backend/src/modules/auth/auth.service.ts
-apps/backend/src/modules/auth/auth.module.ts
-apps/backend/src/modules/auth/dto/register.dto.ts
-apps/backend/src/modules/auth/dto/verify-email.dto.ts
-apps/backend/src/modules/auth/entities/user.entity.ts
-packages/types/src/auth.types.ts
-packages/constants/src/validation.constants.ts
-packages/constants/src/error.constants.ts
+apps/backend/src/modules/auth/auth.service.ts         — toUserDto(), login (already rejects deleted users)
+apps/backend/src/modules/auth/entities/user.entity.ts  — User entity with deletedAt, isActive columns
+apps/backend/src/modules/auth/guards/jwt.guard.ts     — JwtAuthGuard for route protection
+apps/backend/src/modules/users/users.controller.ts    — GET/PATCH /users/me already exist
+apps/backend/src/modules/users/users.service.ts       — updateProfile() pattern to follow
+packages/types/src/user.types.ts                      — User, ProfileResponse types
+packages/constants/src/error.constants.ts             — ERROR_CODES, ERROR_MESSAGES
 ```
 
 ---
@@ -208,16 +193,18 @@ Do not silently choose an approach.
 
 The task is complete only when:
 
-* `POST /auth/login` validates credentials and returns `{ user, token }` + sets an httpOnly cookie,
-* unverified users and invalid credentials are rejected with `401 UNAUTHORIZED`,
-* `POST /auth/logout` successfully clears the session,
-* a Passport-JWT strategy + guard protect at least the auth-state endpoint,
+* `DELETE /users/me` accepts a password confirmation and performs anonymization,
+* wrong password returns `401 UNAUTHORIZED`,
+* no authentication returns `401`,
+* after deletion: login fails, session fails, username is anonymized (`deleted#uuid`),
+* profile fields are cleared, `password_hash` is cleared, `deleted_at` is set, `is_active` is false,
+* historical messages are preserved (no messages deleted or modified),
 * shared types/constants are used where applicable,
-* tests cover the login success and failure cases (invalid credentials, unverified user), and logout,
+* tests cover deletion success, wrong password, no auth, post-deletion login, post-deletion session, DB state,
 * type-check, lint, tests, format-check pass,
 * the endpoint is verified against a live backend,
 * no unauthorized features were implemented,
-* no unapproved infrastructure or dependencies were introduced (beyond the approved Passport-JWT set),
+* no unapproved infrastructure or dependencies were introduced,
 * no secrets were committed,
 * the repository remains in a coherent runnable state.
 
@@ -273,8 +260,8 @@ No unauthorized scope changes.
 
 # Golden Rule
 
-> Implement login and logout, verify them, record them, report them, and stop.
+> Implement account deletion, verify it, record it, report it, and stop.
 
 Do not implement future features simply because the architecture anticipates them.
 
-Do not start Task 1.4.
+Do not start the next task.
