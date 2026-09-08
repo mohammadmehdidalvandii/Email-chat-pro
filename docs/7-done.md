@@ -540,7 +540,9 @@ apps/backend/src/modules/users/users.service.ts
 
 ## Task 1.5 — Account Deletion
 
-**Status:** Not Started
+**Status:** Completed with note
+
+**Date:** 2026-09-08
 
 **Scope:**
 
@@ -549,17 +551,69 @@ apps/backend/src/modules/users/users.service.ts
 * Preservation of message history
 * Referential integrity
 
+**Implemented / Verified State:**
+
+- **DELETE /users/me endpoint** (`users.controller.ts`): `JwtAuthGuard`-protected route accepting `{ password }` for explicit confirmation (features.md — "Deletion requires explicit confirmation"). Wrong password → `401 UNAUTHORIZED` (`PASSWORD_INCORRECT`); success → `200` with `{ message: "Account deleted" }`.
+- **DeleteAccountDto** (`dto/delete-account.dto.ts`): `@IsString() @IsNotEmpty()` password validation via global `ValidationPipe`.
+- **UsersService.deleteAccount(user, dto)** (`users.service.ts`): verifies the password with `bcrypt.compare`, then anonymizes per architecture.md §Account Deletion — sets `deleted_at = NOW()`, `is_active = false`, renames `username` to `deleted#{uuid}`, clears `full_name`/`bio`/`avatar_url` (to NULL) and `password_hash` (to `''`). The row is **not** removed; messages remain with their original `sender_id` (foreign-key integrity preserved).
+- **Session invalidation**: because `is_active` is set to `false`, the existing `JwtStrategy.validate()` rejects the account on every subsequent request (401) — no token change needed. Login already rejects soft-deleted/inactive accounts (Task 1.3), so a deleted account cannot re-authenticate.
+- **Username uniqueness after deletion**: `deleted#{uuid}` is 44 chars and contains `#`, so it is outside the valid username alphabet (`^[a-zA-Z0-9_-]+$`, max 30) and can never collide with a real handle; the `LOWER(username)` unique index keeps it case-insensitive. The previous handle is freed and claimable.
+- **Shared types** (`packages/types/user.types.ts`): `DeleteAccountInput` (request body) and `DeleteAccountResponse` (`{ message }` payload) added.
+- **Shared constants** (`packages/constants/error.constants.ts`): `PASSWORD_INCORRECT` and `ACCOUNT_DELETED` added.
+- **Database migration** (`AllowAnonymizedUsername1788970200000`): the Task 1.5 spec requires storing `deleted#{uuid}` (44 chars, contains `#`), which the Task 1.4 `username` column (`varchar(30)`, CHECK 3–30 length, format `^[a-zA-Z0-9_-]+$`) could not accept — the correct-password DELETE originally failed with a DB constraint error (500). Per the product decision boundary (STOP → REPORT → ASK), this was surfaced and the maintainer approved widening + relaxing the constraints. The migration widens `username` to `varchar(64)` and replaces both CHECK constraints so the column accepts a normal username (3–30, `^[a-zA-Z0-9_-]+$`) **or** the reserved anonymized form `^deleted#[0-9a-f-]{36}$`. Input validation is unchanged: only `deleteAccount()` writes the anonymized handle; `UpdateProfileDto` still enforces the username regex/length.
+- **User entity** (`user.entity.ts`): `username` column length updated `30` → `64` to match the migration.
+- **Tests**: 38/38 passing — `users.service.spec.ts` (2 new: wrong password → 401 with no save, valid password → anonymized DB state + one save), `users.controller.spec.ts` (1 new: deleteMe delegation + envelope). Post-deletion login/session rejection is already covered by `auth.service.spec.ts` (soft-deleted/inactive) and the live endpoint tests; no-auth → 401 is a guard behavior verified live (no e2e harness exists in this repo).
+
 **Verification:**
 
 ```text
-Not Started
+Executed 2026-09-08.
+
+- npm run type-check:  PASS (all 5 workspaces)
+- npm run lint:        PASS (backend + frontend)
+- npm test:            PASS (5 suites / 38 tests)
+- npm run format:check PASS
+- migration:run:       PASS (AddProfileColumns1788969600000 and
+                          AllowAnonymizedUsername1788970200000 applied)
+- Live endpoint tests: PASS
+  - DELETE /users/me (wrong password)        -> 401 PASSWORD_INCORRECT
+  - DELETE /users/me (correct password)      -> 200 { message: "Account deleted" }
+  - DELETE /users/me (no auth)               -> 401
+  - DELETE /users/me (empty body)            -> 400 VALIDATION_ERROR
+  - DELETE /users/me (non-string password)   -> 400 VALIDATION_ERROR
+  - DELETE /users/me (unknown field)         -> 400 VALIDATION_ERROR
+  - POST /auth/login (after deletion)        -> 401 (Invalid email or password)
+  - GET /auth/session (old token)            -> 401
+  - GET  /users/me (old token)               -> 401
+  - PATCH /users/me (old token)              -> 401
+  - DB state after deletion:                 confirmed
+      row preserved (not hard-deleted)
+      deleted_at set, is_active=false
+      username = "deleted#<uuid>" (44 chars)
+      full_name / bio / avatar_url = NULL
+      password_hash = "" (cleared)
+  - Freed username re-claimable by new user  -> 200 (PATCH /users/me)
+  - Normal username validation intact        -> 400 for "bad#name" and >30 chars
 ```
 
 **Files Changed:**
 
 ```text
-Not Started
+Modified:
+apps/backend/src/modules/auth/entities/user.entity.ts     (username length 30 -> 64)
+apps/backend/src/modules/users/users.controller.spec.ts   (+ deleteMe test)
+apps/backend/src/modules/users/users.controller.ts        (+ DELETE /users/me)
+apps/backend/src/modules/users/users.service.spec.ts      (+ deleteAccount tests)
+apps/backend/src/modules/users/users.service.ts           (+ deleteAccount)
+packages/constants/src/error.constants.ts                 (+ PASSWORD_INCORRECT, ACCOUNT_DELETED)
+packages/types/src/user.types.ts                          (+ DeleteAccountInput, DeleteAccountResponse)
+
+Created:
+apps/backend/src/database/migrations/1788970200000-AllowAnonymizedUsername.ts
+apps/backend/src/modules/users/dto/delete-account.dto.ts
 ```
+
+**Note:** The username constraint adjustment recorded above is an approved schema change (maintainer decision) required to satisfy the Task 1.5 anonymization spec. No messages were touched; no `users` row was hard-deleted during implementation or verification.
 
 ---
 

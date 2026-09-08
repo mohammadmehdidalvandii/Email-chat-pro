@@ -44,3 +44,20 @@ export interface UpdateProfileInput {
  * directly (unlike /auth/session, which wraps it in `{ user }`).
  */
 export type ProfileResponse = User
+
+/**
+ * Request body for DELETE /users/me (Task 1.5 — Account Deletion).
+ * Requires the current password for confirmation (features.md —
+ * "Deletion requires explicit confirmation").
+ */
+export interface DeleteAccountInput {
+  password: string
+}
+
+/**
+ * Successful response payload for DELETE /users/me (architecture.md §API
+ * Endpoints — User Endpoints).
+ */
+export interface DeleteAccountResponse {
+  message: string
+}

@@ -1,8 +1,10 @@
-import { ConflictException, Injectable } from '@nestjs/common'
+import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { Raw, Repository } from 'typeorm'
+import * as bcrypt from 'bcryptjs'
 import { ERROR_CODES, ERROR_MESSAGES } from '@email-chat-pro/constants'
 import { User } from '../auth/entities/user.entity'
+import { DeleteAccountDto } from './dto/delete-account.dto'
 import { UpdateProfileDto } from './dto/update-profile.dto'
 
 /**
@@ -66,6 +68,41 @@ export class UsersService {
       }
       throw error
     }
+  }
+
+  /**
+   * Permanently deletes the user's account by anonymizing their identity
+   * (architecture.md §Account Deletion — Anonymization).
+   *
+   * The row is NOT removed (foreign-key integrity with messages must be
+   * preserved). Instead:
+   *  1. `deleted_at` is set to NOW().
+   *  2. `is_active` is set to false (prevents JWT authentication).
+   *  3. `username` is renamed to `deleted#{uuid}` (frees the old handle,
+   *     outside the valid username alphabet so it cannot collide).
+   *  4. `full_name`, `bio`, `avatar_url` are cleared.
+   *  5. `password_hash` is cleared (prevents login).
+   *
+   * Historical messages remain intact with their original `sender_id`.
+   */
+  async deleteAccount(user: User, dto: DeleteAccountDto): Promise<void> {
+    const passwordMatches = await bcrypt.compare(dto.password, user.passwordHash)
+    if (!passwordMatches) {
+      throw new UnauthorizedException({
+        code: ERROR_CODES.UNAUTHORIZED,
+        message: ERROR_MESSAGES.PASSWORD_INCORRECT,
+      })
+    }
+
+    user.deletedAt = new Date()
+    user.isActive = false
+    user.username = `deleted#${user.id}`
+    user.fullName = null
+    user.bio = null
+    user.avatarUrl = null
+    user.passwordHash = ''
+
+    await this.usersRepository.save(user)
   }
 
   /**

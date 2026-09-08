@@ -47,4 +47,7 @@ export const ERROR_MESSAGES = {
   FULL_NAME_TOO_LONG: 'Full name must be no more than 100 characters',
   BIO_TOO_LONG: 'Bio must be no more than 500 characters',
   AVATAR_URL_TOO_LONG: 'Avatar URL must be no more than 500 characters',
+  // Task 1.5 — Account Deletion
+  PASSWORD_INCORRECT: 'Password is incorrect',
+  ACCOUNT_DELETED: 'Account deleted',
 } as const

@@ -14,19 +14,21 @@ When the task is completed and verified, the completed work MUST be recorded in 
 
 # Current Phase
 
-## Phase 1 — Authentication and User Profile
+## Phase 2 — Real-time Messaging
 
-The current task is **Task 1.5 — Account Deletion**.
+The current task is **Task 2.1 — Chat Foundation**.
 
-Tasks 1.1 (Registration), 1.2 (Email Verification), 1.3 (Login and Logout), and 1.4 (User Profile) are completed and verified (`docs/7-done.md`).
+Task 1.5 (Account Deletion) is completed and verified (`docs/7-done.md`).
+
+> This file is a placeholder for the **next approved task**. It was set when Task 1.5 completed. The task owner should review and confirm this scope before implementation begins. Claude Code MUST NOT begin implementing this task until it has been re-approved.
 
 ---
 
 # Current Objective
 
-Implement account deletion so authenticated users can permanently delete their account. Deletion must anonymize user identity while preserving historical message data for the benefit of other participants.
+Implement the **one-to-one chat model** foundation: a persisted `chats` table where every chat has exactly two participants and at most one chat exists per participant pair, following `architecture.md` §Data Model — Chats Table.
 
-Account deletion is a critical security action: the deleted account must not be able to authenticate again, existing sessions must become invalid, and the user's profile data must be cleared — but messages must remain intact with a "Deleted User" attribution.
+The chat **data model** is the only deliverable of this task. Message persistence (Task 2.2), real-time messaging (Task 2.3), and the conversation list (Task 2.4) build on top of this foundation.
 
 ---
 
@@ -34,81 +36,35 @@ Account deletion is a critical security action: the deleted account must not be 
 
 Claude Code is authorized to work only on the following areas.
 
-## 1. Account Deletion Endpoint
+## 1. Chats Data Model
 
-* Implement `DELETE /users/me` per `architecture.md` §API Endpoints:
+* Create a `chats` table via a TypeORM migration per `architecture.md` §Data Model:
 
   ```text
-  DELETE /users/me
-    Authentication: Required (JWT)
-    Request:
-      {
-        "password": "current_password"
-      }
-    Response: 200
-      {
-        "success": true,
-        "data": { "message": "Account deleted" }
-      }
+  chats (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_a UUID NOT NULL REFERENCES users(id),
+    user_b UUID NOT NULL REFERENCES users(id),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_a, user_b),
+    CHECK (user_a < user_b),
+    CHECK (user_a != user_b)
+  )
   ```
 
-* The endpoint MUST require a valid JWT (`JwtAuthGuard`).
-* The endpoint MUST require the user's current password for confirmation (`features.md` — "Deletion requires explicit confirmation").
-* The password MUST be verified against the stored `password_hash` before deletion proceeds.
-* Invalid password MUST return a `401 UNAUTHORIZED` error.
+* Add indexes per the architecture: `idx_chats_user_a ON chats(user_a)`, `idx_chats_user_b ON chats(user_b)`.
+* Enforce the **unique participant pair** invariant: `UNIQUE (user_a, user_b)` guarantees one chat per user pair; `CHECK (user_a < user_b)` normalizes so `(A,B)` and `(B,A)` map to the same row.
+* Add a shared `ChatEntity`-equivalent backend entity.
+* Add `Chat` types to `packages/types` (shared contract) where applicable.
 
-## 2. Deletion Behavior (Anonymization)
+## 2. Participant Normalization Helper
 
-Per `architecture.md` §Account Deletion (Anonymization), when a user deletes their account:
+* A lookup must normalize a pair before querying: if `user1 > user2` then swap, matching the stored `user_a < user_b` ordering (architecture.md — Schema Reasoning for Chats).
 
-1. Set `deleted_at = NOW()`.
-2. Set `is_active = FALSE`.
-3. Rename `username` to `deleted#{original_id}` (e.g., `deleted#550e8400-e29b-41d4-a716-446655440000`).
-4. Clear `full_name`, `bio`, `avatar_url` (set to NULL).
-5. Clear `password_hash` (prevents login).
-6. Do NOT delete the `users` row — it must remain for foreign-key integrity with messages.
-7. Do NOT delete any messages — historical messages are preserved.
+## 3. Repository Query Foundation (read path only)
 
-This is an **anonymization**, not a hard delete. The row stays for referential integrity; the user identity is removed; messages remain with their original `sender_id`.
-
-## 3. Session Invalidation
-
-* After deletion, the user's existing JWT tokens must not be accepted by protected endpoints.
-* The `GET /auth/session` endpoint (and all `JwtAuthGuard`-protected endpoints) MUST reject deleted users (`deletedAt !== null` OR `isActive === false`) with a `401 UNAUTHORIZED` response.
-* The login endpoint (`POST /auth/login`) already rejects deleted/inactive accounts (Task 1.3). Verify this still works after deletion.
-
-## 4. Deleted User Display
-
-* In the shared `User` type and API responses, a deleted user should be distinguishable from an active user. The `isActive: false` and `deletedAt` fields communicate this state.
-* The `toUserDto()` mapper must handle deleted users correctly (the existing mapper already maps `isActive` and does not include `deletedAt` in the shared contract — this behavior is correct and should be preserved).
-
-## 5. Username Uniqueness After Deletion
-
-* The `deleted#{uuid}` format ensures the old username is freed while the anonymized handle cannot collide with any valid username (which must match `^[a-zA-Z0-9_-]+$` and cannot contain `#`).
-* The `LOWER()` unique index handles the `deleted#` prefix case-insensitively, which is fine since no valid username starts with `deleted#`.
-
-## 6. Shared Packages
-
-* Add shared account deletion types to `packages/types` where applicable.
-* Add shared account deletion error messages to `packages/constants` where applicable.
-* Do not move backend logic into `packages/utils`.
-
-## 7. Tests
-
-* Add tests for:
-  * successful account deletion (valid password → 200, DB state confirmed),
-  * deletion with wrong password → 401,
-  * deletion without authentication → 401,
-  * post-deletion login attempt → 401,
-  * post-deletion session check → 401,
-  * DB state after deletion: `deleted_at` set, `is_active` false, `password_hash` cleared, `username` anonymized, profile fields cleared, messages preserved.
-* Preserve all existing Task 1.1–1.4 tests.
-
-## 8. UserController Route Registration
-
-* The `DELETE /users/me` route is added to `UsersController` (the existing users controller already handles `GET /users/me` and `PATCH /users/me` from Task 1.4).
-* The route is protected by `@UseGuards(JwtAuthGuard)`.
-* The endpoint requires the `DeleteAccountDto` body with password confirmation.
+* Where a repository is added, keep it to the read path required by the model (e.g., finding the chat for a normalized participant pair), consistent with the architecture's `GET /chats` conversation-list shape. Do NOT persist messages in this task.
 
 ---
 
@@ -116,34 +72,38 @@ This is an **anonymization**, not a hard delete. The row stays for referential i
 
 The following work MUST NOT be implemented during this task.
 
-## Email Change
+## Message Persistence (Task 2.2)
 
-* Do NOT implement email change (`POST /users/me/change-email`). This belongs to a separate authorized task.
+* Do NOT create the `messages` table, message entity, message DTOs, or message CRUD.
 
-## Password Reset
+## Real-time Messaging (Task 2.3)
 
-* Do NOT implement password reset. Out of scope for Phase 1.
+* Do NOT introduce Socket.IO parts, chat/message gateways, or WebSocket event contracts.
 
-## Hard Delete
+## Conversation List (Task 2.4)
 
-* Do NOT permanently delete the `users` row. The deletion is an anonymization/soft-delete per `architecture.md`. Messages reference `sender_id` via foreign key.
+* Do NOT build the full `GET /chats` conversation list with message aggregates and recent-activity sorting.
 
-## Message Deletion
+## Contacts and Search (Phase 3)
 
-* Do NOT delete or modify any messages during account deletion. Historical messages are preserved.
+* Do NOT implement contact requests, contact acceptance, or the contact relationship gating on chat creation.
 
 ## Frontend
 
-* Do NOT implement frontend account deletion UI. This task is **backend-only** (consistent with Task 1.3 and Task 1.4).
-
-## Phase 2/3/4 Features
-
-* Do NOT implement contact requests, chats, messages, search, media, permission enforcement for messaging, or internationalization.
+* Do NOT implement any frontend chat UI, stores, or services at this phase boundary. The phase stubs in the frontend (`chats/page.tsx`, `chats/[chatId]/page.tsx`) are placeholders.
 
 ## Infrastructure and Dependencies
 
 * Do NOT introduce Redis, Kafka, RabbitMQ, NATS, Kubernetes, or any unapproved infrastructure.
-* Do NOT add new dependencies. Account deletion uses only existing dependencies.
+* Do NOT add new dependencies beyond what `stack.md` approves.
+
+---
+
+# Open Decisions (ask before implementing)
+
+The following concerns the chats lifecycle and may need a maintainer decision when implementation begins:
+
+* **Chat creation trigger** — whether a chat is created explicitly (POST /chats), implicitly on first message, or from an accepted contact. The architecture's Chats Table defines the model but `2-features.md` lists "Dependency: Accepted Contact Relationship" for conversations while contacts are a Phase 3 feature. If this ambiguity is unresolved at implementation time: **STOP → REPORT → ASK**.
 
 ---
 
@@ -154,25 +114,23 @@ The following work MUST NOT be implemented during this task.
 The implementation MUST remain consistent with:
 
 ```text
-1-overview-project.md    — soft-delete preserves message history
-2-features.md            — Account Deletion acceptance criteria
-3-architecture.md        — Account Deletion (Anonymization) procedure, User data model,
-                           DELETE /users/me endpoint
-4-stack.md               — no new dependencies for account deletion
+1-overview-project.md    — messaging is one-to-one; phases
+2-features.md            — Conversation / Chat Window (Phase 2, Critical)
+3-architecture.md        — Data Model: Chats Table; API: GET /chats; WebSocket: /chats
+4-stack.md               — approved technologies and ports
 5-rules.md               — coding, TypeScript, error handling, security, testing, Git rules
-7-done.md                — Task 1.1 through Task 1.4 records
+7-done.md                — Task 1.1 through Task 1.5 records
 ```
 
 ## Existing Code to Reuse
 
 ```text
-apps/backend/src/modules/auth/auth.service.ts         — toUserDto(), login (already rejects deleted users)
-apps/backend/src/modules/auth/entities/user.entity.ts  — User entity with deletedAt, isActive columns
-apps/backend/src/modules/auth/guards/jwt.guard.ts     — JwtAuthGuard for route protection
-apps/backend/src/modules/users/users.controller.ts    — GET/PATCH /users/me already exist
-apps/backend/src/modules/users/users.service.ts       — updateProfile() pattern to follow
-packages/types/src/user.types.ts                      — User, ProfileResponse types
-packages/constants/src/error.constants.ts             — ERROR_CODES, ERROR_MESSAGES
+apps/backend/src/modules/auth/auth.module.ts    — cross-module exports pattern
+apps/backend/src/modules/auth/guards/jwt.guard.ts — JwtAuthGuard for route protection
+apps/backend/src/database/migrations/           — existing migration patterns
+packages/types/                                 — shared contract package
+packages/constants/                             — shared constants package
+apps/backend/src/modules/users/                 — module structure pattern (Task 1.4/1.5)
 ```
 
 ---
@@ -193,16 +151,13 @@ Do not silently choose an approach.
 
 The task is complete only when:
 
-* `DELETE /users/me` accepts a password confirmation and performs anonymization,
-* wrong password returns `401 UNAUTHORIZED`,
-* no authentication returns `401`,
-* after deletion: login fails, session fails, username is anonymized (`deleted#uuid`),
-* profile fields are cleared, `password_hash` is cleared, `deleted_at` is set, `is_active` is false,
-* historical messages are preserved (no messages deleted or modified),
-* shared types/constants are used where applicable,
-* tests cover deletion success, wrong password, no auth, post-deletion login, post-deletion session, DB state,
-* type-check, lint, tests, format-check pass,
-* the endpoint is verified against a live backend,
+* the `chats` table matches `architecture.md` §Data Model (columns, FK, UNIQUE pair, CHECKs, indexes),
+* exactly one chat exists per participant pair regardless of argument order,
+* the pair-normalization helper returns the stored row for both `(A,B)` and `(B,A)` lookups,
+* shared `Chat` types are added where applicable,
+* no message persistence, WebSocket, or frontend work was performed,
+* migrations run cleanly on the local database,
+* type-check, lint, tests, format-check pass where configured,
 * no unauthorized features were implemented,
 * no unapproved infrastructure or dependencies were introduced,
 * no secrets were committed,
@@ -222,7 +177,7 @@ npm run format:check
 npm run migration:run   (with DATABASE_URL exported from apps/backend/.env)
 ```
 
-Then verify the endpoint against a live backend.
+Then verify the chat model against a live backend where applicable.
 
 Do not invent commands that are not configured in the repository.
 
@@ -260,8 +215,6 @@ No unauthorized scope changes.
 
 # Golden Rule
 
-> Implement account deletion, verify it, record it, report it, and stop.
+> Implement the chat foundation, verify it, record it, report it, and stop.
 
-Do not implement future features simply because the architecture anticipates them.
-
-Do not start the next task.
+Do not start Task 2.2 until this task is completed, verified, and recorded.

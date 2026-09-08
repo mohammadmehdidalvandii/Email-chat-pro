@@ -43,7 +43,7 @@ export class User {
   verifiedAt!: Date | null
 
   /** Unique case-insensitive handle (validation + index enforced by the Task 1.4 migration). */
-  @Column({ type: 'varchar', length: 30, name: 'username', nullable: true })
+  @Column({ type: 'varchar', length: 64, name: 'username', nullable: true })
   username!: string | null
 
   /** User-provided display name. */

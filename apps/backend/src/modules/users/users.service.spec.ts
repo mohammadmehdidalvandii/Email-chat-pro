@@ -1,6 +1,7 @@
 import { ConflictException } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
+import * as bcrypt from 'bcryptjs'
 import { ERROR_CODES, ERROR_MESSAGES } from '@email-chat-pro/constants'
 import { User } from '../auth/entities/user.entity'
 import { UsersService } from './users.service'
@@ -146,6 +147,48 @@ describe('UsersService', () => {
       await expect(
         service.updateProfile({ ...baseUser }, { username: 'alice' }),
       ).rejects.toBeInstanceOf(ConflictException)
+    })
+  })
+
+  describe('deleteAccount', () => {
+    const activeUser: User = {
+      ...baseUser,
+      passwordHash: bcrypt.hashSync('SecurePass123!', 10),
+      username: 'alice',
+      fullName: 'Alice',
+      bio: 'Hello',
+      avatarUrl: 'https://example.com/avatar.png',
+      isActive: true,
+      deletedAt: null,
+    }
+
+    it('rejects a wrong password with a 401 unauthorized error', async () => {
+      await expect(
+        service.deleteAccount({ ...activeUser }, { password: 'WrongPass123!' }),
+      ).rejects.toMatchObject({
+        status: 401,
+        response: {
+          code: ERROR_CODES.UNAUTHORIZED,
+          message: ERROR_MESSAGES.PASSWORD_INCORRECT,
+        },
+      })
+      expect(repository.save).not.toHaveBeenCalled()
+    })
+
+    it('anonymizes the account on a valid password and persists the changes', async () => {
+      repository.save.mockImplementation((user: Partial<User>) => Promise.resolve(user))
+
+      await service.deleteAccount({ ...activeUser }, { password: 'SecurePass123!' })
+
+      expect(repository.save).toHaveBeenCalledTimes(1)
+      const saved = repository.save.mock.calls[0][0] as User
+      expect(saved.deletedAt).toBeInstanceOf(Date)
+      expect(saved.isActive).toBe(false)
+      expect(saved.username).toBe(`deleted#${activeUser.id}`)
+      expect(saved.fullName).toBeNull()
+      expect(saved.bio).toBeNull()
+      expect(saved.avatarUrl).toBeNull()
+      expect(saved.passwordHash).toBe('')
     })
   })
 })
