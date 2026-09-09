@@ -67,4 +67,31 @@ describe('ChatsService', () => {
       expect(reverseCall).toEqual(forwardCall)
     })
   })
+
+  describe('findById', () => {
+    const chat: Chat = {
+      id: 'chat-1',
+      userAId: '11111111-1111-1111-1111-111111111111',
+      userBId: '22222222-2222-2222-2222-222222222222',
+      createdAt: new Date('2026-01-01T00:00:00Z'),
+      updatedAt: new Date('2026-01-01T00:00:00Z'),
+    }
+
+    it('returns the chat when found', async () => {
+      repository.findOne.mockResolvedValue(chat)
+
+      const result = await service.findById('chat-1')
+
+      expect(result).toBe(chat)
+      expect(repository.findOne).toHaveBeenCalledWith({ where: { id: 'chat-1' } })
+    })
+
+    it('returns null when no chat exists with the given id', async () => {
+      repository.findOne.mockResolvedValue(null)
+
+      const result = await service.findById('nonexistent')
+
+      expect(result).toBeNull()
+    })
+  })
 })

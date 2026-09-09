@@ -64,3 +64,14 @@ export const BIO_MAX_LENGTH = 500
 
 /** Maximum avatar_url length (architecture.md — VARCHAR(500)). */
 export const AVATAR_URL_MAX_LENGTH = 500
+
+// ---------------------------------------------------------------------------
+// Task 2.2 — Message validation (architecture.md §Validation Rules — Message
+// Content)
+// ---------------------------------------------------------------------------
+
+/** Minimum message content length (architecture.md — Message Content). */
+export const MESSAGE_CONTENT_MIN_LENGTH = 1
+
+/** Maximum message content length (architecture.md — Message Content). */
+export const MESSAGE_CONTENT_MAX_LENGTH = 5000

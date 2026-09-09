@@ -702,7 +702,9 @@ packages/types/src/chat.types.ts
 
 ## Task 2.2 — Message Persistence
 
-**Status:** Not Started
+**Status:** Completed
+
+**Date:** 2026-09-09
 
 **Scope:**
 
@@ -711,10 +713,57 @@ packages/types/src/chat.types.ts
 * Message ownership
 * Message history
 
+**Implemented / Verified State:**
+
+- **Database migration** (`1789050600000-CreateMessagesTable.ts`): creates the `messages` table exactly per `architecture.md` §Data Model — `id uuid PRIMARY KEY DEFAULT gen_random_uuid()`, `chat_id uuid NOT NULL REFERENCES chats(id)`, `sender_id uuid NOT NULL REFERENCES users(id)`, `content TEXT NOT NULL`, `message_type VARCHAR(20) NOT NULL DEFAULT 'text'`, `media_url VARCHAR(500)`, `created_at`/`updated_at TIMESTAMP NOT NULL DEFAULT now()`, CHECK constraint `chk_messages_message_type` on `message_type IN ('text','image','video')`, plus the four indexes: `idx_messages_chat_id` (chat_id), `idx_messages_sender_id` (sender_id), `idx_messages_created_at` (created_at), and `idx_messages_chat_created` (chat_id, created_at DESC) — the hot index for the message-history query.
+- **Shared constants** (`packages/constants/validation.constants.ts`): added `MESSAGE_CONTENT_MIN_LENGTH` (1) and `MESSAGE_CONTENT_MAX_LENGTH` (5000) per `architecture.md` §Validation Rules — Message Content.
+- **Shared error constants** (`packages/constants/error.constants.ts`): added `CHAT_NOT_FOUND`, `NOT_CHAT_PARTICIPANT`, `MESSAGE_CONTENT_REQUIRED`, `MESSAGE_CONTENT_TOO_LONG`, `MESSAGE_TYPE_INVALID`, `MESSAGE_MEDIA_NOT_ALLOWED` per the error-handling contract.
+- **Shared types** (`packages/types/chat.types.ts`): added `MessageType` (`'text' | 'image' | 'video'`), `Message` (id, chatId, senderId, sender: User, content, messageType, mediaUrl, createdAt), and `CreateMessageInput` per `architecture.md` §Data Model — Messages.
+- **Message entity** (`modules/messages/entities/message.entity.ts`): maps `messages` with scalar `chatId` (`chat_id`), `@ManyToOne(() => User, { eager: false }) @JoinColumn({ name: 'sender_id' }) sender`, text `content`, `messageType` (`message_type`), `mediaUrl` (`media_url`, nullable), `@CreateDateColumn`/`@UpdateDateColumn` on `created_at`/`updated_at`. The `@JoinColumn` explicitly binds the relation to the migrated `sender_id` column — without it TypeORM generates a mismatched `senderId` camelCase column name, which was caught during live verification and fixed.
+- **CreateMessageDto** (`modules/messages/dto/create-message.dto.ts`): validated with `class-validator` against the shared constants — `content` must be 1–5000 chars (`@Length`), `messageType` must be `'text'` (`@IsIn(['text'])`; image/video are Phase 4), `mediaUrl` is `@IsOptional()` (rejected server-side when present on a text message).
+- **ChatsService extension** (`modules/chats/chats.service.ts`): added `findById(id): Promise<Chat | null>` — single `findOne({ where: { id } })` to verify chat existence/membership. Used by MessagesService for both authorization checks. Added two unit tests in `chats.service.spec.ts` (returns chat when found, returns null when absent) — now 45 total including the Task 2.1 suite.
+- **MessagesService** (`modules/messages/messages.service.ts`): `sendMessage(sender, chatId, dto)` authorizes (chat existence → 404 NOT_FOUND, participation check against `chat.userAId`/`chat.userBId` → 403 FORBIDDEN, text+mediaUrl → 400 VALIDATION_ERROR), then creates and saves the entity, returning the shared `Message` DTO via `authService.toUserDto(sender)`. `getHistory(userId, chatId, page, limit)` runs the same authorization, then `findAndCount({ where: { chatId }, order: { createdAt: 'DESC' }, skip: (page-1)*limit, take: limit, relations: ['sender'] })` using the `idx_messages_chat_created` index, returning `{ data: Message[], total }`.
+- **MessagesController** (`modules/messages/messages.controller.ts`): `POST /chats/:chatId/messages` and `GET /chats/:chatId/messages`, both `JwtAuthGuard`-protected, mounted under `Controller('chats')` (sharing the `/chats` namespace with a future ChatsController). `:chatId` is validated as UUID before the handler (`ParseUUIDPipe`). GET pagination via `DefaultValuePipe(1)`+`ParseIntPipe` page and `DefaultValuePipe(50)`+`ParseIntPipe` limit. The controller builds the paginated envelope (`data`, `pagination: { total, page, limit, pages }`, `timestamp`) itself; the service returns only `{ data, total }`.
+- **MessagesModule** (`modules/messages/messages.module.ts`): imports `TypeOrmModule.forFeature([Message])`, `AuthModule` (JwtAuthGuard + AuthService.toUserDto), `ChatsModule` (ChatsService.findById). Registered in `app.module.ts`; `Message` added to `data-source.ts` entities.
+- **Authorization boundary**: chat membership only (the contact-relationship check is Phase 3; `contact_requests` does not exist).
+- **Tests**: 16 new, **61/61 total** — `messages.service.spec.ts` (10: 404 not-found send, 403 not-participant send, userB allowance, 400 mediaUrl-on-text, happy-path mapping + create/save contract; 404 not-found history, 403 not-participant history, paginated result mapping + findAndCount contract, page-2 offset, empty history) and `messages.controller.spec.ts` (4: sendMessage delegation+envelope, getHistory mapping+paged envelope, multi-page pages math, pages=0 on empty).
+- **No frontend, no WebSocket, no media, no chat-creation**: Task 2.2 is text-only persistence and history (per the authorized scope). `image`/`video` message types are database-ready but DTO-rejected (Phase 4). Chat rows are still externally seeded; the creation trigger remains deferred per Task 2.1.
+
 **Verification:**
 
 ```text
-Not Started
+Executed 2026-09-09.
+
+- npm run build:packages: PASS
+- npx tsc --noEmit (backend): PASS
+- npx eslint src --max-warnings=0 (backend): PASS
+- npm test (backend jest): PASS — 9 suites / 61 tests
+    app.controller, auth.service, auth.controller,
+    users.service, users.controller, chats.service,
+    chat-participants, messages.service, messages.controller
+- migration:run: PASS (CreateMessagesTable1789050600000 applied; 6
+  total; columns, FKs, CHECK, all 4 indexes confirmed via live schema
+  introspection — messages_pkey, idx_messages_chat_id,
+  idx_messages_chat_created, idx_messages_sender_id,
+  idx_messages_created_at, chk_messages_message_type,
+  messages_chat_id_fkey, messages_sender_id_fkey)
+- Live endpoint tests (backend on port 4000):
+    1. POST /chats/:chatId/messages {text}     -> 201 + Message contract
+       (id, chatId, senderId, sender:User, content, messageType,
+        mediaUrl:null, createdAt)
+    2. POST second message                     -> 201 + different id
+    3. GET /chats/:chatId/messages            -> 200, newest-first order,
+       pagination envelope { total, page, limit, pages }, sender DTOs resolved
+    4. POST /chats/000...000/messages         -> 404 CHAT_NOT_FOUND
+    5. GET /chats/000...000/messages          -> 404 CHAT_NOT_FOUND (same path)
+    6. Unauthenticated /chats/:id/messages    -> 401 (JwtAuthGuard guard behavior)
+    7. Seed chat creation (normalized pair)   -> inserted for live test
+- Live fix: @JoinColumn({ name: 'sender_id' }) was added to the
+  Message sender relation after the initial live test returned
+  INTERNAL_ERROR — TypeORM had generated senderId (camelCase)
+  instead of sender_id (snake_case); the DB rejected both INSERT
+  and SELECT; the fix was applied and the endpoints re-verified with
+  real database writes through the app.
 ```
 
 ---
@@ -1161,6 +1210,31 @@ Unauthorized scope changes:
 - None
 ```
 
+```text
+Task: 2.2
+Date: 2026-09-09
+
+Environment:
+- Node.js v24.17.0
+- npm 11.13.0
+- Docker 29.5.3
+- PostgreSQL 16 (email-chat-pro-db container, port 5432)
+
+Checks:
+- npm run build:packages: PASS
+- npx tsc --noEmit (backend): PASS
+- npx eslint src --max-warnings=0 (backend): PASS
+- npm test (backend jest): PASS (9 suites / 61 tests)
+- migration:run: PASS (CreateMessagesTable1789050600000 applied; 6 total)
+- Live DB schema introspection: PASS (messages table, all columns, FKs,
+  CHECK, all 4 indexes confirmed)
+- Live endpoint tests: PASS (POST/GET/text persist, history pagination,
+  newest-first ordering, 404 not-found, 401 unauthenticated, seeded chat)
+
+Unauthorized scope changes:
+- None
+```
+
 ---
 
 # Known Issues
@@ -1476,6 +1550,18 @@ Change: Task 2.1 status moved from Not Started to "Completed", with the chats
 Reason: Required by the Task 2.1 completion workflow.
 Approved By: Mohammad Mehdi (Task 2.1 authorised; chat-creation deferral
        approved 2026-09-09).
+```
+
+```text
+Context Change: Task 2.2 record completed.
+File: docs/7-done.md
+Change: Task 2.2 status moved from Not Started to "Completed", with the
+       messages table migration, Message entity (@JoinColumn fix), shared
+       contracts, DTO, ChatsService.findById, MessagesService +
+       MessagesController + MessagesModule, and actual verification results
+       (type-check, lint, 9 suites / 61 tests, migration, live endpoints).
+Reason: Required by the Task 2.2 completion workflow.
+Approved By: Mohammad Mehdi (Task 2.2 re-approved for execution).
 ```
 
 ```text

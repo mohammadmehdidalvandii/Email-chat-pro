@@ -2,6 +2,7 @@
  * Shared error codes and messages (architecture.md: packages/constants/error-messages.ts).
  * Used to keep error responses consistent with the standardized API contract.
  */
+import { MESSAGE_CONTENT_MAX_LENGTH } from './validation.constants'
 
 /** Standard error codes used in API error responses (architecture.md §Error Handling). */
 export const ERROR_CODES = {
@@ -50,4 +51,12 @@ export const ERROR_MESSAGES = {
   // Task 1.5 — Account Deletion
   PASSWORD_INCORRECT: 'Password is incorrect',
   ACCOUNT_DELETED: 'Account deleted',
+  // Task 2.2 — Message Persistence
+  CHAT_NOT_FOUND: 'Chat not found',
+  NOT_CHAT_PARTICIPANT: 'You are not a participant of this chat',
+  MESSAGE_CONTENT_REQUIRED: 'Message content is required',
+  MESSAGE_CONTENT_TOO_LONG: `Message content must be no more than ${MESSAGE_CONTENT_MAX_LENGTH} characters`,
+  MESSAGE_TYPE_INVALID:
+    'messageType must be "text" — image and video messages are not supported yet',
+  MESSAGE_MEDIA_NOT_ALLOWED: 'Text messages cannot include a media URL',
 } as const

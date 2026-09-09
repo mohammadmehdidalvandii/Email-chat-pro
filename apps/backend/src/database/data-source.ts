@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm'
 import { User } from '../modules/auth/entities/user.entity'
 import { Chat } from '../modules/chats/entities/chat.entity'
+import { Message } from '../modules/messages/entities/message.entity'
 
 /**
  * Default local PostgreSQL connection, matching docker-compose.yml.
@@ -18,7 +19,7 @@ const DEFAULT_DATABASE_URL =
 export const AppDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL,
-  entities: [User, Chat],
+  entities: [User, Chat, Message],
   migrations: [__dirname + '/migrations/*{.ts,.js}'],
   synchronize: false,
 })

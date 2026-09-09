@@ -30,4 +30,13 @@ export class ChatsService {
     const [ua, ub] = normalizeParticipants(userAId, userBId)
     return this.chatsRepository.findOne({ where: { userAId: ua, userBId: ub } })
   }
+
+  /**
+   * Finds a chat by its id (architecture.md §API Endpoints — Message
+   * Endpoints). Used by MessagesService to verify chat existence and
+   * membership before persisting or reading messages.
+   */
+  async findById(id: string): Promise<Chat | null> {
+    return this.chatsRepository.findOne({ where: { id } })
+  }
 }
