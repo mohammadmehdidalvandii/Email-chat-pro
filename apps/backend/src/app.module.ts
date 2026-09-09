@@ -4,6 +4,7 @@ import { AppController } from './app.controller'
 import { AppService } from './app.service'
 import { getDatabaseConfig } from './config/database.config'
 import { AuthModule } from './modules/auth/auth.module'
+import { ChatsModule } from './modules/chats/chats.module'
 import { UsersModule } from './modules/users/users.module'
 
 @Module({
@@ -13,6 +14,7 @@ import { UsersModule } from './modules/users/users.module'
     }),
     AuthModule,
     UsersModule,
+    ChatsModule,
   ],
   controllers: [AppController],
   providers: [AppService],

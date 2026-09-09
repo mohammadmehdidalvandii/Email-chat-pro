@@ -621,20 +621,82 @@ apps/backend/src/modules/users/dto/delete-account.dto.ts
 
 ## Task 2.1 — Chat Foundation
 
-**Status:** Not Started
+**Status:** Completed
+
+**Date:** 2026-09-09
 
 **Scope:**
 
-* One-to-one chat model
-* Chat persistence
+* One-to-one chat model (`chats` table)
 * Two participants per chat
 * Unique participant pair
+* Participant-pair normalization
+* Read-path query foundation
+
+**Implemented / Verified State:**
+
+- **Database migration** (`1788970600000-CreateChatsTable.ts`): creates the `chats` table exactly per `architecture.md` §Data Model — `id uuid PRIMARY KEY DEFAULT gen_random_uuid()`, `user_a uuid NOT NULL REFERENCES users(id)`, `user_b uuid NOT NULL REFERENCES users(id)`, `created_at`/`updated_at TIMESTAMP NOT NULL DEFAULT now()`, `CONSTRAINT uq_chats_user_a_user_b UNIQUE (user_a, user_b)`, `CONSTRAINT chk_chats_user_a_lt_user_b CHECK (user_a < user_b)`, `CONSTRAINT chk_chats_user_a_neq_user_b CHECK (user_a <> user_b)`, plus `idx_chats_user_a` and `idx_chats_user_b`.
+- **Shared `Chat` type** (`packages/types/chat.types.ts`): `{ id, userA: User, userB: User, createdAt, updatedAt }` per architecture.md, exported from `packages/types/src/index.ts`. The `Message` type is intentionally NOT added (Task 2.2).
+- **ChatEntity** (`modules/chats/entities/chat.entity.ts`): maps the `chats` table with scalar FK columns `userAId`/`userBId` (`user_a`/`user_b`) for the read path. The `User` relations needed for the full `Chat` shape are loaded in a later task (conversation list), not speculatively now.
+- **Participant normalization helper** (`modules/chats/chat-participants.ts`): `normalizeParticipants(userA, userB)` swaps when `user1 > user2`, matching the stored `user_a < user_b` ordering (architecture.md — "Lookup normalizes pair before querying: IF user1 > user2 THEN swap").
+- **ChatsService** (`modules/chats/chats.service.ts`): read-path only — `findByParticipants(userAId, userBId)` normalizes the pair and runs a single `findOne`. The service does NOT create chats and does NOT touch messages.
+- **ChatsModule** (`modules/chats/chats.module.ts`): registers `ChatsService` and exports it for downstream tasks (message persistence, conversation list). Registered in `app.module.ts`; `Chat` added to the migration `data-source.ts` entities.
+- **Tests**: 7 new, 45/45 total — `chat-participants.spec.ts` (4: order-kept, swapped, idempotent, UUID ids) and `chats.service.spec.ts` (3: normalized query shape, null when absent, (A,B) and (B,A) resolve to the same query).
+
+**Chat creation trigger — deferred (approved):**
+
+`docs/6-current-task.md` → Open Decisions flags the chat-creation trigger (explicit `POST /chats` / implicit on first message / from accepted contact) as an unresolved ambiguity requiring STOP → REPORT → ASK. The authorized Task 2.1 scope (data model + normalization + read-path repository) never creates a chat row, so the decision is not load-bearing for any deliverable here; the maintainer approved deferring it, to be resolved in the task that introduces an actual creation path (Task 2.4 or Phase 3 contact acceptance).
 
 **Verification:**
 
 ```text
-Not Started
+Executed 2026-09-09.
+
+- npm run type-check:  PASS (all workspaces)
+- npm run lint:        PASS (backend + frontend)
+- npm test:            PASS (7 suites / 45 tests; 7 new for chats)
+- npm run format:check PASS
+- migration:run:       PASS (CreateChatsTable1788970600000 applied; 5 total)
+- Live DB schema:      PASS — columns, FKs, UNIQUE, both CHECKs, both
+                       indexes match architecture.md exactly
+- Live DB behavior:    PASS
+    reversed-pair insert  -> rejected by CHECK chk_chats_user_a_lt_user_b
+    normalized insert     -> OK (user_a < user_b stored)
+    duplicate pair        -> rejected by UNIQUE uq_chats_user_a_user_b
+    lookup (A,B)          -> finds the row
+    lookup (B,A)          -> finds the same stored row (none via reverse
+                             ordering) — normalized lookup confirmed
+    (disposable users/chats cleaned up afterward)
+- Live backend:         PASS
+    health GET /api/v1          -> 200 Email-Chat-Pro envelope
+    POST /api/v1/auth/register  -> 201 (real DB write through the app)
+    POST /api/v1/auth/login     -> 401 EMAIL_NOT_VERIFIED (expected:
+                                   fresh accounts are unverified; no email
+                                   transport in the stack)
+    registered row confirmed in DB, then removed
+    startup log: ChatsModule dependencies initialized + Nest started
 ```
+
+**Files Changed:**
+
+```text
+Modified:
+apps/backend/src/app.module.ts              (register ChatsModule)
+apps/backend/src/database/data-source.ts    (entities + Chat)
+packages/types/src/index.ts                 (+ export chat.types)
+
+Created:
+apps/backend/src/database/migrations/1788970600000-CreateChatsTable.ts
+apps/backend/src/modules/chats/chat-participants.ts
+apps/backend/src/modules/chats/chat-participants.spec.ts
+apps/backend/src/modules/chats/chats.module.ts
+apps/backend/src/modules/chats/chats.service.ts
+apps/backend/src/modules/chats/chats.service.spec.ts
+apps/backend/src/modules/chats/entities/chat.entity.ts
+packages/types/src/chat.types.ts
+```
+
+**Note:** No messages, WebSocket, or frontend work was performed (Task 2.1 scope). Two environment notes from verification: (a) the port-5432 host conflict between the local Windows `postgresql-x64-18` service and the Docker `email-chat-pro-db` container recurred and was re-resolved by stopping the Windows service; (b) this Bash session exports `PORT=20128` (an occupied port), which shadows the project port when running `node dist/main.js` — the server must be started with `PORT=4000` explicitly. Neither is a product issue.
 
 ---
 
@@ -1400,6 +1462,33 @@ Change: Task 0.1 status moved from Pending to "Completed with Known Issues",
        with actual verification results, changed-file list, verification
        record, and open issues.
 Reason: Required by the Task 0.1 completion workflow.
+Approved By: Mohammad Mehdi.
+```
+
+```text
+Context Change: Task 2.1 record completed.
+File: docs/7-done.md
+Change: Task 2.1 status moved from Not Started to "Completed", with the chats
+       data model, normalization helper, read-path repository, the approved
+       chat-creation-trigger deferral, actual verification results (static
+       checks, migration, live DB invariants, live backend), and changed-file
+       list.
+Reason: Required by the Task 2.1 completion workflow.
+Approved By: Mohammad Mehdi (Task 2.1 authorised; chat-creation deferral
+       approved 2026-09-09).
+```
+
+```text
+Context Change: Execution boundary advanced to Task 2.2 placeholder.
+File: docs/6-current-task.md
+Change: Replaced the Task 2.1 (Chat Foundation) execution boundary with the
+       statement that Task 2.1 is completed and verified (docs/7-done.md),
+       naming the next task (Task 2.2 — Message Persistence) WITHOUT defining
+       its scope, and marking the file as a placeholder pending maintainer
+       approval. Task 2.2 is not started.
+Reason: Task 2.1 completed and verified (recorded in done.md); the normal
+       lifecycle requires current-task.md to describe the next approved task,
+       but Task 2.2 scope is not yet approved so it is only named.
 Approved By: Mohammad Mehdi.
 ```
 
