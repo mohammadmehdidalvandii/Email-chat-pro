@@ -859,7 +859,9 @@ packages/types/src/websocket.types.ts
 
 ## Task 2.4 — Conversation List
 
-**Status:** Not Started
+**Status:** Completed
+
+**Date:** 2026-09-09
 
 **Scope:**
 
@@ -867,11 +869,83 @@ packages/types/src/websocket.types.ts
 * Conversation ordering
 * Basic conversation information
 
+**Implemented / Verified State:**
+
+- **Shared contract** (`packages/types/chat.types.ts`): added `ConversationListItem` — `{ id, contact: User, lastMessage: Message | null, lastActivityAt: string }`. This is the API contract for `GET /chats`, exported automatically through `packages/types/src/index.ts`. It resolves the Conversation List acceptance criteria (features.md): the **contact** carries name/avatar fields (`username`, `fullName`, `avatarUrl` via the shared `User` contract), **lastMessage** is the message preview, and **lastActivityAt** is the activity-time display/sort key.
+- **ChatsService** (`modules/chats/chats.service.ts`): new `findUserConversations(userId)` — returns every chat the user participates in (`where: [{ userAId: userId }, { userBId: userId }]`), each resolved to:
+  - `contact` — the **other** participant (chosen by which side of the `userA`/`userB` scalar pair the caller is on), mapped to the shared `User` DTO via `AuthService.toUserDto`.
+  - `lastMessage` — the chat's single most recent `Message` (or `null`).
+  - `lastActivityAt` — the last message's `createdAt`, or the chat's `createdAt` when the chat has no messages (recent-activity sort key).
+  - Results are **sorted by recent activity, most recent first** (features.md — "Conversations are sorted by recent activity").
+  - No N+1: other participants are bulk-loaded with a single `usersRepository.find({ where: { id: In(ids) } })` (TypeORM `In` operator) and latest messages with a single `DISTINCT ON (chat_id)` query backed by `idx_messages_chat_created` (`loadLatestMessages`, using `leftJoinAndSelect('m.sender')`, `where chat_id IN (...)`, `orderBy chat_id ASC + created_at DESC`, `distinctOn(['m.chat_id'])`). An empty chat set short-circuits before either bulk query.
+  - `toMessageDto` (private) maps a persisted `Message` entity to the shared `Message` contract (sender resolved via `toUserDto`) — a small intentional duplication of `MessagesService.toMessageDto` to avoid a module cycle (see Module wiring below).
+- **ChatsController** (`modules/chats/chats.controller.ts`, new): `GET /chats`, `@UseGuards(JwtAuthGuard)` + `@HttpCode(200)`, returns `ApiResponse<ConversationListItem[]>` built from `req.user.id` — the list is scoped to the authenticated user, never caller-provided. Mounted under `Controller('chats')`, sharing the `/chats` namespace with `MessagesController` (which owns `:chatId/messages`); there is no route conflict.
+- **ChatsModule** (`modules/chats/chats.module.ts`): now imports `TypeOrmModule.forFeature([Chat, User, Message])` (User + Message repos needed for the other-participant and latest-message reads) and `AuthModule` (shared `toUserDto` mapper + guard). Adds `controllers: [ChatsController]`. `ChatsService` remains exported for downstream reuse.
+- **No Chat entity change**: the `Chat` entity still maps scalar `userAId`/`userBId` columns without relations (adding `@ManyToOne` to the scalar columns would conflict with the existing decorators — TypeORM cannot own both a scalar column and a relation on the same DB column). The other participant is loaded via the separate `In()` user query instead of a relation, preserving the approved data model untouched.
+- **No chat-creation endpoint introduced**: `GET /chats` is read-only. Creating chats remains deferred (Task 2.1 open decision — chat creation trigger resolved in a later task that introduces an actual creation path).
+- **Scope boundary**: no unread counters, no read receipts, no pagination on `GET /chats` (not required by features.md), no frontend (conversation UI is a later task), no contact-gating (Phase 3). `ChatsService.findUserConversations` respects **message-history preservation** and chat-membership authorization: a user only ever sees chats they participate in.
+
+**Tests:** 12 new, **84/84 total across 11 suites** — `chats.service.spec.ts` (+5 `findUserConversations`: empty chat set short-circuits, other-participant + latest-message + activity resolution, other-participant selection by position in the pair, chat-creation-time fallback when no messages, recency sort) and `chats.controller.spec.ts` (new file, 2: service delegation + `ApiResponse` envelope, empty-array return). Both specs use the established `jest.mock('@nestjs/jwt', ...)` pattern for the ESM-only `@nestjs/jwt` v12 (controller spec needs it because the `ChatsController → ChatsService → AuthService` import chain reaches `@nestjs/jwt`).
+
 **Verification:**
 
 ```text
-Not Started
+Executed 2026-09-09.
+
+- npm run build:packages: PASS
+- npx tsc --noEmit (backend): PASS
+- npx eslint "src/**/*.ts" --max-warnings=0 (backend): PASS
+- npx jest (backend): PASS — 11 suites / 84 tests
+- npm run build: PASS (nest build)
+- Live endpoint tests (backend on port 4000 — must be started with
+  PORT=4000 explicitly because this Bash session exports PORT=20128,
+  a known environment note from Task 2.1):
+    1. GET /chats (no token)                -> 401 UNAUTHORIZED envelope
+    2. register alice + bob + carol, mark
+       verified via SQL (no email transport
+       in the stack — verification token is
+       not delivered), login x3            -> tokens obtained
+    3. GET /chats as alice (no chats)       -> 200 { data: [] }
+    4. seed chat-1 (alice-bob) + chat-2
+       (alice-carol) via SQL (chat creation
+       endpoint is deferred; Task 2.1 open
+       decision), with messages:
+       chat-1: bob "Hi Alice!" (-10 min),
+               alice "Hey Bob! how are you?"
+                      (-8 min, latest in chat)
+       chat-2: carol "Hello Alice! long time"
+                      (-3 min, newest overall)
+    5. GET /chats as alice                 -> 200; 2 conversations
+       ordered chat-2 (Carol, newest) first then chat-1 (Bob);
+       chat-2 lastMessage = carol's "Hello Alice! long time";
+       chat-1 lastMessage = alice's "Hey Bob! how are you?"
+         (the older "Hi Alice!" correctly NOT selected);
+       contact = the OTHER participant (Carol / Bob, never alice);
+       lastActivityAt = last message createdAt;
+       messageType/mediaUrl present in the Message contract;
+       ApiResponse envelope { success, data, timestamp }
+    6. GET /chats as bob                   -> 200; 1 conversation only
+       (chat-1), contact = alice — caller-scoped isolation confirmed
+       (carol's chat is invisible to bob), latest message + preview resolved
+    7. Seeded verification data cleaned up (3 test users, 2 chats,
+       3 messages removed; pre-existing Task 2.2/2.3 rows untouched)
 ```
+
+**Files Changed:**
+
+```text
+Modified:
+packages/types/src/chat.types.ts                      (+ ConversationListItem)
+apps/backend/src/modules/chats/chats.module.ts        (+ User/Message repos, AuthModule import, ChatsController)
+apps/backend/src/modules/chats/chats.service.ts       (+ findUserConversations, loadLatestMessages, toMessageDto; injects User/Message repos + AuthService)
+apps/backend/src/modules/chats/chats.service.spec.ts  (+5 findUserConversations tests; repo/auth mocks)
+
+Created:
+apps/backend/src/modules/chats/chats.controller.ts
+apps/backend/src/modules/chats/chats.controller.spec.ts
+```
+
+**Note:** No frontend, no WebSocket changes, no contact-gating, no chat creation, no unread/read-receipt state — Task 2.4 scope. The `ConversationListItem` payload shape is the implementation of the architecture.md `GET /chats` (which loosely lists "Chat objects"); the richer item is what the Conversation List feature criteria (contact name/avatar, last-message preview, last-activity time) require, so the RouteMapper resolves the chat to its `contact`, `lastMessage`, and `lastActivityAt`. Reused existing infrastructure: `JwtAuthGuard`, `AuthenticatedRequest` pattern, `ApiResponse`, `AuthService.toUserDto`, shared `Chat`/`Message`/`User` contracts, `normalizeParticipants`. No new dependency. No Redis/Kafka/brokers introduced.
 
 ---
 
@@ -1330,6 +1404,32 @@ Unauthorized scope changes:
 - None
 ```
 
+```text
+Task: 2.4
+Date: 2026-09-09
+
+Environment:
+- Node.js v24.17.0
+- npm 11.13.0
+- Docker 29.5.3
+- PostgreSQL 16 (email-chat-pro-db container, port 5432)
+
+Checks:
+- npm run build:packages: PASS
+- npx tsc --noEmit (backend): PASS
+- npx eslint "src/**/*.ts" --max-warnings=0 (backend): PASS
+- npx jest (backend): PASS (11 suites / 84 tests)
+- npm run build: PASS (nest build)
+- Live endpoint tests: PASS (201/200/401 — register x3, SQL verify (no
+  email transport), login x3, GET /chats no-token 401, empty list 200,
+  seeded 2 chats + 3 messages, alice sees 2 conversations ordered by
+  recency with correct latest message + other participant, bob sees only
+  his 1 conversation; seeded data cleaned up)
+
+Unauthorized scope changes:
+- None
+```
+
 ---
 
 # Known Issues
@@ -1697,6 +1797,41 @@ Change: Replaced the Task 2.3 (Real-time Messaging) execution boundary with
 Reason: Task 2.3 completed and verified (recorded in done.md); the normal
        lifecycle requires current-task.md to describe the next approved task,
        but Task 2.4 scope is not yet approved so it is only named.
+Approved By: Mohammad Mehdi.
+```
+
+```text
+Context Change: Task 2.4 record completed.
+File: docs/7-done.md
+Change: Task 2.4 status moved from Not Started to "Completed", with the
+       ConversationListItem shared contract, ChatsService.findUserConversations
+       (other participant + latest message + recency sort via one DISTINCT ON
+       query and one In() bulk user query, no N+1), the new ChatsController
+       GET /chats (JwtAuthGuard, caller-scoped), the ChatsModule wiring
+       (User/Message repos + AuthModule), and actual verification results
+       (type-check, lint, 11 suites / 84 tests, build, live endpoint tests
+       incl. caller-scoped isolation).
+Reason: Required by the Task 2.4 completion workflow.
+Approved By: Mohammad Mehdi (Task 2.4 re-approved for execution with the
+       scope from done.md Task 2.4 placeholder + features.md Conversation
+       List + architecture.md GET /chats).
+```
+
+```text
+Context Change: Execution boundary advanced to Task 2.5 placeholder.
+File: docs/6-current-task.md
+Change: Replaced the Task 2.4 (Conversation List) execution boundary with the
+       statement that Task 2.4 is completed and verified (docs/7-done.md),
+       naming the next task (Task 2.5 — Chat Creation) WITHOUT defining its
+       scope, and marking the file as a placeholder pending maintainer
+       approval. Task 2.5 is not started.
+Reason: Task 2.4 completed and verified (recorded in done.md); the normal
+       lifecycle requires current-task.md to describe the next approved task,
+       but Task 2.5 scope is not yet approved so it is only named.
+       NOTE: "Task 2.5 — Chat Creation" is the working title carried forward
+       from the prior open decision (chat-creation trigger — explicit POST
+       /chats / implicit on first message / from accepted contact, Task 2.1
+       deferral); it is a placeholder, not an approved scope.
 Approved By: Mohammad Mehdi.
 ```
 

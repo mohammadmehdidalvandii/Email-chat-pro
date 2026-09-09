@@ -60,3 +60,23 @@ export interface CreateMessageInput {
   messageType: MessageType
   mediaUrl?: string | null
 }
+
+/**
+ * A single row in a user's conversation list (features.md — Phase 2,
+ * "Conversation List"; GET /chats).
+ *
+ * The chat is rendered as its resolved "other" participant (`contact`),
+ * the most recent message as a preview (`lastMessage`, null when the chat has
+ * no messages yet), and a recent-activity timestamp used to sort the list
+ * (`lastActivityAt` — the last message time, or the chat creation time when
+ * there are no messages).
+ */
+export interface ConversationListItem {
+  id: string
+  /** The other participant (the authenticated user's counterpart in the chat). */
+  contact: User
+  /** The most recent message in the chat, used as a preview. Null when empty. */
+  lastMessage: Message | null
+  /** Sort key for "recent activity" — last message time, else chat creation time. */
+  lastActivityAt: string
+}
