@@ -1,8 +1,11 @@
 import {
   BadRequestException,
   ForbiddenException,
+  forwardRef,
+  Inject,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { ERROR_CODES, ERROR_MESSAGES } from '@email-chat-pro/constants'
@@ -11,6 +14,7 @@ import { Repository } from 'typeorm'
 import { AuthService } from '../auth/auth.service'
 import { User } from '../auth/entities/user.entity'
 import { ChatsService } from '../chats/chats.service'
+import { ChatGateway } from '../websocket/websocket.gateway'
 import { CreateMessageDto } from './dto/create-message.dto'
 import { Message } from './entities/message.entity'
 
@@ -34,6 +38,9 @@ export class MessagesService {
     private readonly messagesRepository: Repository<Message>,
     private readonly chatsService: ChatsService,
     private readonly authService: AuthService,
+    @Optional()
+    @Inject(forwardRef(() => ChatGateway))
+    private readonly chatGateway: ChatGateway | undefined,
   ) {}
 
   /**
@@ -80,8 +87,14 @@ export class MessagesService {
       mediaUrl: dto.mediaUrl ?? null,
     })
     const saved = await this.messagesRepository.save(message)
+    const messageDto = this.toMessageDto(saved)
 
-    return this.toMessageDto(saved)
+    // Task 2.3 — Real-time delivery. REST persists (source of truth); the
+    // gateway broadcasts `message:received` to the chat room. The gateway is
+    // optional so the service remains usable in isolation (e.g. tests).
+    this.chatGateway?.broadcastToChat(chatId, { message: messageDto, chatId })
+
+    return messageDto
   }
 
   /**

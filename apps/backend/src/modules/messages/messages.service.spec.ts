@@ -5,6 +5,7 @@ import { AuthService } from '../auth/auth.service'
 import { User } from '../auth/entities/user.entity'
 import { ChatsService } from '../chats/chats.service'
 import { Chat } from '../chats/entities/chat.entity'
+import { ChatGateway } from '../websocket/websocket.gateway'
 import { CreateMessageDto } from './dto/create-message.dto'
 import { Message } from './entities/message.entity'
 import { MessagesService } from './messages.service'
@@ -27,6 +28,10 @@ describe('MessagesService', () => {
 
   const authService = {
     toUserDto: jest.fn(),
+  }
+
+  const chatGateway = {
+    broadcastToChat: jest.fn(),
   }
 
   const baseUser: User = {
@@ -68,6 +73,7 @@ describe('MessagesService', () => {
           useValue: { findById: jest.fn() },
         },
         { provide: AuthService, useValue: authService },
+        { provide: ChatGateway, useValue: chatGateway },
       ],
     }).compile()
 
@@ -199,6 +205,48 @@ describe('MessagesService', () => {
       expect(result.messageType).toBe('text')
       expect(result.mediaUrl).toBeNull()
       expect(result.createdAt).toBe(messageEntity.createdAt.toISOString())
+    })
+
+    it('broadcasts the persisted message to the chat room via ChatGateway', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+      const messageEntity = {
+        id: 'msg-1',
+        chatId: 'chat-1',
+        sender: baseUser,
+        content: 'Hello!',
+        messageType: 'text',
+        mediaUrl: null,
+        createdAt: new Date('2026-06-01T00:00:00Z'),
+      }
+      repository.create.mockReturnValue(messageEntity)
+      repository.save.mockResolvedValue(messageEntity)
+      authService.toUserDto.mockReturnValue({ id: baseUser.id })
+
+      const result = await service.sendMessage(baseUser, 'chat-1', dto)
+
+      expect(chatGateway.broadcastToChat).toHaveBeenCalledTimes(1)
+      expect(chatGateway.broadcastToChat).toHaveBeenCalledWith('chat-1', {
+        message: result,
+        chatId: 'chat-1',
+      })
+    })
+
+    it('does not broadcast when the chat does not exist', async () => {
+      chatsService().findById.mockResolvedValue(null)
+
+      await expect(service.sendMessage(baseUser, 'chat-1', dto)).rejects.toMatchObject({
+        status: 404,
+      })
+      expect(chatGateway.broadcastToChat).not.toHaveBeenCalled()
+    })
+
+    it('does not broadcast when the user is not a participant', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+
+      await expect(
+        service.sendMessage({ ...baseUser, id: 'not-a-participant' } as User, 'chat-1', dto),
+      ).rejects.toMatchObject({ status: 403 })
+      expect(chatGateway.broadcastToChat).not.toHaveBeenCalled()
     })
   })
 

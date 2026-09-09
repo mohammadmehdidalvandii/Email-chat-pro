@@ -16,19 +16,19 @@ When the task is completed and verified, the completed work MUST be recorded in 
 
 ## Phase 2 — Real-time Messaging
 
-**Task 2.2 — Message Persistence** is **completed and verified** (`docs/7-done.md`).
+**Task 2.3 — Real-time Messaging** is **completed and verified** (`docs/7-done.md`).
 
 ---
 
 # Next Task
 
-The next task is **Task 2.3 — Real-time Messaging**. It has **NOT been started**.
+The next task is **Task 2.4 — Conversation List**. It has **NOT been started**.
 
-> This file is a placeholder for the **next approved task**. It was set when Task 2.2 completed. Task 2.3's scope has NOT been approved and is intentionally NOT defined here. The task owner should review and confirm the Task 2.3 scope before implementation begins.
+> This file is a placeholder for the **next approved task**. It was set when Task 2.3 completed. Task 2.4's scope has NOT been approved and is intentionally NOT defined here. The task owner should review and confirm the Task 2.4 scope before implementation begins.
 
-Claude Code MUST NOT begin implementing Task 2.3 until it has been explicitly re-approved.
+Claude Code MUST NOT begin implementing Task 2.4 until it has been explicitly re-approved.
 
-Claude Code MUST NOT invent Task 2.3 requirements from memory or from `features.md`/`architecture.md` (e.g. Socket.IO setup, chat rooms, shared event contracts, or real-time delivery).
+Claude Code MUST NOT invent Task 2.4 requirements from memory or from `features.md`/`architecture.md` (e.g. conversation retrieval, ordering, or basic conversation information).
 
 ---
 

@@ -770,7 +770,9 @@ Executed 2026-09-09.
 
 ## Task 2.3 — Real-time Messaging
 
-**Status:** Not Started
+**Status:** Completed
+
+**Date:** 2026-09-09
 
 **Scope:**
 
@@ -779,11 +781,79 @@ Executed 2026-09-09.
 * Real-time message delivery
 * Shared WebSocket event contracts
 
+**Implemented / Verified State:**
+
+- **Dependencies** (`apps/backend/package.json`): added `@nestjs/platform-socket.io@^11.2.3`, `@nestjs/websockets@^11.2.3`, and `socket.io@^4.8.3` per `stack.md`.
+- **Shared WebSocket contracts** (`packages/types/websocket.types.ts`, exported from `packages/types/src/index.ts`): `JoinChatPayload`, `LeaveChatPayload`, `SendMessagePayload`, `MessageSentEvent` (`{ message, chatId }`), `ErrorEvent` (`{ code, message }`), plus `WS_CLIENT_EVENTS` (`chat:join`, `chat:leave`, `message:send`) and `WS_SERVER_EVENTS` (`message:received`, `error:event`, `chat:joined`, `chat:left`) — consumed by both the gateway and the (future) frontend so event payloads stay consistent (architecture.md §WebSocket Events).
+- **Shared error constants** (`packages/constants/error.constants.ts`): `WS_CONNECTION_FAILED`, `WS_UNAUTHORIZED`, `WS_CHAT_UNAUTHORIZED` with the standard error envelope.
+- **ChatGateway** (`modules/websocket/websocket.gateway.ts`): Socket.IO gateway on the `/chats` namespace with CORS restricted to the frontend origin.
+  - `handleConnection` reads the JWT from `socket.handshake.auth.token`, verifies it, and looks the user up from the DB. Missing/invalid tokens or unknown/inactive users are rejected with `error:event` `UNAUTHORIZED` followed by `disconnect(true)`. Valid users are stored in an in-memory `connectedUsers` map (socket.id → User) and a `Client connected — <id>` log is emitted.
+  - `handleDisconnect` removes the socket from `connectedUsers`.
+  - `handleJoinChat` (`chat:join`) verifies the user is a participant of the chat (`ChatsService.findById` + participant check against `userAId`/`userBId`), then `client.join('chat:{id}')`; non-participants receive `error:event` `FORBIDDEN` (`WS_CHAT_UNAUTHORIZED`). Returns `chat:joined`.
+  - `handleLeaveChat` (`chat:leave`) leaves the room and returns `chat:left`.
+  - `broadcastToChat(chatId, event)` emits `message:received` to the `chat:{id}` room — the real-time delivery mechanism after REST persistence.
+  - **Connect→join race fix**: `handleConnection` performs an async DB lookup, so a client could emit `chat:join` before the map is populated (observed in live verification — immediate join after connect returned `UNAUTHORIZED`). `handleJoinChat` now resolves the user via a `resolveUser()` helper that falls back to re-verifying the handshake token and re-loading the user from the DB when the map entry is not yet present. This keeps join authorization correct regardless of timing. A unit test covers the fallback path.
+- **WebSocketModule** (`modules/websocket/websocket.module.ts`): imports `TypeOrmModule.forFeature([User])`, `AuthModule`, and `ChatsModule`; provides and exports `ChatGateway`.
+- **Messages integration** (`modules/messages/messages.service.ts`, `messages.module.ts`, `app.module.ts`): `MessagesService` injects `ChatGateway` via `@Optional() @Inject(forwardRef(() => ChatGateway))`; after a message is persisted (`sendMessage`), it calls `chatGateway?.broadcastToChat(chatId, { message, chatId })`. `MessagesModule` imports `WebSocketModule` via `forwardRef` to resolve the module cycle; `WebSocketModule` is registered in `app.module.ts`. REST remains the source of truth for persistence; the gateway does not handle `message:send` in Task 2.3.
+- **Not implemented**: typing indicators, read receipts, presence, media over WebSocket — all out of scope (Phase 4 / out-of-scope list).
+
+**Tests:** 16 new, **77/77 total across 10 suites** — `websocket.gateway.spec.ts` (13: 5 handleConnection [no-token, invalid token, unknown user, inactive user, valid connection], 1 handleDisconnect, 4 handleJoinChat [unauthorized, not-found, forbidden, authorized] + 1 race-fallback, 1 handleLeaveChat, 1 broadcastToChat) and `messages.service.spec.ts` (+3 broadcast tests: broadcast after persist, no broadcast on chat-not-found, no broadcast on non-participant). The specs use the established `jest.mock('@nestjs/jwt', ...)` pattern for the ESM-only `@nestjs/jwt` v12.
+
 **Verification:**
 
 ```text
-Not Started
+Executed 2026-09-09.
+
+- npm ci --include=dev:  PASS (restored dev deps removed by the global
+  `omit=["dev"]` config; needed for type-check/lint/test)
+- npx tsc --noEmit (backend): PASS
+- npx eslint "src/**/*.ts" --max-warnings=0 (backend): PASS
+- npx jest (backend): PASS — 10 suites / 77 tests
+- npm run build:  PASS (nest build)
+- Live WebSocket E2E (backend on port 4000, /chats namespace):
+    1. no-token connection          -> rejected; client got error:event
+       UNAUTHORIZED + server disconnect
+    2. alice (valid token)          -> connected, chat:join -> chat:joined
+    3. testmsg (valid token)        -> connected, chat:join -> chat:joined
+    4. REST POST /chats/:id/messages (alice) -> 201; testmsg received
+       message:received with correct chatId, content, and senderId
+    5. bob (non-participant)        -> connected; chat:join -> error:event
+       FORBIDDEN (not added to room)
+    Result: 14/14 checks passed.
+  Backend log evidence (ChatGateway):
+    - Connection rejected — no token provided [...]
+    - Client connected — 11111111-1111-1111-1111-111111111111 [...]
+    - Client connected — 99b14b63-8b27-4241-876e-a278dfc256fb [...]
+    - User 1111... joined room chat:aaaaaaaa-... [...]
+    - User 99b1... joined room chat:aaaaaaaa-... [...]
+    - Broadcast message:received to room chat:aaaaaaaa-... [...]
+    - Client connected — 22222222-2222-2222-2222-222222222222 [...]
+- Live fix (surfaced by live verification): the connect→join race described
+  above was observed live (immediate chat:join after connect returned
+  UNAUTHORIZED) and fixed in handleJoinChat; re-verified live (14/14).
 ```
+
+**Files Changed:**
+
+```text
+Modified:
+apps/backend/package.json                       (+ @nestjs/platform-socket.io,
+                                                 @nestjs/websockets, socket.io)
+apps/backend/src/app.module.ts                  (+ WebSocketModule import)
+apps/backend/src/modules/messages/messages.module.ts   (+ forwardRef WebSocketModule)
+apps/backend/src/modules/messages/messages.service.ts  (+ @Optional() @Inject(forwardRef(ChatGateway)); broadcast after persist)
+apps/backend/src/modules/messages/messages.service.spec.ts (+3 broadcast tests)
+packages/constants/src/error.constants.ts       (+ WS_CONNECTION_FAILED, WS_UNAUTHORIZED, WS_CHAT_UNAUTHORIZED)
+packages/types/src/index.ts                     (+ export websocket.types)
+
+Created:
+apps/backend/src/modules/websocket/websocket.gateway.ts
+apps/backend/src/modules/websocket/websocket.gateway.spec.ts
+apps/backend/src/modules/websocket/websocket.module.ts
+packages/types/src/websocket.types.ts
+```
+
+**Note:** No frontend, media, presence, or typing-indicator work was performed (Task 2.3 scope). The frontend production build remains a pre-existing known issue (see Open Issues). `socket.io-client` was installed transiently (`--no-save`) only as a live-verification tool and is not a project dependency.
 
 ---
 
@@ -1235,6 +1305,31 @@ Unauthorized scope changes:
 - None
 ```
 
+```text
+Task: 2.3
+Date: 2026-09-09
+
+Environment:
+- Node.js v24.17.0
+- npm 11.13.0
+- Docker 29.5.3
+- PostgreSQL 16 (email-chat-pro-db container, port 5432)
+
+Checks:
+- npm ci --include=dev: PASS (restored dev deps for type-check/lint/test)
+- npx tsc --noEmit (backend): PASS
+- npx eslint "src/**/*.ts" --max-warnings=0 (backend): PASS
+- npx jest (backend): PASS (10 suites / 77 tests)
+- npm run build: PASS (nest build)
+- Live WebSocket E2E: PASS (14/14 checks — no-token rejection,
+  alice + testmsg connect and join, REST POST -> message:received broadcast
+  to the other participant, bob non-participant join rejected FORBIDDEN)
+- Live race fix re-verified: PASS
+
+Unauthorized scope changes:
+- None
+```
+
 ---
 
 # Known Issues
@@ -1575,6 +1670,33 @@ Change: Replaced the Task 2.1 (Chat Foundation) execution boundary with the
 Reason: Task 2.1 completed and verified (recorded in done.md); the normal
        lifecycle requires current-task.md to describe the next approved task,
        but Task 2.2 scope is not yet approved so it is only named.
+Approved By: Mohammad Mehdi.
+```
+
+```text
+Context Change: Task 2.3 record completed.
+File: docs/7-done.md
+Change: Task 2.3 status moved from Not Started to "Completed", with the
+       Socket.IO gateway, shared WebSocket event contracts/error constants,
+       messages-module broadcast integration, the connect→join race fix
+       surfaced by live verification, and actual verification results
+       (type-check, lint, 10 suites / 77 tests, build, live WebSocket E2E
+       14/14).
+Reason: Required by the Task 2.3 completion workflow.
+Approved By: Mohammad Mehdi (Task 2.3 authorised for execution).
+```
+
+```text
+Context Change: Execution boundary advanced to Task 2.4 placeholder.
+File: docs/6-current-task.md
+Change: Replaced the Task 2.3 (Real-time Messaging) execution boundary with
+       the statement that Task 2.3 is completed and verified (docs/7-done.md),
+       naming the next task (Task 2.4 — Conversation List) WITHOUT defining
+       its scope, and marking the file as a placeholder pending maintainer
+       approval. Task 2.4 is not started.
+Reason: Task 2.3 completed and verified (recorded in done.md); the normal
+       lifecycle requires current-task.md to describe the next approved task,
+       but Task 2.4 scope is not yet approved so it is only named.
 Approved By: Mohammad Mehdi.
 ```
 

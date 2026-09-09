@@ -59,4 +59,8 @@ export const ERROR_MESSAGES = {
   MESSAGE_TYPE_INVALID:
     'messageType must be "text" — image and video messages are not supported yet',
   MESSAGE_MEDIA_NOT_ALLOWED: 'Text messages cannot include a media URL',
+  // Task 2.3 — Real-time Messaging (WebSocket)
+  WS_CONNECTION_FAILED: 'WebSocket connection failed',
+  WS_UNAUTHORIZED: 'Authentication required to connect',
+  WS_CHAT_UNAUTHORIZED: 'You are not a participant of this chat',
 } as const

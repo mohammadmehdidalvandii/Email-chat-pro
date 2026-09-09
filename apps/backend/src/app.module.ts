@@ -7,6 +7,7 @@ import { AuthModule } from './modules/auth/auth.module'
 import { ChatsModule } from './modules/chats/chats.module'
 import { MessagesModule } from './modules/messages/messages.module'
 import { UsersModule } from './modules/users/users.module'
+import { WebSocketModule } from './modules/websocket/websocket.module'
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { UsersModule } from './modules/users/users.module'
     UsersModule,
     ChatsModule,
     MessagesModule,
+    WebSocketModule,
   ],
   controllers: [AppController],
   providers: [AppService],
