@@ -1025,7 +1025,9 @@ Created:
 
 ## Task 3.2 — Contact Requests
 
-**Status:** Not Started
+**Status:** Completed with Known Issues
+
+**Date:** 2026-09-13
 
 **Scope:**
 
@@ -1036,11 +1038,73 @@ Created:
 * Duplicate request prevention
 * Self-request prevention
 
+**Implemented / Verified State:**
+
+- **Database migration** (`1789257600000-CreateContactRequestsTable.ts`): creates the `contact_requests` table per `architecture.md` §Data Model — `id uuid PRIMARY KEY DEFAULT gen_random_uuid()`, `sender_id uuid NOT NULL REFERENCES users(id)`, `receiver_id uuid NOT NULL REFERENCES users(id)`, `status varchar(20) NOT NULL DEFAULT 'pending'`, `created_at`/`updated_at TIMESTAMP NOT NULL DEFAULT now()`, `CONSTRAINT uq_contact_requests_sender_receiver UNIQUE (sender_id, receiver_id)`, `CONSTRAINT chk_contact_requests_sender_neq_receiver CHECK (sender_id <> receiver_id)`, `CONSTRAINT chk_contact_requests_status CHECK (status IN ('pending','accepted','declined'))`, plus `idx_contacts_receiver_id` and `idx_contacts_status`.
+- **Shared contracts** (`packages/types/contact.types.ts`): `ContactRequestStatus` (`'pending' | 'accepted' | 'declined'`), `ContactRequest` (id, senderId, sender: User, receiverId, receiver: User, status, createdAt, updatedAt), `CreateContactRequestInput` (receiverId), `UpdateContactRequestInput` (status: `accepted | declined`), exported via `packages/types/src/index.ts`. Both participants are full `User` objects so the recipient can identify the sender.
+- **Shared constants** (`packages/constants`): `CONTACT_REQUEST_STATUSES` and `CONTACT_REQUEST_RESPONSE_STATUSES` (validation.constants.ts); seven `CONTACT_REQUEST_*` error messages (error.constants.ts).
+- **ContactRequest entity** (`modules/contacts/entities/contact-request.entity.ts`): maps `contact_requests` with the two `@ManyToOne` User relations via explicit `@JoinColumn({ name: 'sender_id' })` / `@JoinColumn({ name: 'receiver_id' })` (per the Task 2.2 sender_id lesson — without it TypeORM generates camelCase column names). Only relations are mapped (no scalar FK columns), matching the shared contract's full-user shape and the chats-entity note that TypeORM cannot own both a scalar column and a relation on one column.
+- **DTOs** (`modules/contacts/dto/`): `CreateContactRequestDto` (`receiverId` `@IsUUID()`), `UpdateContactRequestDto` (`status` `@IsIn(CONTACT_REQUEST_RESPONSE_STATUSES)` — anything other than `accepted`/`declined` → 400 `VALIDATION_ERROR` via the global pipe).
+- **ContactsService** (`modules/contacts/contacts.service.ts`):
+  - `sendRequest(sender, receiverId)`: self-request → 400 `CONTACT_REQUEST_SELF_NOT_ALLOWED`; receiver must exist, be active, and not be deleted → else 404 `CONTACT_REQUEST_RECEIVER_NOT_FOUND`; existing **pending or accepted** request for the directed pair → 409 `CONTACT_REQUEST_DUPLICATE`; existing **declined** request → **reactivated to `pending`** (approved reading of "Declined requests prevent future messages until new request sent"; the re-send is the new request); `23505` insert race → 409.
+  - `getIncomingRequests(userId)`: all **pending** requests where the caller is the receiver, relations `sender`+`receiver` loaded, `createdAt DESC` (newest first).
+  - `respondToRequest(userId, requestId, status)`: 404 when the request does not exist; 403 `CONTACT_REQUEST_NOT_RECEIVER` when the caller is not the receiver (a sender cannot respond to its own request); 409 `CONTACT_REQUEST_ALREADY_RESPONDED` when the status is no longer `pending`. Accept and decline both run inside a **single `DataSource.transaction`** (CLAUDE.md §19 — multiple related DB operations must succeed or fail together): the status is updated, and on `accepted` the one-to-one chat is created via `normalizeParticipants` (stored `user_a < user_b`) with an in-transaction dedupe (an existing chat is reused; an isolated `23505` chat-insert race is absorbed so the status update still commits).
+  - `toContactRequestDto`: maps the entity to the shared contract via `AuthService.toUserDto` for both participants; `senderId`/`receiverId` derived from the loaded relations.
+- **ContactsController** (`modules/contacts/contacts.controller.ts`): `@Controller('contacts')`, all routes `JwtAuthGuard`-protected with `AuthenticatedRequest` — `POST requests` (201), `GET requests/incoming` (200), `PATCH requests/:requestId` (`ParseUUIDPipe`, 200). The sender / responding receiver are derived from `req.user`, never from the body.
+- **ContactsModule** (`modules/contacts/contacts.module.ts`): registers `TypeOrmModule.forFeature([ContactRequest, User, Chat])` + `AuthModule`; provides and exports `ContactsService`. The shared `DataSource` from `TypeOrmModule.forRoot` is injected for the transaction. Registered in `app.module.ts`; `ContactRequest` added to the migration `data-source.ts` entities.
+- **Chat creation on accept** (Approved Decision 2, 2026-09-13): accepting a request atomically creates the normalized one-to-one chat, resolving the Task 2.1 deferred chat-creation trigger **for the contact-acceptance path only**. No explicit `POST /chats`, no first-message chat creation, and no contact-based messaging gating were introduced (`MessagesService` is untouched — that is Task 3.3).
+- **Tests**: 22 new, **113/113 total across 13 suites** — `contacts.service.spec.ts` (19: sendRequest — self 400, receiver 404, active+non-deleted lookup shape, pending 409, accepted 409, declined→reactivate, happy-path create + contract mapping, 23505→409, non-unique rethrow; getIncomingRequests — pending-only + DESC + relations, empty; respondToRequest — 404, 403 not-receiver, 409 already-responded, accept creates normalized chat in one transaction, reversed-pair normalization, existing-chat dedupe, isolated 23505 absorbed, decline without chat) and `contacts.controller.spec.ts` (3: POST delegation/envelope, GET incoming delegation, PATCH delegation). Specs use the established `jest.mock('@nestjs/jwt', ...)` pattern and a mocked `DataSource.transaction` that invokes the callback with a mocked `EntityManager`.
+
 **Verification:**
 
 ```text
-Not Started
+Executed 2026-09-13.
+
+- npm run build:packages: PASS
+- npx tsc --noEmit (backend): PASS
+- npx eslint "src/**/*.ts" --max-warnings=0 (backend): PASS
+- npx jest (backend): PASS — 13 suites / 113 tests (+22 for contacts)
+- npm run build (nest build): PASS
+- npm run format:check: PARTIAL — all Task 3.2 files pass Prettier; the
+  pre-existing Task 2.2 migration file (1789050600000-CreateMessagesTable.ts)
+  remains unformatted (unchanged, out of scope — known issue carried from
+  Task 3.1/2.2).
+- Migration (npm run migration:show, DB connectivity probe): FAILED — the
+  environment blocker from Task 3.1 persists. Host port 5432 is held by the
+  Windows PostgreSQL service (postgresql-x64-18), which rejects the app
+  credentials (probe returned 28P01 FATAL auth_failed this session). The
+  approved Docker postgres container is unreachable from the Windows host
+  (bridge IP 172.20.0.2 TCP probe timed out — WSL2 NAT). Stopping the Windows
+  service requires admin, which is unavailable.
+- Live endpoint tests (current-task.md checks 1-13): NOT EXECUTED — blocked by
+  the same environment (the contact_requests table could not be created
+  against any reachable PostgreSQL). Not claimed passed.
 ```
+
+**Files Changed:**
+
+```text
+Modified:
+apps/backend/src/app.module.ts                            (+ ContactsModule import)
+apps/backend/src/database/data-source.ts                  (+ ContactRequest entity in entities)
+packages/constants/src/error.constants.ts                (+ 7 CONTACT_REQUEST_* messages)
+packages/constants/src/validation.constants.ts           (+ CONTACT_REQUEST_STATUSES, CONTACT_REQUEST_RESPONSE_STATUSES)
+packages/types/src/index.ts                              (+ export contact.types)
+
+Created:
+apps/backend/src/database/migrations/1789257600000-CreateContactRequestsTable.ts
+apps/backend/src/modules/contacts/contacts.controller.spec.ts
+apps/backend/src/modules/contacts/contacts.controller.ts
+apps/backend/src/modules/contacts/contacts.module.ts
+apps/backend/src/modules/contacts/contacts.service.spec.ts
+apps/backend/src/modules/contacts/contacts.service.ts
+apps/backend/src/modules/contacts/dto/create-contact-request.dto.ts
+apps/backend/src/modules/contacts/dto/update-contact-request.dto.ts
+apps/backend/src/modules/contacts/entities/contact-request.entity.ts
+packages/types/src/contact.types.ts
+```
+
+**Note:** No frontend, WebSocket, presence, rate limiting, contact list, contact-based messaging authorization (Task 3.3), or chat creation outside the accept path was implemented (Task 3.2 scope). `MessagesService` and `ChatsService` are untouched. The migration is written and static-verified but was NOT applied to a live database (environment blocker) — the table does not exist at runtime until it can be applied. No new dependency, no Redis/Kafka/brokers.
 
 ---
 
@@ -1512,6 +1576,38 @@ Unauthorized scope changes:
 - None
 ```
 
+```text
+Task: 3.2
+Date: 2026-09-13
+
+Environment:
+- Node.js v24.17.0
+- npm 11.13.0
+- Docker (Docker Desktop / WSL2 backend), daemon running
+- Windows PostgreSQL 18 service still owns host TCP 5432 (recurring port
+  conflict — see Task 0.1/1.1 known issues)
+
+Checks:
+- npm run build:packages: PASS
+- npx tsc --noEmit (backend): PASS
+- npx eslint "src/**/*.ts" --max-warnings=0 (backend): PASS
+- npx jest (backend): PASS (13 suites / 113 tests; +22 for contacts)
+- npm run build (nest build): PASS
+- npm run format:check: PARTIAL (all Task 3.2 files pass; pre-existing
+  Task 2.2 migration file 1789050600000-CreateMessagesTable.ts remains
+  unformatted — not modified here, out of scope)
+- Migration / live DB: NOT APPLIED — DB connectivity probe (migration:show)
+  returned 28P01 FATAL auth_failed against the host 5432 listener (Windows
+  service); Docker container bridge IP 172.20.0.2 TCP probe timed out (WSL2
+  NAT). The contact_requests table was not created against any reachable
+  PostgreSQL. Not claimed applied.
+- Live endpoint tests (current-task.md checks 1-13): NOT EXECUTED — blocked
+  by the same environment blocker. Not claimed passed.
+
+Unauthorized scope changes:
+- None
+```
+
 ---
 
 # Known Issues
@@ -1772,6 +1868,36 @@ Next Action: Run the 8 live checks per current-task.md once the environment is
        Desktop reachable on the host port), then re-record the result here.
 ```
 
+## Open Issues After Task 3.2
+
+```text
+Issue: The contact_requests migration could not be applied and the Task 3.2
+       live endpoint checks (current-task.md checks 1-13) could not be
+       executed. The identical environment blocker from Task 3.1 persists and
+       was re-confirmed this session: the reachable host listener on 5432 is
+       the Windows PostgreSQL service (postgresql-x64-18), which rejected the
+       app credentials (DB connectivity probe via migration:show returned
+       28P01 FATAL auth_failed); the approved Docker postgres container is
+       unreachable from the Windows host (bridge IP 172.20.0.2 TCP probe timed
+       out — WSL2 NAT); stopping the Windows service requires admin, which is
+       unavailable.
+Impact: The contact_requests table does not exist at runtime (the migration is
+       written and static-verified but unapplied), so the three contact
+       endpoints cannot be exercised live yet. Static verification is green
+       (build:packages, tsc, eslint, 113 jest tests, nest build); the service
+       logic — validation/error semantics, transactional accept->chat
+       creation, reactivation-after-decline — is covered by unit tests, but
+       the live HTTP+DB path (JwtAuthGuard against a real request, TypeORM
+       insert/transaction against PostgreSQL, the ApiResponse envelope) is
+       unverified.
+Discovered During: Task 3.2 live verification attempt.
+Current Status: Open. The Windows PostgreSQL service still owns host 5432.
+Next Action: Apply the migration and run the 13 live checks per current-task.md
+       once the environment is resolvable (admin available to stop the Windows
+       service, or Docker Desktop reachable on the host port), then re-record
+       the result here.
+```
+
 ---
 
 # Architecture Changes
@@ -1990,6 +2116,50 @@ Change: Task 3.1 status moved from "Not Started" to "Completed with Known
 Reason: Required by the Task 3.1 completion workflow; recorded honestly with
        the live-verification blocker instead of claiming unexecuted checks.
 Approved By: Mohammad Mehdi (Task 3.1 authorised via docs/6-current-task.md).
+```
+
+```text
+Context Change: Execution boundary advanced to Task 3.2.
+File: docs/6-current-task.md
+Change: Replaced the Task 3.1 (User Search) execution boundary with the Task
+       3.2 (Contact Requests) execution boundary — authorized scope (send /
+       pending-incoming / accept / decline, the contact_requests data model,
+       shared contracts/constants), the two approved maintainer decisions
+       (Task 3.2 authorized for implementation now; accepting a request
+       atomically creates the normalized one-to-one chat), an explicit
+       Not-Authorized list (Task 3.3 contact list/messaging gating, chat
+       creation outside the accept path, frontend, WebSocket/presence, rate
+       limiting, media, i18n), and verification requirements with an
+       expectation that live checks may be blocked by the known environment
+       issue.
+Reason: Task 3.1 completed and recorded (docs/7-done.md); the normal lifecycle
+       requires current-task.md to describe the next approved task, which the
+       maintainer approved via AskUserQuestion (2026-09-13) together with the
+       create-chat-on-accept decision.
+Approved By: Mohammad Mehdi.
+```
+
+```text
+Context Change: Task 3.2 record completed.
+File: docs/7-done.md
+Change: Task 3.2 status moved from "Not Started" to "Completed with Known
+       Issues", with the contact-request implementation (contact_requests
+       migration, ContactRequest entity, DTOs, ContactsService send /
+       getIncoming / respond with the transactional accept->chat creation,
+       ContactsController, ContactsModule + app wiring, shared contracts and
+       constants, 22 new tests -> 113 total), the executed static-verification
+       results (build:packages, tsc, eslint, jest, nest build all PASS; format
+       PARTIAL due to the pre-existing Task 2.2 file), and an explicitly
+       documented environment blocker — the contact_requests migration could
+       not be applied and the 13 live endpoint checks were NOT executed and
+       are NOT claimed passed (28P01 against the host 5432 listener,
+       172.20.0.2 unreachable, no admin).
+Reason: Required by the Task 3.2 completion workflow; recorded honestly with
+       the live-verification blocker instead of claiming unexecuted checks.
+Approved By: Mohammad Mehdi (Task 3.2 re-approved for execution with the
+       scope from the Task 3.2 placeholder + features.md contact features +
+       architecture.md Contact Endpoints/Validation, and the
+       create-chat-on-accept decision).
 ```
 
 ---

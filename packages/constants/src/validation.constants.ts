@@ -86,3 +86,20 @@ export const SEARCH_LIMIT_DEFAULT = 10
 
 /** Maximum result count for GET /users/search (results are capped at this). */
 export const SEARCH_LIMIT_MAX = 50
+
+// ---------------------------------------------------------------------------
+// Task 3.2 — Contact request validation (architecture.md §Contact Request
+// Validation / §Data Model — Contact Requests)
+// ---------------------------------------------------------------------------
+
+/**
+ * All contact request statuses, mirroring the contact_requests `status` column
+ * CHECK constraint (architecture.md — `'pending', 'accepted', 'declined'`).
+ */
+export const CONTACT_REQUEST_STATUSES = ['pending', 'accepted', 'declined'] as const
+
+/**
+ * Statuses the recipient may set when responding to an incoming request
+ * (architecture.md — UpdateContactRequestInput: `'accepted' | 'declined'`).
+ */
+export const CONTACT_REQUEST_RESPONSE_STATUSES = ['accepted', 'declined'] as const

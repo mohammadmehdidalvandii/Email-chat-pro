@@ -65,4 +65,12 @@ export const ERROR_MESSAGES = {
   WS_CHAT_UNAUTHORIZED: 'You are not a participant of this chat',
   // Task 3.1 — User Search
   SEARCH_QUERY_REQUIRED: 'Search query is required',
+  // Task 3.2 — Contact Requests
+  CONTACT_REQUEST_RECEIVER_NOT_FOUND: 'User not found',
+  CONTACT_REQUEST_SELF_NOT_ALLOWED: 'You cannot send a contact request to yourself',
+  CONTACT_REQUEST_DUPLICATE: 'A contact request between these users already exists',
+  CONTACT_REQUEST_NOT_FOUND: 'Contact request not found',
+  CONTACT_REQUEST_NOT_RECEIVER: 'You are not the recipient of this contact request',
+  CONTACT_REQUEST_ALREADY_RESPONDED: 'This contact request has already been responded to',
+  CONTACT_REQUEST_STATUS_INVALID: 'status must be "accepted" or "declined"',
 } as const

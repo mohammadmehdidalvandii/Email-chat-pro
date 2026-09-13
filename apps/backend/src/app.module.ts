@@ -5,6 +5,7 @@ import { AppService } from './app.service'
 import { getDatabaseConfig } from './config/database.config'
 import { AuthModule } from './modules/auth/auth.module'
 import { ChatsModule } from './modules/chats/chats.module'
+import { ContactsModule } from './modules/contacts/contacts.module'
 import { MessagesModule } from './modules/messages/messages.module'
 import { UsersModule } from './modules/users/users.module'
 import { WebSocketModule } from './modules/websocket/websocket.module'
@@ -17,6 +18,7 @@ import { WebSocketModule } from './modules/websocket/websocket.module'
     AuthModule,
     UsersModule,
     ChatsModule,
+    ContactsModule,
     MessagesModule,
     WebSocketModule,
   ],

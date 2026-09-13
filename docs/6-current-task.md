@@ -16,66 +16,74 @@ When the task is completed and verified, the completed work MUST be recorded in 
 
 ## Phase 3 — Contacts and Search
 
-**Task 3.1 — User Search** is the currently authorized task.
+**Task 3.2 — Contact Requests** is the currently authorized task.
 
-The prior Phase 2 execution boundary (Task 2.4 — Conversation List) is completed and verified (`docs/7-done.md`).
-
-The Task 2.5 — Chat Creation working title from the previous placeholder is **removed**. There is no approved Task 2.5 in the project roadmap, and chat creation is NOT authorized here.
+The prior Phase 3 execution boundary (Task 3.1 — User Search) is completed. It is recorded in `docs/7-done.md` as **"Completed with Known Issues"** — its 8 live endpoint checks remain unexecuted because of an environment blocker (host port 5432 port conflict; see `docs/7-done.md` Known Issues). That blocker persists and is expected to block Task 3.2 live checks the same way.
 
 ---
 
 # Authorized Scope
 
-## Task 3.1 — User Search
+## Task 3.2 — Contact Requests
 
-Implement the **User Search** feature as defined in:
+Implement the **Contact Requests** feature as defined in:
 
-- `features.md` — Phase 3, Feature: User Search
-- `architecture.md` — §API Endpoints, User Endpoints (`GET /users/search`)
+- `features.md` — Phase 3, Feature: Contact Request (send / persist / record creator + receiver / prevent duplicates / inform recipient / do NOT enable messaging) and Contact Request Management (view pending, accept, decline, accepted → active contact relationship, declined → no messaging, state persisted).
+- `architecture.md` — §Data Model (Contact Requests), §Contact Endpoints, §Contact Request Types, §Contact Request Validation.
+- The `docs/7-done.md` Task 3.2 placeholder (Send / Accept / Decline / Pending / Duplicate prevention / Self-request prevention).
+
+### Approved Decisions (maintainer, 2026-09-13)
+
+1. **Task 3.2 is authorized for implementation now** (this boundary replaces the Task 3.1 boundary).
+2. **Chat creation on accept**: accepting a contact request creates the one-to-one chat for the participant pair **atomically** (inside the same transaction as the status update), resolving the Task 2.1 deferred chat-creation trigger for the contact-acceptance path. Chat rows are stored with normalized participants (`user_a < user_b`) and deduplicated (no duplicate chat per pair).
 
 ### Must Implement
 
-- `GET /users/search` endpoint:
+- `POST /contacts/requests` endpoint:
   - Authentication: Required (`JwtAuthGuard`).
-  - Query params:
-    - `q`: the search query (username or email).
-    - `limit`: default `10`, max `50`.
-  - Response: `200` with the shared `ApiResponse` envelope containing an array of matching user objects.
-- Username search with **partial matching**.
-- Email search with **exact matching**.
-- Only eligible, active users are returned.
-- Deleted / inactive users are excluded from results.
-- Result count is limited to the defined limit rules (default 10, max 50).
+  - Body: `{ receiverId }` (validated as UUID).
+  - Sender is the authenticated user (never from the body).
+  - Response: `201` with the shared `ApiResponse` envelope containing a `ContactRequest`.
+- `GET /contacts/requests/incoming` endpoint:
+  - Authentication: Required.
+  - Response: `200` with an array of the authenticated user's **pending** incoming `ContactRequest`s, newest first.
+- `PATCH /contacts/requests/:requestId` endpoint:
+  - Authentication: Required.
+  - Param `requestId` validated as UUID.
+  - Body: `{ status: 'accepted' | 'declined' }` (other values → 400 `VALIDATION_ERROR`).
+  - Only the request's **receiver** may respond (else 403).
+  - `accepted` → status updated **and** one-to-one chat created (see Approved Decision 2); `declined` → status updated, no chat.
+  - Response: `200` with the updated `ContactRequest`.
+- Contact request validation semantics (architecture.md §Contact Request Validation):
+  - Receiver must exist and be active (deleted/inactive users → 404).
+  - Sender cannot request itself → 400.
+  - No duplicate requests per directed pair: an existing **pending or accepted** request → 409; an existing **declined** request → **reactivated to `pending`** on re-send (the only self-consistent reading of "Declined requests prevent future messages until new request sent" — the re-send is the new request).
+  - A `23505` unique-violation race on insert → 409.
+- Persistence: `contact_requests` table (migration) with `UNIQUE (sender_id, receiver_id)`, `CHECK (sender_id <> receiver_id)`, `CHECK (status IN ('pending','accepted','declined'))`, and the `idx_contacts_receiver_id` + `idx_contacts_status` indexes per architecture.md.
+- Shared contracts:
+  - `ContactRequestStatus`, `ContactRequest`, `CreateContactRequestInput`, `UpdateContactRequestInput` in `packages/types` — the single source of truth.
+  - Shared constants in `packages/constants` where they apply (error messages, status lists).
+- Messaging authorization based on an accepted contact relationship is **NOT** part of Task 3.2 (see Not Authorized).
 
-### Shared Contracts
+### Scope Anchor (`architecture.md` — Contact Request Endpoints / Validation)
 
-- Search request/response types belong in `packages/types` — the single source of truth for shared API contracts.
-- Use shared validation constants from `packages/constants` where they apply.
-- Do not duplicate the search API contract independently in frontend or backend.
-
-### Scope Anchor (`features.md` — User Search acceptance criteria)
-
-- Search by username is supported.
-- Search by email is supported.
-- Username search supports appropriate partial matching.
-- Email search supports exact matching.
-- Only eligible active users are returned.
-- Deleted users are not returned.
-- Search results provide the information necessary to identify a user.
-- Search results are limited to a defined result count.
+- Send request → the request is persisted and the recipient can see it in their pending inbox; duplicate and self-requests are prevented. (Real-time push notification of a new request via WebSocket is NOT authorized here.)
+- View pending incoming requests.
+- Accept → request `accepted`; the accepted contact relationship is established; the one-to-one chat is created atomically (Approved Decision 2).
+- Decline → request `declined`; no chat is created; declined requests prevent messaging **until a new request is sent** (which reactivates to `pending`).
+- Request state is persisted (`contact_requests` rows survive restarts).
 
 ---
 
 # Not Authorized
 
-The following MUST NOT be implemented in Task 3.1:
+The following MUST NOT be implemented in Task 3.2:
 
-- Contact requests (send / accept / decline) — Task 3.2.
-- Contact list / contact-based messaging authorization — Task 3.3.
+- **Contact List / GET /contacts / contact-based messaging authorization** — Task 3.3. `MessagesService` authorization must NOT be changed to require an accepted contact relationship.
+- Chat creation **outside the accept path** — no explicit `POST /chats`, no implicit first-message chat creation, no resolution of any other chat-creation trigger. (Only the approved accept-path creation is authorized.)
 - Any later Phase 3 tasks.
-- Chat creation (`POST /chats`) or any resolution of the chat-creation trigger.
-- Frontend work of any kind (search UI, screens, components, services).
-- WebSocket or presence changes.
+- Frontend work of any kind (contact-request UI, screens, components, services).
+- WebSocket or presence changes (no notification push for incoming requests).
 - Rate limiting (Phase 4).
 - Media, internationalization, or any other later-phase feature.
 
@@ -83,7 +91,7 @@ The following MUST NOT be implemented in Task 3.1:
 
 # Verification Requirements
 
-Before Task 3.1 may be recorded as complete:
+Before Task 3.2 may be recorded as complete:
 
 ```text
 - npm run build:packages
@@ -91,22 +99,31 @@ Before Task 3.1 may be recorded as complete:
 - npx eslint "src/**/*.ts" --max-warnings=0 (backend)
 - npx jest (backend, all suites)
 - npm run build (nest build)
+- npm run format:check (note: a pre-existing Task 2.2 migration file,
+  1789050600000-CreateMessagesTable.ts, is known to be unformatted; it is not
+  modified by this task and is out of scope)
 ```
 
-Live endpoint tests (backend on port 4000, started with `PORT=4000` explicitly):
+Live verification (migration + backend on port 4000, started with `PORT=4000` explicitly):
 
 ```text
-1. GET /users/search (no token)            -> 401 UNAUTHORIZED
-2. register active users, mark verified    -> tokens obtained (no email transport in the stack)
-3. search by exact username                -> matching active user returned
-4. search by partial username              -> matching active users returned
-5. search by exact email                   -> matching active user returned
-6. deleted user is not returned            -> excluded
-7. `limit` default (10) and max (50) enforced
-8. seeded verification data cleaned up
+- npm run migration:run (contact_requests table created; constraints/indexes present)
+1. POST /contacts/requests (no token)         -> 401 UNAUTHORIZED
+2. register two active users, mark verified  -> tokens obtained (no email transport in the stack)
+3. send request alice -> bob                 -> 201 + ContactRequest (sender=alice, receiver=bob, status=pending)
+4. send request alice -> bob again           -> 409 (duplicate)
+5. send request alice -> alice               -> 400 (self-request)
+6. send request alice -> unknown user        -> 404 (receiver not found)
+7. GET /contacts/requests/incoming as bob    -> 200, the pending request
+8. GET /contacts/requests/incoming as alice  -> 200, empty (only pending incoming)
+9. PATCH accept as bob                       -> 200 accepted AND a chat row exists for the (normalized) pair
+10. PATCH the same request again             -> 409 (already responded)
+11. PATCH decline (second request) as bob    -> 200 declined, no chat created
+12. re-send alice -> bob after decline       -> 201, reactivated to pending
+13. seeded verification data cleaned up
 ```
 
-Do not claim a check passed unless it was actually executed successfully.
+The Task 3.1 environment blocker (host port 5432 held by the Windows PostgreSQL service, proposed Docker container unreachable at 172.20.0.2, no admin to stop the service) is expected to block steps above. **If any live check cannot be executed, it MUST NOT be claimed passed**; record it as a known issue exactly as Task 3.1 did.
 
 ---
 

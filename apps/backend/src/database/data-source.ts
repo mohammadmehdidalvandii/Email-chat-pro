@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm'
 import { User } from '../modules/auth/entities/user.entity'
 import { Chat } from '../modules/chats/entities/chat.entity'
+import { ContactRequest } from '../modules/contacts/entities/contact-request.entity'
 import { Message } from '../modules/messages/entities/message.entity'
 
 /**
@@ -19,7 +20,7 @@ const DEFAULT_DATABASE_URL =
 export const AppDataSource = new DataSource({
   type: 'postgres',
   url: process.env.DATABASE_URL ?? DEFAULT_DATABASE_URL,
-  entities: [User, Chat, Message],
+  entities: [User, Chat, ContactRequest, Message],
   migrations: [__dirname + '/migrations/*{.ts,.js}'],
   synchronize: false,
 })
