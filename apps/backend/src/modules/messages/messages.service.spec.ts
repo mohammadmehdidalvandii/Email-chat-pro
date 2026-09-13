@@ -5,6 +5,7 @@ import { AuthService } from '../auth/auth.service'
 import { User } from '../auth/entities/user.entity'
 import { ChatsService } from '../chats/chats.service'
 import { Chat } from '../chats/entities/chat.entity'
+import { ContactsService } from '../contacts/contacts.service'
 import { ChatGateway } from '../websocket/websocket.gateway'
 import { CreateMessageDto } from './dto/create-message.dto'
 import { Message } from './entities/message.entity'
@@ -32,6 +33,10 @@ describe('MessagesService', () => {
 
   const chatGateway = {
     broadcastToChat: jest.fn(),
+  }
+
+  const contactsService = {
+    areContacts: jest.fn(),
   }
 
   const baseUser: User = {
@@ -64,6 +69,9 @@ describe('MessagesService', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks()
+    // Task 3.3: by default the pair shares an accepted contact relationship, so
+    // existing sendMessage tests pass the gate; a dedicated test overrides it.
+    contactsService.areContacts.mockResolvedValue(true)
     const moduleRef = await Test.createTestingModule({
       providers: [
         MessagesService,
@@ -73,6 +81,7 @@ describe('MessagesService', () => {
           useValue: { findById: jest.fn() },
         },
         { provide: AuthService, useValue: authService },
+        { provide: ContactsService, useValue: contactsService },
         { provide: ChatGateway, useValue: chatGateway },
       ],
     }).compile()
@@ -82,6 +91,10 @@ describe('MessagesService', () => {
 
   /** Helper to get the mocked ChatsService from the module. */
   const chatsService = () => service['chatsService'] as unknown as { findById: jest.Mock }
+
+  /** Helper to get the mocked ContactsService from the module. */
+  const contactsServiceMock = () =>
+    service['contactsService'] as unknown as { areContacts: jest.Mock }
 
   describe('sendMessage', () => {
     const dto: CreateMessageDto = {
@@ -115,6 +128,46 @@ describe('MessagesService', () => {
         },
       })
       expect(repository.create).not.toHaveBeenCalled()
+    })
+
+    it('throws ForbiddenException when the participants are not accepted contacts', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+      contactsServiceMock().areContacts.mockResolvedValue(false)
+
+      await expect(service.sendMessage(baseUser, 'chat-1', dto)).rejects.toMatchObject({
+        status: 403,
+        response: {
+          code: ERROR_CODES.FORBIDDEN,
+          message: ERROR_MESSAGES.CONTACT_RELATIONSHIP_REQUIRED,
+        },
+      })
+      expect(contactsServiceMock().areContacts).toHaveBeenCalledWith(
+        baseChat.userAId,
+        baseChat.userBId,
+      )
+      expect(repository.create).not.toHaveBeenCalled()
+      expect(repository.save).not.toHaveBeenCalled()
+    })
+
+    it('allows a message only when the contact gate passes', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+      const messageEntity = {
+        id: 'msg-1',
+        chatId: 'chat-1',
+        sender: baseUser,
+        content: 'Hello!',
+        messageType: 'text',
+        mediaUrl: null,
+        createdAt: new Date('2026-06-01T00:00:00Z'),
+      }
+      repository.create.mockReturnValue(messageEntity)
+      repository.save.mockResolvedValue(messageEntity)
+      authService.toUserDto.mockReturnValue({ id: baseUser.id })
+
+      const result = await service.sendMessage(baseUser, 'chat-1', dto)
+
+      expect(contactsServiceMock().areContacts).toHaveBeenCalledTimes(1)
+      expect(result.id).toBe('msg-1')
     })
 
     it('allows the second participant (userB) to send a message', async () => {

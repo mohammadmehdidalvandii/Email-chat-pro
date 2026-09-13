@@ -1110,19 +1110,86 @@ packages/types/src/contact.types.ts
 
 ## Task 3.3 — Contact List
 
-**Status:** Not Started
+**Status:** Completed with Known Issues
 
 **Scope:**
 
-* Accepted contacts
+* Accepted contacts (GET /contacts)
 * Contact retrieval
 * Contact-based messaging authorization
+
+**Implemented (architecture.md §Contact Endpoints; features.md — Contact List / Messaging Access Control):**
+
+* `GET /contacts` — the authenticated user's accepted contacts, returned as
+  shared `User` objects. A contact is established by an ACCEPTED
+  `contact_requests` row in either direction (the user is the receiver OR the
+  sender), deduplicated per contact, sorted by username. Pending / declined
+  requests do not make two users contacts. No new table or migration — contacts
+  derive from the accepted-request state that Task 3.2 already persists.
+* Contact-based messaging authorization — `MessagesService.sendMessage` now
+  verifies the chat's participant pair shares an ACCEPTED contact relationship
+  (either direction) before persisting a message. A chat between non-contacts
+  yields `403 FORBIDDEN` with `CONTACT_RELATIONSHIP_REQUIRED`. Because the
+  WebSocket gateway does not handle `message:send` (REST persists and broadcasts
+  — Task 2.3), the REST `sendMessage` path is the only send path and is fully
+  gated. History reads remain participant-scoped (reading is not "messaging" in
+  the feature scope).
+* Relationship semantics: `contact_requests` is one-directional, but acceptance
+  is mutual — after B accepts A's request, both A and B can message in the chat
+  created on accept, so the gate accepts an accepted request in either direction.
+* Shared constant added: `CONTACT_RELATIONSHIP_REQUIRED`
+  (`packages/constants/src/error.constants.ts`).
+* Module wiring: `MessagesModule` imports `ContactsModule` (exports
+  `ContactsService`); `MessagesService` injects it. No circular dependency
+  (ContactsModule does not import MessagesModule).
 
 **Verification:**
 
 ```text
-Not Started
+Executed 2026-09-13.
+
+- npm run build:packages: PASS
+- npx tsc --noEmit (backend): PASS
+- npx eslint "src/**/*.ts" --max-warnings=0 (backend): PASS
+- npx jest (backend): PASS — 13 suites / 123 tests (+10 for contacts/messages)
+- npm run build (nest build): PASS
+- npm run format:check: PARTIAL — all Task 3.3 files pass Prettier; the
+  pre-existing Task 2.2 migration file (1789050600000-CreateMessagesTable.ts)
+  remains unformatted (unchanged, out of scope — known issue carried from
+  prior tasks).
+- Migration (npm run migration:show, DB connectivity probe): FAILED — the
+  environment blocker persists. Host port 5432 is held by the Windows
+  PostgreSQL service (postgresql-x64-18), which rejects the app credentials
+  (28P01 FATAL auth_failed). The approved Docker postgres container is
+  unreachable from the Windows host (bridge IP 172.20.0.2 TCP probe timed out —
+  WSL2 NAT). Stopping the Windows service requires admin, which is unavailable.
+  Task 3.3 adds no migration itself, but the contact_requests / chats tables
+  could not be exercised against any reachable PostgreSQL.
+- Live endpoint tests (current-task.md checks listed in docs/6): NOT EXECUTED —
+  blocked by the same environment. Not claimed passed.
 ```
+
+**Files Changed:**
+
+```text
+Modified:
+packages/constants/src/error.constants.ts                  (+ CONTACT_RELATIONSHIP_REQUIRED)
+apps/backend/src/modules/contacts/contacts.service.ts     (+ getContacts, areContacts)
+apps/backend/src/modules/contacts/contacts.controller.ts  (+ GET /contacts)
+apps/backend/src/modules/contacts/contacts.service.spec.ts (+ getContacts / areContacts tests)
+apps/backend/src/modules/contacts/contacts.controller.spec.ts (+ GET /contacts test)
+apps/backend/src/modules/messages/messages.service.ts     (+ contact gate in sendMessage)
+apps/backend/src/modules/messages/messages.module.ts      (+ ContactsModule import)
+apps/backend/src/modules/messages/messages.service.spec.ts (+ gate tests, ContactsService mock)
+
+Created:
+(none — no migration, no new file)
+```
+
+**Note:** No frontend, WebSocket/presence, contact-list enrichment beyond the
+`User` contract, history-read gating, blocking/muting/contact deletion, or any
+later-phase feature was implemented (Task 3.3 scope). The changes follow the
+existing architecture and patterns. No new dependency, no Redis/Kafka/brokers.
 
 ---
 
@@ -2160,6 +2227,51 @@ Approved By: Mohammad Mehdi (Task 3.2 re-approved for execution with the
        scope from the Task 3.2 placeholder + features.md contact features +
        architecture.md Contact Endpoints/Validation, and the
        create-chat-on-accept decision).
+```
+
+```text
+Context Change: Execution boundary advanced to Task 3.3.
+File: docs/6-current-task.md
+Change: Replaced the Task 3.2 (Contact Requests) execution boundary with the
+       Task 3.3 (Contact List) execution boundary — authorized scope (GET
+       /contacts returning the authenticated user's accepted contacts as User
+       objects; contact-based messaging authorization in MessagesService.sendMessage
+       gating on an accepted contact relationship in either direction; a new
+       CONTACT_RELATIONSHIP_REQUIRED shared constant; no migration/schema
+       change), an explicit Not-Authorized list (frontend, WebSocket/presence,
+       contact-list enrichment beyond the User contract, history-read gating,
+       blocking/muting/contact deletion, later-phase features), and verification
+       requirements with an expectation that live checks may be blocked by the
+       known environment issue.
+Reason: Task 3.2 completed and recorded (docs/7-done.md); the normal lifecycle
+       requires current-task.md to describe the next approved task, which the
+       maintainer authorized (2026-09-13) by instructing Claude Code to start
+       Task 3.3.
+Approved By: Mohammad Mehdi.
+```
+
+```text
+Context Change: Task 3.3 record completed.
+File: docs/7-done.md
+Change: Task 3.3 status moved from "Not Started" to "Completed with Known
+       Issues", with the contact-list implementation (GET /contacts deriving
+       contacts from accepted contact_requests in either direction, deduplicated
+       and sorted by username; the messaging access-control gate in
+       MessagesService.sendMessage returning 403 CONTACT_RELATIONSHIP_REQUIRED
+       for chats between non-contacts; ContactsModule imported by ModulesModule;
+       +10 new tests -> 123 total), the executed static-verification results
+       (build:packages, tsc, eslint, jest, nest build all PASS; format PARTIAL
+       due to the pre-existing Task 2.2 file), and an explicitly documented
+       environment blocker — no migration was added by Task 3.3, but the
+       contact_requests / chats tables and the live endpoint checks could not
+       be exercised against any reachable PostgreSQL and are NOT claimed passed
+       (28P01 against the host 5432 listener, 172.20.0.2 unreachable, no admin).
+Reason: Required by the Task 3.3 completion workflow; recorded honestly with
+       the live-verification blocker instead of claiming unexecuted checks.
+Approved By: Mohammad Mehdi (Task 3.3 authorized via the 2026-09-13 instruction
+       to start Task 3.3 with the scope from the Task 3.3 placeholder +
+       features.md Contact List / Messaging Access Control + architecture.md
+       Contact Endpoints).
 ```
 
 ---

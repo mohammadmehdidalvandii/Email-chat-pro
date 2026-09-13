@@ -2,13 +2,14 @@ import { Module, forwardRef } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { AuthModule } from '../auth/auth.module'
 import { ChatsModule } from '../chats/chats.module'
+import { ContactsModule } from '../contacts/contacts.module'
 import { WebSocketModule } from '../websocket/websocket.module'
 import { Message } from './entities/message.entity'
 import { MessagesController } from './messages.controller'
 import { MessagesService } from './messages.service'
 
 /**
- * Message persistence module (current-task.md Task 2.2 + Task 2.3).
+ * Message persistence module (current-task.md Task 2.2 + Task 2.3; Task 3.3).
  *
  * Owns the `/chats/:chatId/messages` endpoints. Imports AuthModule for the
  * JwtAuthGuard and AuthService.toUserDto mapping, and ChatsModule for the
@@ -16,12 +17,16 @@ import { MessagesService } from './messages.service'
  *
  * Task 2.3: imports WebSocketModule (forwardRef) so MessagesService can
  * inject ChatGateway for real-time message broadcasting after REST persistence.
+ *
+ * Task 3.3: imports ContactsModule so MessagesService can verify the accepted
+ * contact relationship before accepting a message (messaging access control).
  */
 @Module({
   imports: [
     TypeOrmModule.forFeature([Message]),
     AuthModule,
     ChatsModule,
+    ContactsModule,
     forwardRef(() => WebSocketModule),
   ],
   controllers: [MessagesController],

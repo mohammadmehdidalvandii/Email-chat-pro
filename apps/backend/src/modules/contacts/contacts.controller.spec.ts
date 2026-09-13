@@ -17,6 +17,7 @@ describe('ContactsController', () => {
     sendRequest: jest.fn(),
     getIncomingRequests: jest.fn(),
     respondToRequest: jest.fn(),
+    getContacts: jest.fn(),
   }
 
   const baseUser: User = {
@@ -99,5 +100,17 @@ describe('ContactsController', () => {
     )
     expect(result.success).toBe(true)
     expect(result.data).toMatchObject({ status: 'accepted' })
+  })
+
+  it('GET contacts delegates getContacts with the caller id and wraps the contacts', async () => {
+    const contacts = [{ id: '22222222-2222-2222-2222-222222222222', username: 'bob' }]
+    contactsService.getContacts.mockResolvedValue(contacts)
+
+    const result = await controller.getContacts({ user: baseUser } as never)
+
+    expect(contactsService.getContacts).toHaveBeenCalledWith(baseUser.id)
+    expect(result.success).toBe(true)
+    expect(result.data).toEqual(contacts)
+    expect(typeof result.timestamp).toBe('string')
   })
 })

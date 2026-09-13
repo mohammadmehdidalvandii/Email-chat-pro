@@ -14,6 +14,7 @@ import { Repository } from 'typeorm'
 import { AuthService } from '../auth/auth.service'
 import { User } from '../auth/entities/user.entity'
 import { ChatsService } from '../chats/chats.service'
+import { ContactsService } from '../contacts/contacts.service'
 import { ChatGateway } from '../websocket/websocket.gateway'
 import { CreateMessageDto } from './dto/create-message.dto'
 import { Message } from './entities/message.entity'
@@ -27,9 +28,14 @@ import { Message } from './entities/message.entity'
  *     persist, return the shared Message contract.
  *   - getHistory: authorize, paginate newest-first, return PaginatedResponse.
  *
- * Authorization boundary (Task 2.2): chat membership only.
- * Contact-relationship gating is Phase 3 (contact_requests table does not exist
- * yet).
+ * Authorization boundary:
+ *   - Task 2.2: chat membership only.
+ *   - Task 3.3: contact relationship — the pair must share an accepted contact
+ *     relationship for a message to be accepted (features.md — "Messaging
+ *     Access Control"). Chats are only created on contact acceptance, so this
+ *     is defense-in-depth: if a chat row ever exists between non-contacts,
+ *     sending is blocked with 403. History reads (getHistory) remain
+ *     participant-scoped (reading is not "messaging" in the feature scope).
  */
 @Injectable()
 export class MessagesService {
@@ -38,6 +44,7 @@ export class MessagesService {
     private readonly messagesRepository: Repository<Message>,
     private readonly chatsService: ChatsService,
     private readonly authService: AuthService,
+    private readonly contactsService: ContactsService,
     @Optional()
     @Inject(forwardRef(() => ChatGateway))
     private readonly chatGateway: ChatGateway | undefined,
@@ -52,6 +59,8 @@ export class MessagesService {
    * Authorization:
    *   1. Chat must exist (404 otherwise — prevents leaking chat existence).
    *   2. Authenticated user must be a participant (403 otherwise).
+   *   3. The participants must share an accepted contact relationship (403
+   *      otherwise — Task 3.3 Messaging Access Control).
    *
    * The sender relation is saved explicitly to avoid TypeORM cascade surprises;
    * senderId is derived from sender.id in the response object.
@@ -69,6 +78,17 @@ export class MessagesService {
       throw new ForbiddenException({
         code: ERROR_CODES.FORBIDDEN,
         message: ERROR_MESSAGES.NOT_CHAT_PARTICIPANT,
+      })
+    }
+
+    // Task 3.3 — Messaging Access Control: the participants must share an
+    // accepted contact relationship (either direction) before a message is
+    // accepted. Chats are only created on acceptance, so this protects against
+    // any chat that exists between non-contacts.
+    if (!(await this.contactsService.areContacts(chat.userAId, chat.userBId))) {
+      throw new ForbiddenException({
+        code: ERROR_CODES.FORBIDDEN,
+        message: ERROR_MESSAGES.CONTACT_RELATIONSHIP_REQUIRED,
       })
     }
 

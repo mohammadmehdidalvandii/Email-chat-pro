@@ -409,4 +409,107 @@ describe('ContactsService', () => {
       expect(result.status).toBe('declined')
     })
   })
+
+  describe('getContacts', () => {
+    const carol: User = {
+      ...baseUser,
+      id: '33333333-3333-3333-3333-333333333333',
+      email: 'carol@example.com',
+      username: 'carol',
+      fullName: 'Carol',
+    }
+
+    it('queries accepted requests in both directions with relations loaded', async () => {
+      contactRequestsRepository.find.mockResolvedValue([])
+
+      await service.getContacts(baseUser.id)
+
+      expect(contactRequestsRepository.find).toHaveBeenCalledWith({
+        where: [
+          { receiver: { id: baseUser.id }, status: 'accepted' },
+          { sender: { id: baseUser.id }, status: 'accepted' },
+        ],
+        relations: ['sender', 'receiver'],
+      })
+    })
+
+    it('returns the counterpart of each accepted request, deduplicated and sorted', async () => {
+      // alice -> bob accepted (alice is the sender; bob is her contact)
+      const aliceSent = makeRequest('accepted')
+      // bob -> alice accepted (alice is the receiver; bob is still her contact)
+      const bobSent = { ...makeRequest('accepted'), sender: userB, receiver: baseUser }
+      // alice -> carol accepted (carol is a second contact)
+      const carolSent = { ...makeRequest('accepted'), receiver: carol }
+      // pending / declined requests are NOT contacts
+      const pending = { ...makeRequest('pending'), sender: userB, receiver: baseUser }
+      const declined = { ...makeRequest('declined'), sender: carol, receiver: baseUser }
+      contactRequestsRepository.find.mockResolvedValue([
+        aliceSent,
+        bobSent,
+        carolSent,
+        pending,
+        declined,
+      ])
+
+      const result = await service.getContacts(baseUser.id)
+
+      // bob appears in both directions but is returned once; sorted by username.
+      expect(result).toEqual([
+        { id: userB.id, username: 'bob' },
+        { id: carol.id, username: 'carol' },
+      ])
+    })
+
+    it('returns an empty array when there are no accepted requests', async () => {
+      contactRequestsRepository.find.mockResolvedValue([])
+
+      const result = await service.getContacts(baseUser.id)
+
+      expect(result).toEqual([])
+    })
+  })
+
+  describe('areContacts', () => {
+    it('returns true when an accepted request exists between the pair', async () => {
+      contactRequestsRepository.findOne.mockResolvedValue(makeRequest('accepted'))
+
+      const result = await service.areContacts(baseUser.id, userB.id)
+
+      expect(result).toBe(true)
+      expect(contactRequestsRepository.findOne).toHaveBeenCalledWith({
+        where: [
+          { sender: { id: baseUser.id }, receiver: { id: userB.id }, status: 'accepted' },
+          { sender: { id: userB.id }, receiver: { id: baseUser.id }, status: 'accepted' },
+        ],
+      })
+    })
+
+    it('checks either direction of the pair', async () => {
+      // accepted request exists only in the reverse direction
+      contactRequestsRepository.findOne.mockResolvedValue(makeRequest('accepted') as never)
+
+      const result = await service.areContacts(userB.id, baseUser.id)
+
+      expect(contactRequestsRepository.findOne).toHaveBeenCalledWith({
+        where: [
+          { sender: { id: userB.id }, receiver: { id: baseUser.id }, status: 'accepted' },
+          { sender: { id: baseUser.id }, receiver: { id: userB.id }, status: 'accepted' },
+        ],
+      })
+      expect(result).toBe(true)
+    })
+
+    it('returns false when no accepted request exists', async () => {
+      contactRequestsRepository.findOne.mockResolvedValue(null)
+
+      await expect(service.areContacts(baseUser.id, userB.id)).resolves.toBe(false)
+    })
+
+    it('returns false for the same user without querying', async () => {
+      const result = await service.areContacts(baseUser.id, baseUser.id)
+
+      expect(result).toBe(false)
+      expect(contactRequestsRepository.findOne).not.toHaveBeenCalled()
+    })
+  })
 })

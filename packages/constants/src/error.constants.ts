@@ -73,4 +73,6 @@ export const ERROR_MESSAGES = {
   CONTACT_REQUEST_NOT_RECEIVER: 'You are not the recipient of this contact request',
   CONTACT_REQUEST_ALREADY_RESPONDED: 'This contact request has already been responded to',
   CONTACT_REQUEST_STATUS_INVALID: 'status must be "accepted" or "declined"',
+  // Task 3.3 — Contact List & Messaging Access Control
+  CONTACT_RELATIONSHIP_REQUIRED: 'Messaging requires an accepted contact relationship',
 } as const

@@ -11,7 +11,11 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common'
-import type { ApiResponse, ContactRequest as ContactRequestContract } from '@email-chat-pro/types'
+import type {
+  ApiResponse,
+  ContactRequest as ContactRequestContract,
+  User as SharedUser,
+} from '@email-chat-pro/types'
 import type { Request } from 'express'
 import { User } from '../auth/entities/user.entity'
 import { JwtAuthGuard } from '../auth/guards/jwt.guard'
@@ -92,6 +96,24 @@ export class ContactsController {
     return {
       success: true,
       data: request,
+      timestamp: new Date().toISOString(),
+    }
+  }
+
+  /**
+   * GET /contacts — the authenticated user's accepted contacts (200), mapped
+   * to shared User objects (architecture.md — Contact Endpoints; features.md —
+   * "Contact List"). Contacts are established by an accepted contact request
+   * in either direction (the acceptance is mutual).
+   */
+  @Get()
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async getContacts(@Req() req: AuthenticatedRequest): Promise<ApiResponse<SharedUser[]>> {
+    const contacts = await this.contactsService.getContacts(req.user.id)
+    return {
+      success: true,
+      data: contacts,
       timestamp: new Date().toISOString(),
     }
   }

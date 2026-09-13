@@ -16,82 +16,75 @@ When the task is completed and verified, the completed work MUST be recorded in 
 
 ## Phase 3 — Contacts and Search
 
-**Task 3.2 — Contact Requests** is the currently authorized task.
+**Task 3.3 — Contact List** is the currently authorized task.
 
-The prior Phase 3 execution boundary (Task 3.1 — User Search) is completed. It is recorded in `docs/7-done.md` as **"Completed with Known Issues"** — its 8 live endpoint checks remain unexecuted because of an environment blocker (host port 5432 port conflict; see `docs/7-done.md` Known Issues). That blocker persists and is expected to block Task 3.2 live checks the same way.
+The prior Phase 3 execution boundary (Task 3.2 — Contact Requests) is completed. It is recorded in `docs/7-done.md` as **"Completed with Known Issues"** — the `contact_requests` migration could not be applied against any reachable PostgreSQL. That environment blocker (host port 5432 held by the Windows PostgreSQL service, proposed Docker container unreachable at 172.20.0.2, no admin to stop the service) persists and is expected to block Task 3.3 live checks the same way.
 
 ---
 
 # Authorized Scope
 
-## Task 3.2 — Contact Requests
+## Task 3.3 — Contact List & Messaging Access Control
 
-Implement the **Contact Requests** feature as defined in:
+Implement the **Contact List** feature and **contact-based messaging authorization** as defined in:
 
-- `features.md` — Phase 3, Feature: Contact Request (send / persist / record creator + receiver / prevent duplicates / inform recipient / do NOT enable messaging) and Contact Request Management (view pending, accept, decline, accepted → active contact relationship, declined → no messaging, state persisted).
-- `architecture.md` — §Data Model (Contact Requests), §Contact Endpoints, §Contact Request Types, §Contact Request Validation.
-- The `docs/7-done.md` Task 3.2 placeholder (Send / Accept / Decline / Pending / Duplicate prevention / Self-request prevention).
+- `features.md` — Phase 3, Feature: Contact List (accepted contacts are displayed; contact name/avatar come from the User contract; selecting a contact can open the corresponding conversation) and Feature: Messaging Access Control (backend verifies the contact relationship before accepting a message; users without an accepted relationship cannot send messages; backend enforcement remains authoritative even if frontend restrictions are bypassed).
+- `architecture.md` — §Contact Endpoints (`GET /contacts` → `data: [ ... User objects (contacts) ... ]`), §Data Model (Contact Requests — "Only accepted requests allow messaging").
+- The `docs/7-done.md` Task 3.3 placeholder (Accepted contacts / Contact retrieval / Contact-based messaging authorization).
 
-### Approved Decisions (maintainer, 2026-09-13)
+### Approved Decisions (carried from Task 3.2)
 
-1. **Task 3.2 is authorized for implementation now** (this boundary replaces the Task 3.1 boundary).
-2. **Chat creation on accept**: accepting a contact request creates the one-to-one chat for the participant pair **atomically** (inside the same transaction as the status update), resolving the Task 2.1 deferred chat-creation trigger for the contact-acceptance path. Chat rows are stored with normalized participants (`user_a < user_b`) and deduplicated (no duplicate chat per pair).
+1. **Chat creation on accept** (Approved Decision 2, Task 3.2): the one-to-one chat is created when a contact request is accepted — so, in the approved model, a chat only exists between accepted contacts. Task 3.3's messaging gate is the authoritative backend enforcement of that rule.
+
+### Contact relationship semantics (self-consistent reading of architecture.md)
+
+`contact_requests` is one-directional (sender → receiver), but an **accepted** request establishes a **mutual** relationship: after receiver B accepts sender A's request, the chat exists and both participants message in it. Therefore:
+
+- The messaging gate accepts when an accepted request exists in **either direction** for the pair (a strictly directed gate would prevent the accepter from messaging, which contradicts the accepted-chat model).
+- `GET /contacts` returns the counterpart of every accepted request where the user is the sender OR the receiver (deduplicated per contact).
 
 ### Must Implement
 
-- `POST /contacts/requests` endpoint:
+- `GET /contacts` endpoint:
   - Authentication: Required (`JwtAuthGuard`).
-  - Body: `{ receiverId }` (validated as UUID).
-  - Sender is the authenticated user (never from the body).
-  - Response: `201` with the shared `ApiResponse` envelope containing a `ContactRequest`.
-- `GET /contacts/requests/incoming` endpoint:
-  - Authentication: Required.
-  - Response: `200` with an array of the authenticated user's **pending** incoming `ContactRequest`s, newest first.
-- `PATCH /contacts/requests/:requestId` endpoint:
-  - Authentication: Required.
-  - Param `requestId` validated as UUID.
-  - Body: `{ status: 'accepted' | 'declined' }` (other values → 400 `VALIDATION_ERROR`).
-  - Only the request's **receiver** may respond (else 403).
-  - `accepted` → status updated **and** one-to-one chat created (see Approved Decision 2); `declined` → status updated, no chat.
-  - Response: `200` with the updated `ContactRequest`.
-- Contact request validation semantics (architecture.md §Contact Request Validation):
-  - Receiver must exist and be active (deleted/inactive users → 404).
-  - Sender cannot request itself → 400.
-  - No duplicate requests per directed pair: an existing **pending or accepted** request → 409; an existing **declined** request → **reactivated to `pending`** on re-send (the only self-consistent reading of "Declined requests prevent future messages until new request sent" — the re-send is the new request).
-  - A `23505` unique-violation race on insert → 409.
-- Persistence: `contact_requests` table (migration) with `UNIQUE (sender_id, receiver_id)`, `CHECK (sender_id <> receiver_id)`, `CHECK (status IN ('pending','accepted','declined'))`, and the `idx_contacts_receiver_id` + `idx_contacts_status` indexes per architecture.md.
-- Shared contracts:
-  - `ContactRequestStatus`, `ContactRequest`, `CreateContactRequestInput`, `UpdateContactRequestInput` in `packages/types` — the single source of truth.
-  - Shared constants in `packages/constants` where they apply (error messages, status lists).
-- Messaging authorization based on an accepted contact relationship is **NOT** part of Task 3.2 (see Not Authorized).
+  - Response: `200` with the shared `ApiResponse` envelope containing the authenticated user's accepted contacts as `User` objects (the existing shared contract; no new types).
+  - Derivation: accepted `contact_requests` rows in either direction, deduplicated, sorted by username (stable list — ordering is not defined by architecture).
+  - Pending / declined requests do NOT make two users contacts.
+- Contact-based messaging authorization:
+  - `MessagesService.sendMessage` verifies the chat's participant pair shares an accepted contact relationship (either direction) before persisting the message.
+  - No relationship → `403 FORBIDDEN` with `CONTACT_RELATIONSHIP_REQUIRED` (new shared constant in `packages/constants`).
+  - The REST path is the only message-send path (Task 2.3 — WebSocket `message:send` is not handled; REST persists and broadcasts), so gating `sendMessage` covers all message sending.
+  - History reads (`getHistory`) remain participant-scoped; reading is not "messaging" in the feature scope, which prevents *sending* between non-contacts.
+- No new data model, migration, or shared type is needed: contacts derive from the existing accepted `contact_requests` rows (chat created on accept), and the contact response is the existing shared `User` contract.
 
-### Scope Anchor (`architecture.md` — Contact Request Endpoints / Validation)
+### Scope Anchor (`features.md` — Contact List / Messaging Access Control)
 
-- Send request → the request is persisted and the recipient can see it in their pending inbox; duplicate and self-requests are prevented. (Real-time push notification of a new request via WebSocket is NOT authorized here.)
-- View pending incoming requests.
-- Accept → request `accepted`; the accepted contact relationship is established; the one-to-one chat is created atomically (Approved Decision 2).
-- Decline → request `declined`; no chat is created; declined requests prevent messaging **until a new request is sent** (which reactivates to `pending`).
-- Request state is persisted (`contact_requests` rows survive restarts).
+- Accepted contacts are returned; name/avatar come from the `User` contract (last-message / last-activity previews belong to the Conversation List, Task 2.4).
+- Backend verifies the contact relationship before accepting a message.
+- Users without an accepted relationship cannot send messages (403).
+- Backend enforcement remains authoritative even if frontend restrictions are bypassed.
+- Pending / declined requests do not enable messaging.
 
 ---
 
 # Not Authorized
 
-The following MUST NOT be implemented in Task 3.2:
+The following MUST NOT be implemented in Task 3.3:
 
-- **Contact List / GET /contacts / contact-based messaging authorization** — Task 3.3. `MessagesService` authorization must NOT be changed to require an accepted contact relationship.
-- Chat creation **outside the accept path** — no explicit `POST /chats`, no implicit first-message chat creation, no resolution of any other chat-creation trigger. (Only the approved accept-path creation is authorized.)
-- Any later Phase 3 tasks.
-- Frontend work of any kind (contact-request UI, screens, components, services).
-- WebSocket or presence changes (no notification push for incoming requests).
-- Rate limiting (Phase 4).
-- Media, internationalization, or any other later-phase feature.
+- Any later Phase 3 tasks (Task 3.3 is the final Phase 3 task).
+- Frontend work of any kind (contact-list UI, screens, components, services).
+- WebSocket or presence changes (no contact online/offline push, no presence-derived gating).
+- Rate limiting, media, internationalization, or any other later-phase feature.
+- Enriching `GET /contacts` beyond the architecture contract (architecture returns `User` objects; last-message/last-activity previews are the Conversation List's job).
+- Gating `getHistory` — only message sending is gated by the contact relationship.
+- Blocking, muting, contact deletion, or any contact-management behavior not defined in the architecture.
+- Any migration / schema change (the accepted-relationship state already lives in `contact_requests`).
 
 ---
 
 # Verification Requirements
 
-Before Task 3.2 may be recorded as complete:
+Before Task 3.3 may be recorded as complete:
 
 ```text
 - npm run build:packages
@@ -104,26 +97,21 @@ Before Task 3.2 may be recorded as complete:
   modified by this task and is out of scope)
 ```
 
-Live verification (migration + backend on port 4000, started with `PORT=4000` explicitly):
+Live verification (backend on port 4000, started with `PORT=4000` explicitly):
 
 ```text
-- npm run migration:run (contact_requests table created; constraints/indexes present)
-1. POST /contacts/requests (no token)         -> 401 UNAUTHORIZED
-2. register two active users, mark verified  -> tokens obtained (no email transport in the stack)
-3. send request alice -> bob                 -> 201 + ContactRequest (sender=alice, receiver=bob, status=pending)
-4. send request alice -> bob again           -> 409 (duplicate)
-5. send request alice -> alice               -> 400 (self-request)
-6. send request alice -> unknown user        -> 404 (receiver not found)
-7. GET /contacts/requests/incoming as bob    -> 200, the pending request
-8. GET /contacts/requests/incoming as alice  -> 200, empty (only pending incoming)
-9. PATCH accept as bob                       -> 200 accepted AND a chat row exists for the (normalized) pair
-10. PATCH the same request again             -> 409 (already responded)
-11. PATCH decline (second request) as bob    -> 200 declined, no chat created
-12. re-send alice -> bob after decline       -> 201, reactivated to pending
-13. seeded verification data cleaned up
+- npm run migration:run (contact_requests table from Task 3.2 must exist first)
+1. register two active users, mark verified  -> tokens obtained (no email transport)
+2. alice -> bob contact request, bob accepts -> chat created for the pair
+3. GET /contacts as alice                    -> 200, [bob] (User object)
+4. GET /contacts as bob                      -> 200, [alice] (User object)
+5. POST message to the chat as alice         -> 201 (gate passes)
+6. POST message to the chat as bob           -> 201 (either-direction gate passes)
+7. send message in a chat between non-contacts -> 403 (CONTACT_RELATIONSHIP_REQUIRED)
+8. seeded verification data cleaned up
 ```
 
-The Task 3.1 environment blocker (host port 5432 held by the Windows PostgreSQL service, proposed Docker container unreachable at 172.20.0.2, no admin to stop the service) is expected to block steps above. **If any live check cannot be executed, it MUST NOT be claimed passed**; record it as a known issue exactly as Task 3.1 did.
+The same environment blocker is expected to block steps above. **If any live check cannot be executed, it MUST NOT be claimed passed**; record it as a known issue exactly as prior tasks did.
 
 ---
 

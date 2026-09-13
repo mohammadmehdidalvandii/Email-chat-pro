@@ -7,7 +7,10 @@ import {
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
 import { ERROR_CODES, ERROR_MESSAGES } from '@email-chat-pro/constants'
-import type { ContactRequest as ContactRequestContract } from '@email-chat-pro/types'
+import type {
+  ContactRequest as ContactRequestContract,
+  User as SharedUser,
+} from '@email-chat-pro/types'
 import { DataSource, EntityManager, IsNull, Repository } from 'typeorm'
 import { AuthService } from '../auth/auth.service'
 import { User } from '../auth/entities/user.entity'
@@ -39,8 +42,10 @@ const PG_UNIQUE_VIOLATION = '23505'
  *     DataSource.transaction per CLAUDE.md §19 — the request status update and
  *     the chat creation must succeed or fail together.
  *
- * Messaging authorization based on an accepted contact relationship is NOT
- * implemented here — that is Task 3.3 (contact-based messaging gating).
+ *   - getContacts: the authenticated user's accepted contacts (Task 3.3).
+ *   - areContacts: whether a pair shares an accepted contact relationship in
+ *     either direction (Task 3.3 — consumed by MessagesService to gate message
+ *     sending; the acceptance is mutual, so this works for both participants).
  */
 @Injectable()
 export class ContactsService {
@@ -191,6 +196,62 @@ export class ContactsService {
     request.status = status
     request.updatedAt = now
     return this.toContactRequestDto(request)
+  }
+
+  /**
+   * Returns the authenticated user's accepted contacts (GET /contacts;
+   * features.md — "Contact List"; architecture.md — Contact Endpoints).
+   *
+   * An acceptance establishes a **mutual** relationship: `contact_requests`
+   * is one-directional (sender → receiver), but both the user who accepted and
+   * the user they accepted see each other as a contact. The query therefore
+   * loads accepted requests in either direction (where the user is the
+   * receiver OR the sender) and returns the *other* participant of each row,
+   * deduplicated when a pair has accepted requests in both directions.
+   * Contacts are sorted by username for a stable, deterministic list.
+   */
+  async getContacts(userId: string): Promise<SharedUser[]> {
+    const requests = await this.contactRequestsRepository.find({
+      where: [
+        { receiver: { id: userId }, status: 'accepted' },
+        { sender: { id: userId }, status: 'accepted' },
+      ],
+      relations: ['sender', 'receiver'],
+    })
+
+    const seen = new Set<string>()
+    const contacts: SharedUser[] = []
+    for (const request of requests) {
+      const other = request.sender.id === userId ? request.receiver : request.sender
+      if (seen.has(other.id)) {
+        continue
+      }
+      seen.add(other.id)
+      contacts.push(this.authService.toUserDto(other))
+    }
+    return contacts.sort((a, b) => (a.username ?? '').localeCompare(b.username ?? ''))
+  }
+
+  /**
+   * Verifies whether two users share an ACCEPTED contact relationship in
+   * either direction (features.md — "Messaging Access Control"; Task 3.3.
+   * Used by MessagesService to gate message sending).
+   *
+   * `contact_requests` is one-directional (sender → receiver), but acceptance
+   * is mutual — the chat created on accept is usable by both participants —
+   * so the check passes when an accepted request exists in either direction.
+   */
+  async areContacts(userAId: string, userBId: string): Promise<boolean> {
+    if (userAId === userBId) {
+      return false
+    }
+    const existing = await this.contactRequestsRepository.findOne({
+      where: [
+        { sender: { id: userAId }, receiver: { id: userBId }, status: 'accepted' },
+        { sender: { id: userBId }, receiver: { id: userAId }, status: 'accepted' },
+      ],
+    })
+    return existing !== null
   }
 
   /**
