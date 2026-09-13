@@ -953,7 +953,9 @@ apps/backend/src/modules/chats/chats.controller.spec.ts
 
 ## Task 3.1 — User Search
 
-**Status:** Not Started
+**Status:** Completed with Known Issues
+
+**Date:** 2026-09-13
 
 **Scope:**
 
@@ -962,11 +964,62 @@ apps/backend/src/modules/chats/chats.controller.spec.ts
 * Email search
 * Search result contracts
 
+**Implemented / Verified State:**
+
+- **Shared contract** (`packages/types/user.types.ts`): added `UserSearchQuery` (`{ q: string, limit?: number }`) and `UserSearchResponse` (`User[]`) per architecture.md §API Endpoints — User Endpoints (`GET /users/search`). Both are exported automatically through the `export *` index.
+- **Shared constants** (`packages/constants/validation.constants.ts`): `SEARCH_LIMIT_DEFAULT` (10) and `SEARCH_LIMIT_MAX` (50) per architecture.md ("limit: default 10, max 50"). `ERROR_MESSAGES.SEARCH_QUERY_REQUIRED` added in `error.constants.ts`.
+- **UsersService.searchUsers(q, limit)** (`users.service.ts`):
+  - `q` is required and trimmed; missing / empty / whitespace-only → `400 VALIDATION_ERROR` (`SEARCH_QUERY_REQUIRED`) — an empty query would enumerate the whole user table, not "search".
+  - Username matches are case-insensitive **partial** matches (`LOWER(username) LIKE LOWER(pattern)`); LIKE wildcards (`%` / `_` / `\`) in the input are escaped so user text matches literally (features.md — "Username search supports appropriate partial matching").
+  - Email matches are case-insensitive **exact** matches (`LOWER(email) = LOWER(:email)`) (features.md — "Email search supports exact matching").
+  - Only **active, non-deleted** users are returned (`isActive: true`, `deletedAt: IsNull()`; the TypeORM soft-delete filter also applies) (features.md — "Deleted users are not returned").
+  - `limit` is clamped to `[1, SEARCH_LIMIT_MAX]` and the result set is capped via `take`; results are ordered `username ASC`.
+- **UsersController.searchUsers** (`users.controller.ts`): `GET /users/search`, `JwtAuthGuard`-protected, `@HttpCode(200)`. `q` is read raw (`string | undefined`); `limit` uses `DefaultValuePipe(SEARCH_LIMIT_DEFAULT)` + `ParseIntPipe`. Returns `ApiResponse<UserSearchResponse>` with each user mapped through `AuthService.toUserDto` (password/verification hashes never exposed). The authenticated caller is required but is not used to filter results (architecture.md specifies eligible active users; features.md doesn't exclude self).
+- **Tests**: 7 new, **91/91 total across 11 suites** — `users.service.spec.ts` (6: empty/whitespace/missing query → 400 and no query issued; OR username/email predicates + default limit 10; LIKE-wildcard escaping (`al%ice` → `%al\%ice%`); limit 500 clamped to 50; limit 0 clamped to 1; repository-result passthrough) and `users.controller.spec.ts` (1: searchUsers delegation + `ApiResponse` mapping). No new dependency; all existing infrastructure reused (`JwtAuthGuard`, `AuthService.toUserDto`, `ApiResponse<T>`, shared constants).
+
 **Verification:**
 
 ```text
-Not Started
+Executed 2026-09-13.
+
+- npm run build:packages: PASS
+- npx tsc --noEmit (backend): PASS
+- npx eslint "src/**/*.ts" --max-warnings=0 (backend): PASS
+- npx jest (backend): PASS — 11 suites / 91 tests
+- npm run build (nest build): PASS
+- npm run format:check: PARTIAL — all Task 3.1 files pass Prettier; one
+  pre-existing Task 2.2 file (1789050600000-CreateMessagesTable.ts) remains
+  unformatted (not modified by this task; out of scope; Task 2.2 did not run
+  format:check).
+- Live endpoint tests (8 checks per current-task.md): NOT EXECUTED — blocked
+  by the environment. Host port 5432 is held by the Windows PostgreSQL service
+  (postgresql-x64-18), which rejects the app credentials (password
+  authentication failed). The approved Docker postgres container is up and
+  healthy but its published host port is shadowed by the Windows listener and
+  its internal bridge IP (172.20.0.2) is unreachable from the Windows host
+  (WSL2 NAT); stopping the Windows service (the documented Task 0.1/1.1 fix)
+  requires admin, which is unavailable (access denied). The 8 live checks were
+  NOT run and are NOT claimed passed.
 ```
+
+**Files Changed:**
+
+```text
+Modified:
+apps/backend/src/modules/users/users.controller.ts     (+ GET /users/search endpoint)
+apps/backend/src/modules/users/users.controller.spec.ts (+ searchUsers envelope test)
+apps/backend/src/modules/users/users.module.ts         (module doc: owns /users/search)
+apps/backend/src/modules/users/users.service.ts        (+ searchUsers, escapeLikePattern)
+apps/backend/src/modules/users/users.service.spec.ts   (+ 6 searchUsers tests)
+packages/constants/src/error.constants.ts              (+ SEARCH_QUERY_REQUIRED)
+packages/constants/src/validation.constants.ts         (+ SEARCH_LIMIT_DEFAULT, SEARCH_LIMIT_MAX)
+packages/types/src/user.types.ts                        (+ UserSearchQuery, UserSearchResponse)
+
+Created:
+(none — every change was an addition to an existing file)
+```
+
+**Note:** No frontend, WebSocket, contacts, rate limiting, or chat-creation work was performed (Task 3.1 scope). No new dependency, no migration (no DB schema change), no Redis/Kafka/brokers. The `docs/6-current-task.md` execution boundary for Task 3.1 was already in the working tree when this session resumed; the task is recorded here, and the boundary is NOT advanced to a Task 3.2 placeholder because the live endpoint verification is still pending an environment fix (maintainer decision required).
 
 ---
 
@@ -1430,6 +1483,35 @@ Unauthorized scope changes:
 - None
 ```
 
+```text
+Task: 3.1
+Date: 2026-09-13
+
+Environment:
+- Node.js v24.17.0
+- npm 11.13.0
+- Docker (Docker Desktop / WSL2 backend), daemon running
+- Windows PostgreSQL 18 service still owns host TCP 5432 (recurring port
+  conflict — see Task 0.1/1.1 known issues)
+
+Checks:
+- npm run build:packages: PASS
+- npx tsc --noEmit (backend): PASS
+- npx eslint "src/**/*.ts" --max-warnings=0 (backend): PASS
+- npx jest (backend): PASS (11 suites / 91 tests; +7 for search)
+- npm run build (nest build): PASS
+- npm run format:check: PARTIAL (all Task 3.1 files pass; pre-existing
+  Task 2.2 migration file 1789050600000-CreateMessagesTable.ts is
+  unformatted — not modified here, out of scope)
+- Live endpoint tests (current-task.md checks 1-8): NOT EXECUTED —
+  blocked by the host 5432 port conflict (Windows postgres rejects the
+  app credentials; Docker container unreachable from the Windows host;
+  no admin to stop the Windows service). Not claimed passed.
+
+Unauthorized scope changes:
+- None
+```
+
 ---
 
 # Known Issues
@@ -1664,6 +1746,32 @@ Next Action: Revisit only if an explicit rejection requirement for replayed
        tokens is added to the project scope.
 ```
 
+## Open Issues After Task 3.1
+
+```text
+Issue: Live endpoint verification for GET /users/search could not be executed.
+       Host port 5432 is held by the local Windows PostgreSQL service
+       (postgresql-x64-18), which rejects the app credentials (password
+       authentication failed for user "email_chat_dev") — the recurring
+       conflict first documented in Task 0.1/1.1. The approved Docker postgres
+       container (email-chat-pro-db, "Up ... healthy") cannot serve the
+       backend: its published host port is shadowed by the Windows listener
+       (both bind 0.0.0.0:5432 and SYNs land on the Windows one), and its
+       internal bridge IP (172.20.0.2) is unreachable from the Windows host
+       (WSL2 NAT). The documented fix (stop the Windows service) needs
+       administrator rights, which are unavailable (access denied).
+Impact: current-task.md live checks 1-8 were NOT run and are NOT claimed
+       passed. Static verification is green (build:packages, tsc, eslint,
+       91 jest tests, nest build). The endpoint's query semantics are covered
+       by unit tests; the live HTTP+DB path (JwtAuthGuard, real LIKE/exact
+       query against PostgreSQL, ApiResponse envelope) is unverified.
+Discovered During: Task 3.1 live endpoint verification attempt.
+Current Status: Open. The Windows PostgreSQL service still owns host 5432.
+Next Action: Run the 8 live checks per current-task.md once the environment is
+       resolvable (admin available to stop the Windows service, or Docker
+       Desktop reachable on the host port), then re-record the result here.
+```
+
 ---
 
 # Architecture Changes
@@ -1862,6 +1970,26 @@ Reason: Task 1.1 completed and verified (recorded above); the normal lifecycle
        approved this update (AskUserQuestion, 2026-09-07) before Task 1.2 was
        implemented.
 Approved By: Mohammad Mehdi.
+```
+
+```text
+Context Change: Task 3.1 record completed.
+File: docs/7-done.md
+Change: Task 3.1 status moved from "Not Started" to "Completed with Known
+       Issues", with the user-search implementation (UserSearchQuery /
+       UserSearchResponse shared contracts, SEARCH_LIMIT_DEFAULT/MAX and
+       SEARCH_QUERY_REQUIRED shared constants, UsersService.searchUsers
+       semantics, UsersController GET /users/search, 7 new tests -> 91 total),
+       the executed static-verification results, and an explicitly documented
+       environment blocker (host 5432 port conflict) for the 8 live endpoint
+       checks, which were NOT executed and are NOT claimed passed.
+       docs/6-current-task.md is left at the Task 3.1 boundary (unchanged by
+       this session) rather than advanced to a Task 3.2 placeholder, because
+       the live verification is still pending an environment fix; the next Task
+       3.2 scope is not yet approved.
+Reason: Required by the Task 3.1 completion workflow; recorded honestly with
+       the live-verification blocker instead of claiming unexecuted checks.
+Approved By: Mohammad Mehdi (Task 3.1 authorised via docs/6-current-task.md).
 ```
 
 ---

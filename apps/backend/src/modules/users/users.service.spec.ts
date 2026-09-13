@@ -1,8 +1,9 @@
 import { ConflictException } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
+import { FindOperator } from 'typeorm'
 import * as bcrypt from 'bcryptjs'
-import { ERROR_CODES, ERROR_MESSAGES } from '@email-chat-pro/constants'
+import { ERROR_CODES, ERROR_MESSAGES, SEARCH_LIMIT_MAX } from '@email-chat-pro/constants'
 import { User } from '../auth/entities/user.entity'
 import { UsersService } from './users.service'
 
@@ -11,6 +12,7 @@ describe('UsersService', () => {
 
   const repository = {
     findOne: jest.fn(),
+    find: jest.fn(),
     save: jest.fn(),
   }
 
@@ -189,6 +191,89 @@ describe('UsersService', () => {
       expect(saved.bio).toBeNull()
       expect(saved.avatarUrl).toBeNull()
       expect(saved.passwordHash).toBe('')
+    })
+  })
+
+  describe('searchUsers', () => {
+    it('rejects an empty, whitespace-only, or missing query with a validation error', async () => {
+      await expect(service.searchUsers('', 10)).rejects.toMatchObject({
+        status: 400,
+        response: {
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message: ERROR_MESSAGES.SEARCH_QUERY_REQUIRED,
+        },
+      })
+      await expect(service.searchUsers('   ', 10)).rejects.toMatchObject({
+        status: 400,
+        response: {
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message: ERROR_MESSAGES.SEARCH_QUERY_REQUIRED,
+        },
+      })
+      await expect(service.searchUsers(undefined, 10)).rejects.toMatchObject({
+        status: 400,
+        response: {
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message: ERROR_MESSAGES.SEARCH_QUERY_REQUIRED,
+        },
+      })
+      expect(repository.find).not.toHaveBeenCalled()
+    })
+
+    it('queries active non-deleted users with OR username/email predicates and the default limit', async () => {
+      repository.find.mockResolvedValue([])
+
+      await service.searchUsers('ali', 10)
+
+      expect(repository.find).toHaveBeenCalledTimes(1)
+      const options = repository.find.mock.calls[0][0]
+      expect(options.take).toBe(10)
+      expect(options.order).toEqual({ username: 'ASC' })
+      expect(options.where).toHaveLength(2)
+      for (const branch of options.where) {
+        expect(branch.isActive).toBe(true)
+        expect(branch.deletedAt).toBeInstanceOf(FindOperator)
+      }
+      // First branch is the partial username match with the query as a literal
+      // fragment; LIKE wildcards in the input are escaped so they match literally.
+      const usernameOperator = options.where[0].username
+      expect(usernameOperator).toBeInstanceOf(FindOperator)
+      expect(usernameOperator.objectLiteralParameters).toEqual({ pattern: '%ali%' })
+    })
+
+    it('escapes LIKE wildcards in the query so they match literally', async () => {
+      repository.find.mockResolvedValue([])
+
+      await service.searchUsers('al%ice', 10)
+
+      const options = repository.find.mock.calls[0][0]
+      expect(options.where[0].username.objectLiteralParameters).toEqual({ pattern: '%al\\%ice%' })
+    })
+
+    it('clamps the limit to the configured maximum when it exceeds the cap', async () => {
+      repository.find.mockResolvedValue([])
+
+      await service.searchUsers('ali', 500)
+
+      expect(repository.find.mock.calls[0][0].take).toBe(SEARCH_LIMIT_MAX)
+    })
+
+    it('clamps the limit to at least 1 when it is below the minimum', async () => {
+      repository.find.mockResolvedValue([])
+
+      await service.searchUsers('ali', 0)
+
+      expect(repository.find.mock.calls[0][0].take).toBe(1)
+    })
+
+    it('returns the users found by the repository', async () => {
+      const alice = { ...baseUser, id: 'uuid-alice', username: 'alice', fullName: 'Alice' }
+      const bob = { ...baseUser, id: 'uuid-bob', username: 'bob', fullName: 'Bob' }
+      repository.find.mockResolvedValue([alice, bob])
+
+      const result = await service.searchUsers('ali', 10)
+
+      expect(result).toEqual([alice, bob])
     })
   })
 })

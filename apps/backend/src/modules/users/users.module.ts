@@ -6,11 +6,12 @@ import { UsersController } from './users.controller'
 import { UsersService } from './users.service'
 
 /**
- * User profile module (Task 1.4 — User Profile).
+ * User profile module (Task 1.4 — User Profile, Task 3.1 — User Search).
  *
- * Owns the `/users/me` endpoints. The User entity and the JwtAuthGuard /
- * JwtStrategy / AuthService providers come from AuthModule (exported there), so
- * the two modules share a single auth identity implementation.
+ * Owns the `/users/me` endpoints and the `/users/search` endpoint. The User
+ * entity and the JwtAuthGuard / JwtStrategy / AuthService providers come from
+ * AuthModule (exported there), so the two modules share a single auth identity
+ * implementation.
  */
 @Module({
   imports: [TypeOrmModule.forFeature([User]), AuthModule],

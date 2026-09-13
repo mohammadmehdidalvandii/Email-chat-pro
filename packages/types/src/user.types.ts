@@ -61,3 +61,20 @@ export interface DeleteAccountInput {
 export interface DeleteAccountResponse {
   message: string
 }
+
+/**
+ * Query parameters for GET /users/search (architecture.md §API Endpoints —
+ * User Endpoints). `q` matches a username (partial) or an email (exact);
+ * `limit` caps the result count (default 10, max 50).
+ */
+export interface UserSearchQuery {
+  q: string
+  limit?: number
+}
+
+/**
+ * Successful response payload for GET /users/search — the matching eligible
+ * active users (architecture.md: `data: [ ... User objects ... ]`). Empty when
+ * no users match.
+ */
+export type UserSearchResponse = User[]

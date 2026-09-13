@@ -1,17 +1,25 @@
 import {
   Body,
   Controller,
+  DefaultValuePipe,
   Delete,
   Get,
   HttpCode,
   HttpStatus,
+  ParseIntPipe,
   Patch,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common'
-import type { ApiResponse, DeleteAccountResponse, ProfileResponse } from '@email-chat-pro/types'
+import type {
+  ApiResponse,
+  DeleteAccountResponse,
+  ProfileResponse,
+  UserSearchResponse,
+} from '@email-chat-pro/types'
 import type { Request } from 'express'
-import { ERROR_MESSAGES } from '@email-chat-pro/constants'
+import { ERROR_MESSAGES, SEARCH_LIMIT_DEFAULT } from '@email-chat-pro/constants'
 import { AuthService } from '../auth/auth.service'
 import { User } from '../auth/entities/user.entity'
 import { JwtAuthGuard } from '../auth/guards/jwt.guard'
@@ -74,6 +82,32 @@ export class UsersController {
     return {
       success: true,
       data: { message: ERROR_MESSAGES.ACCOUNT_DELETED },
+      timestamp: new Date().toISOString(),
+    }
+  }
+
+  /**
+   * GET /users/search — searches active users by username (partial) or email
+   * (exact) (architecture.md §API Endpoints — User Endpoints; Task 3.1).
+   *
+   * Query params:
+   *   - q: the search query (username or email)
+   *   - limit: default 10, max 50
+   *
+   * Protected by JwtAuthGuard; the authenticated user is required but is not
+   * used to filter results (features.md specifies eligible active users only).
+   */
+  @Get('search')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async searchUsers(
+    @Query('q') q: string | undefined,
+    @Query('limit', new DefaultValuePipe(SEARCH_LIMIT_DEFAULT), ParseIntPipe) limit: number,
+  ): Promise<ApiResponse<UserSearchResponse>> {
+    const users = await this.usersService.searchUsers(q, limit)
+    return {
+      success: true,
+      data: users.map((user) => this.authService.toUserDto(user)),
       timestamp: new Date().toISOString(),
     }
   }

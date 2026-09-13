@@ -25,6 +25,7 @@ describe('UsersController', () => {
   const usersService = {
     updateProfile: jest.fn(),
     deleteAccount: jest.fn(),
+    searchUsers: jest.fn(),
   }
   const authService = {
     toUserDto: jest.fn(),
@@ -90,6 +91,23 @@ describe('UsersController', () => {
       expect(usersService.deleteAccount).toHaveBeenCalledWith(authenticatedUser, dto)
       expect(response.success).toBe(true)
       expect(response.data).toEqual({ message: ERROR_MESSAGES.ACCOUNT_DELETED })
+      expect(response.timestamp).toEqual(expect.any(String))
+      expect(response.error).toBeUndefined()
+    })
+  })
+
+  describe('searchUsers', () => {
+    it('searches and returns matching users mapped to the shared contract', async () => {
+      const matched = { id: 'uuid-2', username: 'alice', fullName: 'Alice' }
+      usersService.searchUsers.mockResolvedValue([matched])
+      authService.toUserDto.mockReturnValue(matched)
+
+      const response = await controller.searchUsers('ali', 10)
+
+      expect(usersService.searchUsers).toHaveBeenCalledWith('ali', 10)
+      expect(authService.toUserDto).toHaveBeenCalledWith(matched)
+      expect(response.success).toBe(true)
+      expect(response.data).toEqual([matched])
       expect(response.timestamp).toEqual(expect.any(String))
       expect(response.error).toBeUndefined()
     })

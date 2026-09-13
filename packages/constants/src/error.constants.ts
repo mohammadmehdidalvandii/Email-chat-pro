@@ -63,4 +63,6 @@ export const ERROR_MESSAGES = {
   WS_CONNECTION_FAILED: 'WebSocket connection failed',
   WS_UNAUTHORIZED: 'Authentication required to connect',
   WS_CHAT_UNAUTHORIZED: 'You are not a participant of this chat',
+  // Task 3.1 — User Search
+  SEARCH_QUERY_REQUIRED: 'Search query is required',
 } as const

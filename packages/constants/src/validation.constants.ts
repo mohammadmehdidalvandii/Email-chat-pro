@@ -75,3 +75,14 @@ export const MESSAGE_CONTENT_MIN_LENGTH = 1
 
 /** Maximum message content length (architecture.md — Message Content). */
 export const MESSAGE_CONTENT_MAX_LENGTH = 5000
+
+// ---------------------------------------------------------------------------
+// Task 3.1 — User search limits (architecture.md §API Endpoints — GET
+// /users/search: "limit: default 10, max 50")
+// ---------------------------------------------------------------------------
+
+/** Default result count for GET /users/search when no `limit` is provided. */
+export const SEARCH_LIMIT_DEFAULT = 10
+
+/** Maximum result count for GET /users/search (results are capped at this). */
+export const SEARCH_LIMIT_MAX = 50

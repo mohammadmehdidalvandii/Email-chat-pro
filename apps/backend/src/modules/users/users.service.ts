@@ -1,8 +1,13 @@
-import { ConflictException, Injectable, UnauthorizedException } from '@nestjs/common'
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { Raw, Repository } from 'typeorm'
+import { IsNull, Raw, Repository } from 'typeorm'
 import * as bcrypt from 'bcryptjs'
-import { ERROR_CODES, ERROR_MESSAGES } from '@email-chat-pro/constants'
+import { ERROR_CODES, ERROR_MESSAGES, SEARCH_LIMIT_MAX } from '@email-chat-pro/constants'
 import { User } from '../auth/entities/user.entity'
 import { DeleteAccountDto } from './dto/delete-account.dto'
 import { UpdateProfileDto } from './dto/update-profile.dto'
@@ -103,6 +108,63 @@ export class UsersService {
     user.passwordHash = ''
 
     await this.usersRepository.save(user)
+  }
+
+  /**
+   * Searches active users by username or email (Task 3.1 — User Search).
+   *
+   * - `q` is required and trimmed; an empty query is rejected with 400
+   *   VALIDATION_ERROR (an empty query would enumerate the whole user table,
+   *   not "search" — features.md "User Search").
+   * - Username matches are case-insensitive PARTIAL matches (`LOWER LIKE`);
+   *   LIKE wildcards (`%` / `_`) in the input are escaped so user text is a
+   *   literal fragment (features.md — "Username search supports appropriate
+   *   partial matching").
+   * - Email matches are case-insensitive EXACT matches (features.md — "Email
+   *   search supports exact matching").
+   * - Only active, non-deleted users are returned; deleted users (Task 1.5
+   *   anonymization) are excluded (features.md — "Deleted users are not
+   *   returned").
+   * - Results are capped at SEARCH_LIMIT_MAX (default SEARCH_LIMIT_DEFAULT) —
+   *   features.md "Search results are limited to a defined result count".
+   */
+  async searchUsers(q: string | undefined, limit: number): Promise<User[]> {
+    const query = q?.trim() ?? ''
+    if (!query) {
+      throw new BadRequestException({
+        code: ERROR_CODES.VALIDATION_ERROR,
+        message: ERROR_MESSAGES.SEARCH_QUERY_REQUIRED,
+      })
+    }
+
+    const safeLimit = Math.min(Math.max(limit, 1), SEARCH_LIMIT_MAX)
+    const pattern = `%${this.escapeLikePattern(query)}%`
+
+    // Two OR branches: partial username match, or exact email match. The
+    // `LOWER()` comparison mirrors the case-insensitive username unique index
+    // (Task 1.4). `deletedAt: IsNull()` is explicit even though TypeORM's
+    // soft-delete filter excludes deleted rows, so the contract is self-evident.
+    return this.usersRepository.find({
+      where: [
+        {
+          isActive: true,
+          deletedAt: IsNull(),
+          username: Raw((alias) => `LOWER(${alias}) LIKE LOWER(:pattern)`, { pattern }),
+        },
+        {
+          isActive: true,
+          deletedAt: IsNull(),
+          email: Raw((alias) => `LOWER(${alias}) = LOWER(:email)`, { email: query }),
+        },
+      ],
+      order: { username: 'ASC' },
+      take: safeLimit,
+    })
+  }
+
+  /** Escapes LIKE wildcards (`%`, `_`, `\`) so user input matches literally. */
+  private escapeLikePattern(value: string): string {
+    return value.replace(/[\\%_]/g, (char) => `\\${char}`)
   }
 
   /**
