@@ -217,6 +217,115 @@ describe('MessagesService', () => {
       expect(repository.create).not.toHaveBeenCalled()
     })
 
+    it('persists an image message with a mediaUrl and empty content', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+      const imageDto: CreateMessageDto = {
+        messageType: 'image',
+        mediaUrl: 'https://res.cloudinary.com/example-cloud/img.png',
+      }
+      const messageEntity = {
+        id: 'msg-img',
+        chatId: 'chat-1',
+        sender: baseUser,
+        content: '',
+        messageType: 'image',
+        mediaUrl: imageDto.mediaUrl,
+        createdAt: new Date('2026-06-01T00:00:00Z'),
+      }
+      repository.create.mockReturnValue(messageEntity)
+      repository.save.mockResolvedValue(messageEntity)
+      authService.toUserDto.mockReturnValue({ id: baseUser.id })
+
+      const result = await service.sendMessage(baseUser, 'chat-1', imageDto)
+
+      expect(repository.create).toHaveBeenCalledWith({
+        chatId: 'chat-1',
+        sender: baseUser,
+        content: '',
+        messageType: 'image',
+        mediaUrl: imageDto.mediaUrl,
+      })
+      expect(result.messageType).toBe('image')
+      expect(result.content).toBe('')
+      expect(result.mediaUrl).toBe(imageDto.mediaUrl)
+    })
+
+    it('persists an image message caption when content is provided', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+      const imageDto: CreateMessageDto = {
+        messageType: 'image',
+        content: 'Look at this!',
+        mediaUrl: 'https://res.cloudinary.com/example-cloud/img.png',
+      }
+      const messageEntity = {
+        id: 'msg-img2',
+        chatId: 'chat-1',
+        sender: baseUser,
+        content: imageDto.content,
+        messageType: 'image',
+        mediaUrl: imageDto.mediaUrl,
+        createdAt: new Date('2026-06-01T00:00:00Z'),
+      }
+      repository.create.mockReturnValue(messageEntity)
+      repository.save.mockResolvedValue(messageEntity)
+      authService.toUserDto.mockReturnValue({ id: baseUser.id })
+
+      const result = await service.sendMessage(baseUser, 'chat-1', imageDto)
+
+      expect(repository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ content: 'Look at this!', messageType: 'image' }),
+      )
+      expect(result.content).toBe('Look at this!')
+    })
+
+    it('throws BadRequestException when an image message omits mediaUrl', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+
+      await expect(
+        service.sendMessage(baseUser, 'chat-1', { messageType: 'image' }),
+      ).rejects.toMatchObject({
+        status: 400,
+        response: {
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message: ERROR_MESSAGES.IMAGE_MEDIA_URL_REQUIRED,
+        },
+      })
+      expect(repository.create).not.toHaveBeenCalled()
+    })
+
+    it('throws BadRequestException when an image message has an invalid mediaUrl', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+
+      await expect(
+        service.sendMessage(baseUser, 'chat-1', {
+          messageType: 'image',
+          mediaUrl: 'not-a-url',
+        }),
+      ).rejects.toMatchObject({
+        status: 400,
+        response: {
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message: ERROR_MESSAGES.IMAGE_MEDIA_URL_INVALID,
+        },
+      })
+      expect(repository.create).not.toHaveBeenCalled()
+    })
+
+    it('throws BadRequestException when a text message has no content', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+
+      await expect(
+        service.sendMessage(baseUser, 'chat-1', { messageType: 'text' }),
+      ).rejects.toMatchObject({
+        status: 400,
+        response: {
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message: ERROR_MESSAGES.MESSAGE_CONTENT_REQUIRED,
+        },
+      })
+      expect(repository.create).not.toHaveBeenCalled()
+    })
+
     it('persists and returns the message with sender DTO mapping', async () => {
       chatsService().findById.mockResolvedValue(baseChat)
       const messageEntity = {

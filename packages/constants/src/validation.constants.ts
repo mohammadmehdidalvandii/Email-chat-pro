@@ -103,3 +103,28 @@ export const CONTACT_REQUEST_STATUSES = ['pending', 'accepted', 'declined'] as c
  * (architecture.md — UpdateContactRequestInput: `'accepted' | 'declined'`).
  */
 export const CONTACT_REQUEST_RESPONSE_STATUSES = ['accepted', 'declined'] as const
+
+// ---------------------------------------------------------------------------
+// Task 4.1 — File upload validation (architecture.md §File Upload Validation)
+// ---------------------------------------------------------------------------
+
+/** Maximum uploaded image size in bytes (architecture.md — Images: max 10MB). */
+export const IMAGE_MAX_SIZE_BYTES = 10 * 1024 * 1024
+
+/** Minimum image edge length in pixels (architecture.md — dimension rule). */
+export const IMAGE_MIN_DIMENSION_PX = 100
+
+/** Maximum image edge length in pixels (architecture.md — dimension rule). */
+export const IMAGE_MAX_DIMENSION_PX = 5000
+
+/** Image extensions accepted by the upload endpoint (architecture.md — Images). */
+export const IMAGE_FILE_EXTENSIONS = ['jpg', 'jpeg', 'png', 'gif', 'webp'] as const
+
+/** Image MIME types accepted by the upload endpoint (mirrors IMAGE_FILE_EXTENSIONS). */
+export const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'] as const
+
+/** Media types accepted by POST /files/upload (architecture.md — { file, type }). */
+export const UPLOAD_TYPES = ['image', 'video'] as const
+
+/** Maximum media_url length (architecture.md — messages.media_url VARCHAR(500)). */
+export const MEDIA_URL_MAX_LENGTH = 500

@@ -1197,7 +1197,9 @@ existing architecture and patterns. No new dependency, no Redis/Kafka/brokers.
 
 ## Task 4.1 — Image Messages
 
-**Status:** Not Started
+**Status:** Completed with Known Issues
+
+**Date:** 2026-09-14
 
 **Scope:**
 
@@ -1206,11 +1208,158 @@ existing architecture and patterns. No new dependency, no Redis/Kafka/brokers.
 * Image validation
 * Image message contracts
 
+**Implemented:**
+
+* **FilesModule** (`apps/backend/src/modules/files/`) — new module owning file
+  upload. `POST /files/upload`, `JwtAuthGuard`-protected via
+  `@UseFilters(FileSizeExceptionFilter)`, uses Multer `memoryStorage()` with
+  `limits: { fileSize: IMAGE_MAX_SIZE_BYTES }` (10MB) and a MIME pre-filter.
+  The `file` field is required; the optional `type` field is validated by
+  `UploadFileDto` (`@IsIn(UPLOAD_TYPES)`) and restricted to `'image'` (absent
+  defaults to image; `'video'` → `400 VALIDATION_ERROR` `UPLOAD_TYPE_INVALID`
+  — video uploads are Task 4.2). Success returns `200` with the shared
+  `ApiResponse` envelope containing `data: { url }`.
+* **Authoritative image validation** (`FilesService.uploadImage` +
+  `image-file.ts`):
+  - Missing/empty file → `400 VALIDATION_ERROR` `FILE_REQUIRED`.
+  - Format is sniffed from magic bytes (`inspectImageBuffer`: PNG signature,
+    GIF87a/89a header, JPEG SOF marker walk, WebP RIFF+VP8/VP8L/VP8X). A
+    spoofable client `Content-Type` is never trusted alone — the Multer
+    mime filter is only a cheap pre-check; non-image content → `400
+    VALIDATION_ERROR` `FILE_TYPE_INVALID`.
+  - Dimensions parsed from the file header; outside `100×100–5000×5000` px →
+    `400 VALIDATION_ERROR` `FILE_DIMENSIONS_INVALID`. No image-processing
+    dependency was added (documented decision 2 — `sharp`/`image-size` not in
+    `stack.md`).
+  - Size enforced by the Multer limit; an oversized upload surfaces as a
+    `PayloadTooLargeException` mapped to `400 VALIDATION_ERROR`
+    `FILE_SIZE_EXCEEDED` by the controller-scoped `FileSizeExceptionFilter`
+    (the global filter would otherwise leak a 413 with no standard code). The
+    filter (and the `PayloadTooLargeException` detection, which Nest 11
+    renamed from the `FileTooLargeException` this task initially coded for)
+    is unit-tested.
+* **Cloudinary integration**:
+  - `apps/backend/src/config/cloudinary.config.ts` — `getCloudinaryConfig()`
+    reads `CLOUDINARY_CLOUD_NAME` / `CLOUDINARY_API_KEY` /
+    `CLOUDINARY_API_SECRET` and throws when any is missing (mirrors
+    `getJwtConfig`).
+  - Credentials are applied **lazily on first upload** (`FilesService` memoizes
+    the config, decision 3) so the rest of the API boots without Cloudinary.
+    Missing config or a provider rejection → controlled `500 INTERNAL_ERROR`
+    `FILE_UPLOAD_FAILED`; failures are logged with the NestJS `Logger` (never
+    exposing secret/provider details). Upload target folder
+    `email-chat-pro/images`, `resource_type: 'image'`, via a `data:` URI.
+  - No credentials are hard-coded or committed.
+* **Message-side image support** (features.md "stored media reference is
+  associated with the message"):
+  - `CreateMessageDto` now accepts `messageType: 'image'` (`@IsIn(['text',
+    'image'])` — video stays rejected, Task 4.2) and a `mediaUrl` (`@Length(1,
+    MEDIA_URL_MAX_LENGTH)`), with `content` optional at the DTO layer.
+  - `MessagesService.sendMessage` owns the per-type rules: `text` requires
+    non-empty `content` (`MESSAGE_CONTENT_REQUIRED`) and forbids `mediaUrl`
+    (`MESSAGE_MEDIA_NOT_ALLOWED`); `image` requires `mediaUrl`
+    (`IMAGE_MEDIA_URL_REQUIRED`) that passes `isValidHttpUrl`
+    (`IMAGE_MEDIA_URL_INVALID`) and stores `content ?? ''` (the `messages.content`
+    column is `NOT NULL`; captions are not in scope — documented decision 4).
+  - Authorization is unchanged — image messages ride the same
+    participant + accepted-contact gate (Tasks 2.2/3.3) and persistence +
+    `message:received` broadcast paths as text messages.
+* **Shared contracts/constants/utils**:
+  - `packages/types/src/file.types.ts`: `UploadFileType` (`'image' | 'video'`)
+    and `FileUploadResponse` (`{ url: string }`), exported via `index.ts`.
+  - `packages/constants/validation.constants.ts`: `IMAGE_MAX_SIZE_BYTES` (10MB),
+    `IMAGE_MIN_DIMENSION_PX` (100), `IMAGE_MAX_DIMENSION_PX` (5000),
+    `IMAGE_FILE_EXTENSIONS`, `IMAGE_MIME_TYPES`, `UPLOAD_TYPES`,
+    `MEDIA_URL_MAX_LENGTH` (500).
+  - `packages/constants/error.constants.ts`: `FILE_REQUIRED`, `FILE_TYPE_INVALID`,
+    `FILE_SIZE_EXCEEDED`, `FILE_DIMENSIONS_INVALID`, `UPLOAD_TYPE_INVALID`,
+    `IMAGE_MEDIA_URL_REQUIRED`, `IMAGE_MEDIA_URL_INVALID`, `FILE_UPLOAD_FAILED`.
+  - `packages/utils/src/validators.ts`: `isValidHttpUrl(value)` — pure
+    `new URL()` + `http/https` protocol check.
+* **Dependencies** (`apps/backend/package.json`): `cloudinary@^2.11.0`
+  (approved in `stack.md` — File Storage); `@types/multer` (devDependency) to
+  type the transitive `multer` file object under strict TypeScript. Both
+  reified via workspace install.
+
+**Tests:** 32 new, **155/155 total across 17 suites** — `image-file.spec.ts`
+(12: PNG/GIF/JPEG/lossy+lossless+VP8X WebP format+dimension detection, null for
+non-image/empty/truncated/zero-dimension inputs, JPEG with no SOF, `mimeTypeForFormat`
+mapping), `files.service.spec.ts` (missing/empty file 400, non-image 400,
+dimension-rule 400s, happy-path Cloudinary upload → `{ url }` incl. data-URI +
+folder contract, missing-config 500, provider rejection 500, missing secure_url
+500, error-redaction of provider message), `files.controller.spec.ts`
+(envelope + delegation, `type: video` → 400 via DTO), the oversize filter spec,
+and `messages.service.spec.ts` (+ image-message validation: image-required
+mediaUrl, invalid mediaUrl, content-optional → stored `''`, text-with-mediaUrl
+still 400, text content required preserved). The specs use the established
+`jest.mock('@nestjs/jwt', ...)` pattern; the cloudinary `v2` client is mocked so
+no real upload occurs in tests.
+
 **Verification:**
 
 ```text
-Not Started
+Executed 2026-09-14.
+
+- npm install (workspace reify: cloudinary, @types/multer): PASS
+  (devDependencies were initially pruned by a global NODE_ENV=production
+  npm config; re-installed with --include=dev to restore test tooling)
+- npm run build:packages: PASS
+- npx tsc --noEmit (backend): PASS
+- npx eslint "src/**/*.ts" --max-warnings=0 (backend): PASS
+- npx jest (backend): PASS — 17 suites / 155 tests (+32 for Task 4.1)
+- npm run build (nest build): PASS
+- npm run format:check: PARTIAL — all Task 4.1 files pass Prettier; the
+  pre-existing Task 2.2 migration file (1789050600000-CreateMessagesTable.ts)
+  remains unformatted (unchanged, out of scope — known issue carried from
+  Tasks 2.2/3.1/3.2/3.3).
+- Live endpoint tests (current-task.md checks 1-7): NOT EXECUTED — blocked by
+  the same environment blocker documented in Tasks 3.1/3.2 (host port 5432 is
+  held by the Windows PostgreSQL service, which rejects the app credentials;
+  the Docker postgres container is unreachable from the Windows host via WSL2
+  NAT; no admin to stop the Windows service; real Cloudinary credentials are
+  not available). Not claimed passed.
 ```
+
+**Files Changed:**
+
+```text
+Modified:
+apps/backend/package.json                                    (+ cloudinary, @types/multer)
+apps/backend/src/app.module.ts                              (+ FilesModule import)
+apps/backend/src/modules/messages/dto/create-message.dto.ts (messageType image +
+                                                             mediaUrl accepted, content optional)
+apps/backend/src/modules/messages/messages.service.ts       (type-specific text/image
+                                                             validation; content '' fallback)
+apps/backend/src/modules/messages/messages.service.spec.ts  (+ image-message tests,
+                                                             isValidHttpUrl mock usage)
+packages/constants/src/error.constants.ts                   (+ 8 Task 4.1 error messages)
+packages/constants/src/validation.constants.ts              (+ image/upload validation constants)
+packages/types/src/index.ts                                 (+ export file.types)
+packages/utils/src/validators.ts                            (+ isValidHttpUrl)
+package-lock.json                                           (reify cloudinary, @types/multer)
+
+Created:
+apps/backend/src/config/cloudinary.config.ts
+apps/backend/src/modules/files/dto/upload-file.dto.ts
+apps/backend/src/modules/files/filters/file-size.exception.filter.ts
+apps/backend/src/modules/files/filters/file-size.exception.filter.spec.ts
+apps/backend/src/modules/files/files.controller.ts
+apps/backend/src/modules/files/files.controller.spec.ts
+apps/backend/src/modules/files/files.module.ts
+apps/backend/src/modules/files/files.service.ts
+apps/backend/src/modules/files/files.service.spec.ts
+apps/backend/src/modules/files/image-file.ts
+apps/backend/src/modules/files/image-file.spec.ts
+packages/types/src/file.types.ts
+```
+
+**Note:** No frontend work, no video support (`type`/`messageType` `'video'`
+stays rejected), no migration/data-model change, no Cloudinary transformations,
+no throttler/i18n/presence/Winston, no Redis/Kafka/brokers (Task 4.1 scope).
+The `PayloadTooLargeException`→400 mapping and the lazy Cloudinary configuration
+are the two behaviors this task had to derive from Nest 11 / environment
+realities; both are unit-tested and documented as approved decisions in
+`docs/6-current-task.md`.
 
 ---
 
@@ -1675,6 +1824,40 @@ Unauthorized scope changes:
 - None
 ```
 
+```text
+Task: 4.1
+Date: 2026-09-14
+
+Environment:
+- Node.js v24.17.0
+- npm 11.13.0
+- Docker (Docker Desktop / WSL2 backend), daemon running
+- Windows PostgreSQL 18 service still owns host TCP 5432 (recurring port
+  conflict — see Task 0.1/1.1 known issues)
+
+Checks:
+- npm install (workspace reify cloudinary, @types/multer): PASS (note: the
+  global NODE_ENV=production npm config pruned devDependencies; re-installed
+  with `NODE_ENV=development npm install --include=dev` to restore
+  ts-jest/jest/eslint for type-check/lint/test)
+- npm run build:packages: PASS
+- npx tsc --noEmit (backend): PASS
+- npx eslint "src/**/*.ts" --max-warnings=0 (backend): PASS
+- npx jest (backend): PASS (17 suites / 155 tests; +32 for Task 4.1)
+- npm run build (nest build): PASS
+- npm run format:check: PARTIAL (all Task 4.1 files pass; pre-existing
+  Task 2.2 migration file 1789050600000-CreateMessagesTable.ts remains
+  unformatted — not modified here, out of scope; carried known issue)
+- Live endpoint tests (current-task.md checks 1-7): NOT EXECUTED — blocked by
+  the environment (host 5432 held by the Windows PostgreSQL service rejecting
+  app credentials; Docker postgres unreachable from the Windows host via WSL2
+  NAT; no admin to stop the Windows service; no real Cloudinary credentials).
+  Not claimed passed.
+
+Unauthorized scope changes:
+- None
+```
+
 ---
 
 # Known Issues
@@ -1963,6 +2146,49 @@ Next Action: Apply the migration and run the 13 live checks per current-task.md
        once the environment is resolvable (admin available to stop the Windows
        service, or Docker Desktop reachable on the host port), then re-record
        the result here.
+```
+
+## Open Issues After Task 4.1
+
+```text
+Issue: The Task 4.1 live endpoint checks (current-task.md checks 1-7) could not
+       be executed. The identical environment blocker from Tasks 3.1/3.2
+       persists: host port 5432 is held by the Windows PostgreSQL service
+       (postgresql-x64-18), which rejects the app credentials; the approved
+       Docker postgres container is unreachable from the Windows host (bridge IP
+       172.20.0.2 TCP probe timed out — WSL2 NAT); stopping the Windows service
+       requires admin, which is unavailable. Additionally, real Cloudinary
+       credentials are not available, so a real upload through the provider
+       cannot be exercised.
+Impact: The 7 live HTTP/DB/upload-path checks were NOT run and are NOT claimed
+       passed. Static verification is green (build:packages, tsc, eslint, 155
+       jest tests, nest build, format PARTIAL only on the pre-existing Task 2.2
+       migration file). The image magic-byte/dimension parsing, file-size→400
+       filter, per-type message validation, and message persistence are covered
+       by unit tests; the live path (JwtAuthGuard against a real request, Multer
+       multipart parsing, an actual Cloudinary upload URL, the ApiResponse
+       envelope) is unverified against real infrastructure.
+Discovered During: Task 4.1 live verification attempt (environment blocked).
+Current Status: Open. The Windows PostgreSQL service still owns host 5432 and
+       no Cloudinary credentials are configured.
+Next Action: Run the 7 live checks per current-task.md once the environment is
+       resolvable (admin available to stop the Windows service, or Docker
+       Desktop reachable on the host port) and real Cloudinary credentials are
+       provided, then re-record the result here.
+```
+
+```text
+Issue: The upload endpoint's oversized-file path depends on how the platform
+       surfaces Multer's `LIMIT_FILE_SIZE`. Nest 11 (this repo) raises a
+       `PayloadTooLargeException`; the task initially coded for the Nest 10-era
+       `FileTooLargeException` and was corrected to catch `PayloadTooLargeException`.
+Impact: None at runtime — the correction is in place and the filter is unit
+       tested (oversize maps to 400 VALIDATION_ERROR FILE_SIZE_EXCEEDED). This
+       is a framework-version implementation note, documented to avoid
+       regression on a Nest upgrade.
+Discovered During: Task 4.1 implementation (the filter's exception type).
+Current Status: Resolved in code and covered by tests.
+Next Action: None.
 ```
 
 ---
@@ -2272,6 +2498,26 @@ Approved By: Mohammad Mehdi (Task 3.3 authorized via the 2026-09-13 instruction
        to start Task 3.3 with the scope from the Task 3.3 placeholder +
        features.md Contact List / Messaging Access Control + architecture.md
        Contact Endpoints).
+```
+
+```text
+Context Change: Task 4.1 record completed.
+File: docs/7-done.md
+Change: Task 4.1 status moved from "Not Started" to "Completed with Known
+       Issues", with the image-message implementation (FilesModule + POST
+       /files/upload, magic-byte image validation, lazy Cloudinary integration,
+       message-side image support, shared FileUploadResponse/UploadFileType
+       contracts, validation/error constants, isValidHttpUrl util, 32 new tests
+       -> 155 total). The executed static-verification results are recorded
+       (build:packages, tsc backend + packages, eslint, jest, nest build all
+       PASS; format PARTIAL on the pre-existing Task 2.2 file), and the
+       environment blocker (host 5432 port conflict + no real Cloudinary
+       credentials) is recorded explicitly — the 7 live checks were NOT executed
+       and are NOT claimed passed.
+Reason: Required by the Task 4.1 completion workflow; recorded honestly with the
+       live-verification blocker instead of claiming unexecuted checks.
+Approved By: Mohammad Mehdi (Task 4.1 authorized via docs/6-current-task.md,
+       2026-09-14).
 ```
 
 ---

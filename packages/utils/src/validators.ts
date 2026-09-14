@@ -26,3 +26,16 @@ export function isValidPassword(value: string): boolean {
     PASSWORD_REGEX.test(value)
   )
 }
+
+/**
+ * Returns true when the value is an absolute HTTP(S) URL — the only scheme
+ * accepted for client-supplied media references (Task 4.1 image messages).
+ */
+export function isValidHttpUrl(value: string): boolean {
+  try {
+    const parsed = new URL(value)
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}

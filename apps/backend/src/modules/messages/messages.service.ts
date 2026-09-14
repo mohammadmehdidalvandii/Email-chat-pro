@@ -10,6 +10,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm'
 import { ERROR_CODES, ERROR_MESSAGES } from '@email-chat-pro/constants'
 import type { Message as MessageContract } from '@email-chat-pro/types'
+import { isValidHttpUrl } from '@email-chat-pro/utils'
 import { Repository } from 'typeorm'
 import { AuthService } from '../auth/auth.service'
 import { User } from '../auth/entities/user.entity'
@@ -92,19 +93,53 @@ export class MessagesService {
       })
     }
 
-    if (dto.messageType === 'text' && dto.mediaUrl) {
-      throw new BadRequestException({
-        code: ERROR_CODES.VALIDATION_ERROR,
-        message: ERROR_MESSAGES.MESSAGE_MEDIA_NOT_ALLOWED,
-      })
+    // Task 4.1 — Image messages. Validation is type-specific at the service
+    // layer (the DTO covers shape/length; the service owns the per-type rules):
+    //   - text: content required (non-empty), mediaUrl forbidden.
+    //   - image: mediaUrl required and a valid http(s) URL; content optional
+    //     (stored as '' when absent — messages.content is NOT NULL).
+    // Video messages never reach here (the DTO restricts messageType to
+    // text|image; video is Task 4.2).
+    let content: string
+    let mediaUrl: string | null
+    if (dto.messageType === 'text') {
+      if (!dto.content || dto.content.trim() === '') {
+        throw new BadRequestException({
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message: ERROR_MESSAGES.MESSAGE_CONTENT_REQUIRED,
+        })
+      }
+      if (dto.mediaUrl) {
+        throw new BadRequestException({
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message: ERROR_MESSAGES.MESSAGE_MEDIA_NOT_ALLOWED,
+        })
+      }
+      content = dto.content
+      mediaUrl = null
+    } else {
+      if (!dto.mediaUrl) {
+        throw new BadRequestException({
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message: ERROR_MESSAGES.IMAGE_MEDIA_URL_REQUIRED,
+        })
+      }
+      if (!isValidHttpUrl(dto.mediaUrl)) {
+        throw new BadRequestException({
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message: ERROR_MESSAGES.IMAGE_MEDIA_URL_INVALID,
+        })
+      }
+      content = dto.content ?? ''
+      mediaUrl = dto.mediaUrl
     }
 
     const message = this.messagesRepository.create({
       chatId,
       sender,
-      content: dto.content,
+      content,
       messageType: dto.messageType,
-      mediaUrl: dto.mediaUrl ?? null,
+      mediaUrl,
     })
     const saved = await this.messagesRepository.save(message)
     const messageDto = this.toMessageDto(saved)
