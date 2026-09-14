@@ -1,0 +1,11 @@
+{
+  "VALIDATION_ERROR": "Please check the information you entered and try again.",
+  "VERIFICATION_TOKEN_INVALID": "This verification link is invalid or has expired.",
+  "UNAUTHORIZED": "Please log in to continue.",
+  "FORBIDDEN": "You don't have permission to do that.",
+  "NOT_FOUND": "The requested item could not be found.",
+  "CONFLICT": "That action conflicts with existing data.",
+  "RATE_LIMIT_EXCEEDED": "Too many requests. Please try again later.",
+  "INTERNAL_ERROR": "Something went wrong. Please try again.",
+  "fallback": "Something went wrong."
+}

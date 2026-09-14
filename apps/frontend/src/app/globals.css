@@ -1,1 +1,19 @@
 @import 'tailwindcss';
+
+/* Task 4.3 — i18n. Font stack includes Persian/Arabic glyph support so the
+   RTL locale (fa) renders cleanly without bundling a webfont. */
+:root {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Tahoma, 'Noto Sans', 'Noto Sans Arabic',
+    Arial, sans-serif;
+}
+
+body {
+  font-family: var(--font-sans);
+}
+
+/* In RTL mode, left/right-agnostic alignment falls back to the text start,
+   which mirrors correctly for the fa locale. */
+[dir='rtl'] {
+  text-align: start;
+}

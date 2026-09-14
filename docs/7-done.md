@@ -1534,20 +1534,137 @@ explicitly requested these wording fixes before the commit.
 
 ## Task 4.3 — Internationalization
 
-**Status:** Not Started
+**Status:** Completed
+
+**Date:** 2026-09-14
 
 **Scope:**
 
-* Persian
-* English
+* Persian (`fa-IR`)
+* English (`en-US`)
 * i18next integration
 * RTL/LTR handling
+
+**Implemented:**
+
+* **Locale files** — `apps/frontend/public/locales/{en,fa}/{common,auth,chat,errors}.json`
+  (single source of truth, imported directly by the config). `errors.json` is
+  keyed to the backend error codes from `@email-chat-pro/constants` (the API
+  contract stays English; only the displayed text is translated). Full key
+  parity verified between `en` and `fa` across all four namespaces — no missing
+  Persian keys, no orphans.
+* **i18n config** — `apps/frontend/src/config/i18n.config.ts`: the shared
+  i18next instance initialized with the four bundled namespaces,
+  `fallbackLng: 'en'`, `supportedLngs: ['en','fa']`, `defaultNS: 'common'` and
+  `interpolation.escapeValue: false`. The initial `lng` is always `en` so SSR
+  and the first client render agree exactly (no hydration mismatch).
+  `LOCALE_META` maps each locale to its label, `dir` (`ltr`/`rtl`) and
+  `Intl` tag (`en-US`/`fa-IR`).
+* **Provider** — `apps/frontend/src/components/Providers/I18nProvider.tsx`,
+  mounted once in the root layout. It keeps `document.lang` and `document.dir`
+  in sync with the language, subscribes to `languageChanged`, persists the
+  choice, and — after hydration — restores a previously persisted language by
+  `changeLanguage` (a returning `fa` visitor flips to RTL post-mount without a
+  hydration mismatch).
+* **Language switching + persistence** —
+  `apps/frontend/src/components/Layout/LanguageSwitcher.tsx` (a `<select>` in
+  the app shell listing `English` / `فارسی`) and
+  `apps/frontend/src/i18n/storage.ts` (`localStorage` persistence guarded for
+  SSR; default English on first visit — no auto-detection dependency, per the
+  boundary's Decided Points).
+* **RTL/LTR + font coverage** — `globals.css` adds a system font stack with
+  Persian/Arabic glyph support (Tahoma + Noto Sans Arabic fallbacks; no webfont
+  bundled) and `[dir='rtl'] { text-align: start }` so content mirrors
+  correctly. The `<html>` element carries `lang="en" dir="ltr"` and the provider
+  flips both at runtime.
+* **Existing strings translated** — the landing page (`page.tsx`) is now a
+  client component rendering the app name, existing content and `API_BASE_PATH`
+  through `useTranslation('common')`, with a `LanguageSwitcher` and a
+  document-title sync effect.
+* **Locale-aware formatting** — `apps/frontend/src/i18n/formatting.ts`:
+  `toIntlLocale`, `formatDate` and `formatNumber` driven by the active locale's
+  `Intl` tag. No date/number UI exists yet, so the capability is provided and
+  wired to the active language.
+* **Error translation helper** — `apps/frontend/src/i18n/errors.ts`:
+  `translateApiError(code, fallbackText)` maps a backend error code through the
+  `errors` namespace via `ERROR_CODES` (only known codes are translated;
+  unknown/missing input falls back to the code's `fallback` text).
+
+**Dependencies:**
+
+* `i18next` `^26.4.2` and `react-i18next` `^17.0.14` added to
+  `apps/frontend/package.json` — both approved by `stack.md` §11 (and the task
+  boundary). No other dependency was added (in particular no test-runner or
+  `i18next-browser-languagedetector`, per the boundary's Decided Points).
+
+**Tests:**
+
+* No frontend test runner exists in this repo and none is authorized (the
+  boundary's Decided Points explicitly forbid adding one), so no frontend test
+  files were committed for Task 4.3. Equivalent checks were run as throwaway
+  scripts (not committed): en/fa key parity on all four namespaces and a
+  functional i18next smoke test (`en` default strings; `changeLanguage('fa')`
+  → Persian strings with `resolvedLanguage = 'fa'`). Backend jest was re-run to
+  prove no regression and is unchanged (18 suites / 187 tests) — Task 4.3 adds
+  no backend or shared-package files.
 
 **Verification:**
 
 ```text
-Not Started
+Executed 2026-09-14. All static and runtime checks recorded as actually run.
+
+- npm run build:packages (repo root): PASS
+- npx tsc --noEmit (apps/frontend): PASS
+- npx eslint . (apps/frontend): PASS
+- npx jest (backend): PASS — 18 suites / 187 tests (unchanged; backend not touched)
+- npm run format:check (repo root): PARTIAL — all Task 4.3 files pass Prettier;
+  only the pre-existing Task 2.2 migration file is flagged (carried known issue)
+- next build (apps/frontend, `env -u NODE_ENV npx next build`): PASS — "/" and
+  "/_not-found" prerendered as static content. NOTE: the boundary expected this
+  to fail (the frontend build has been recorded as failing since Task 1.1).
+  It PASSED once the global non-standard NODE_ENV=production was unset for the
+  command; see Known Issues for the root-cause finding.
+- Live frontend runtime (dev server, `env -u NODE_ENV npx next dev`): PASS —
+  GET / → 200 with <html lang="en" dir="ltr">, the "Language" switcher label,
+  "Project foundation is ready." and the /api/v1 API_BASE_PATH value
+  server-rendered; the switcher renders both en and fa options; GET
+  /locales/{en,fa}/*.json → 200. NOTE: the boundary expected this NOT to run;
+  it ran and passed.
+- next start (production serve): NOT separately executed — optional; the
+  passing production build plus the dev-server SSR check cover the runtime path.
 ```
+
+**Files Changed:**
+
+```text
+Modified:
+apps/frontend/package.json                            (+ i18next ^26.4.2, react-i18next ^17.0.14)
+package-lock.json                                     (dependency tree)
+apps/frontend/src/app/layout.tsx                      (metadata; <html lang="en" dir="ltr">;
+                                                       body wraps children in I18nProvider)
+apps/frontend/src/app/page.tsx                        (client; useTranslation; LanguageSwitcher;
+                                                       title sync; translated strings; API_BASE_PATH)
+apps/frontend/src/app/globals.css                     (Persian-capable font stack;
+                                                       [dir='rtl'] { text-align: start })
+
+Created:
+apps/frontend/public/locales/en/{common,auth,chat,errors}.json
+apps/frontend/public/locales/fa/{common,auth,chat,errors}.json
+apps/frontend/src/config/i18n.config.ts
+apps/frontend/src/i18n/storage.ts
+apps/frontend/src/i18n/formatting.ts
+apps/frontend/src/i18n/errors.ts
+apps/frontend/src/components/Providers/I18nProvider.tsx
+apps/frontend/src/components/Layout/LanguageSwitcher.tsx
+```
+
+**Note:** Frontend-only task. No backend, no shared-package (`packages/types`,
+`constants`, `utils`), no migration, no data-model change. No languagedetector
+dependency, no test runner, no new env vars (no frontend `.env.example`
+change was needed). Message timestamps were deliberately not part of this
+boundary. The Persian default-state race on first hydration (English paint for
+returning `fa` visitors before the persisted locale is restored) is documented
+in Open Issues; no SSR-first language negotiation was attempted.
 
 ---
 
@@ -2038,6 +2155,45 @@ Unauthorized scope changes:
 - None
 ```
 
+```text
+Task: 4.3
+Date: 2026-09-14
+
+Environment:
+- Node.js v24.17.0
+- npm 11.13.0
+- The shell session sets a global non-standard NODE_ENV=production; the
+  frontend build/dev commands are therefore run with `env -u NODE_ENV`.
+
+Checks:
+- npm run build:packages: PASS
+- npx tsc --noEmit (frontend): PASS
+- npx eslint . (frontend): PASS
+- npx jest (backend): PASS (18 suites / 187 tests — unchanged; Task 4.3 adds no
+  backend files)
+- npm run format:check: PARTIAL (all Task 4.3 files pass Prettier; the
+  pre-existing Task 2.2 migration file 1789050600000-CreateMessagesTable.ts
+  remains unformatted — carried, out of scope)
+- next build (frontend, `env -u NODE_ENV npx next build`): PASS — "/" and
+  "/_not-found" prerendered statically. The long-standing frontend build
+  failure (recorded since Task 1.1 as "<Html> should not be imported") did NOT
+  reproduce once NODE_ENV was unset; the global non-standard NODE_ENV=production
+  is the likely root cause. Recorded as passed because it was run and passed.
+- Dev-server runtime (frontend, `env -u NODE_ENV npx next dev`): PASS — GET / →
+  200 with <html lang="en" dir="ltr">, the "Language" switcher label, the
+  translated "Project foundation is ready." line and the /api/v1 API_BASE_PATH
+  server-rendered; the switcher HTML contains both en and fa options; GET
+  /locales/{en,fa}/{common,auth,chat,errors}.json → 200.
+- Throwaway i18n checks (run as scripts, NOT committed): en/fa key parity on all
+  4 namespaces PASS; functional i18next smoke test PASS (English default, Persian
+  after changeLanguage('fa'), resolvedLanguage='fa').
+- next start (production serve): NOT EXECUTED — optional; the passing
+  production build plus the dev-server SSR check cover the runtime path.
+
+Unauthorized scope changes:
+- None
+```
+
 ---
 
 # Known Issues
@@ -2400,6 +2556,67 @@ Next Action: Run the 8 live checks per current-task.md once the environment is
 
 ---
 
+## Open Issues After Task 4.3
+
+```text
+Issue: This shell exports a global non-standard NODE_ENV=production. Next.js
+       rejects it: `next dev`/`next build` fail or misbehave while it is set,
+       and the recorded frontend build failure (since Task 1.1, "the global
+       NODE_ENV is set to production" / "<Html> should not be imported")
+       disappeared when the variable was unset for the command.
+Impact: No runtime/product impact — all Task 4.3 frontend builds and runtime
+       checks were executed with `env -u NODE_ENV` and passed. The likely
+       root cause of the carried Task 1.1 frontend-build blocker is this
+       environment variable, not a Next.js/build-level defect. The canonical
+       root script path (`npm run build:apps`, which inherits the global
+       NODE_ENV=production) was NOT re-run and may still hit the recorded
+       failure.
+Discovered During: Task 4.3 verification (next build + dev-server runtime).
+Current Status: Open — environment-level; NODE_ENV must be unset for frontend
+       Next.js commands in this session. Re-record once the shell no longer
+       exports NODE_ENV=production.
+Next Action: When the frontend next task begins, rerun `npm run build:apps` (or
+       `next build` with NODE_ENV unset) and record the result; consider
+       removing the global NODE_ENV export from the session profile.
+```
+
+```text
+Issue: A returning Persian visitor (persisted `fa` in localStorage) gets a brief
+       English first paint before the client provider restores `fa` and flips
+       the document to RTL post-hydration. SSR always renders English (the
+       default and the only state the server knows), so there is no SSR-side
+       Persian first paint.
+Impact: Cosmetic flash + one re-render for returning fa users; page content is
+       identical either way and the persisted choice is restored promptly after
+       mount. No hydration mismatch (SSR and first client render both use the
+       default language by design).
+Discovered During: Task 4.3 design (the hydrate-after-restore approach).
+Current Status: Accepted design trade-off for the minimal scaffold. A
+       cookie-based SSR-first language negotiation (reading a locale cookie in
+       the server layout) is a possible future improvement but was NOT in this
+       boundary.
+Next Action: None required now. If a locale cookie is introduced later, the
+       provider restore can read it.
+```
+
+```text
+Issue: No automated frontend tests were committed because no frontend test
+       runner exists and the boundary's Decided Points forbid adding one. The
+       i18n modules (storage.ts, formatting.ts, errors.ts) and the
+       LanguageSwitcher/Provider behavior are therefore covered only by the
+       ad-hoc parity/functional scripts run during verification (not committed).
+Impact: These modules have no regression guard until a frontend test runner is
+       approved. Parity between en/fa JSON is enforced by human re-running the
+       parity check, not by CI.
+Discovered During: Task 4.3 testing decision (boundary Decided Points).
+Current Status: Open by design (matches the boundary).
+Next Action: Decide a frontend test runner when a future frontend task requires
+       it; before that, re-run the throwaway parity script after any locale-file
+       edit.
+```
+
+---
+
 # Architecture Changes
 
 If an approved architecture change occurs, record:
@@ -2748,6 +2965,48 @@ Reason: Required by the Task 4.2 completion workflow; recorded honestly with the
 Approved By: Mohammad Mehdi (Task 4.2 authorized via docs/6-current-task.md on
        2026-09-14; the duration-enforcement approach — dependency-free header
        parsing — was selected by the maintainer on 2026-09-14).
+```
+
+```text
+Context Change: Task 4.3 record completed.
+File: docs/7-done.md
+Change: Task 4.3 status moved from "Not Started" to "Completed", with the
+       frontend-only i18n implementation (i18next + react-i18next, 8 locale
+       JSON files under public/locales/{en,fa} keyed to the shared backend
+       ERROR_CODES for errors.json, the i18n config with English default,
+       I18nProvider with document dir/lang sync + post-hydration restore of the
+       persisted language, LanguageSwitcher with localStorage persistence, RTL
+       CSS + Persian-capable font stack, translated layout/page strings,
+       locale-aware Intl formatters, and the error-code translation helper).
+       The actual verification results are recorded (build:packages, frontend
+       tsc, frontend eslint, backend jest 18/187 all PASS; format PARTIAL on
+       the carried Task 2.2 file). The boundary's pessimistic expectations for
+       `next build` and the live runtime check — both recorded as NOT EXPECTED
+       TO PASS/NOT EXPECTED TO RUN — were EXPOSED as wrong: both were run and
+       PASSED once the global NODE_ENV=production was unset, identifying that
+       env var as the likely root cause of the carried Task 1.1 frontend-build
+       blocker. The carried environment blocker (host 5432 + Cloudinary) is
+       re-recorded in Known Issues because it still applies to backend live
+       checks, though it does not gate this frontend task.
+Reason: Required by the Task 4.3 completion workflow; the better-than-expected
+       build/runtime results are recorded honestly as run-and-passed rather
+       than as the boundary's predicted failures.
+Approved By: Mohammad Mehdi (Task 4.3 authorized via docs/6-current-task.md,
+       2026-09-14).
+```
+
+```text
+Context Change: Execution boundary advanced to Task 4.4 placeholder.
+File: docs/6-current-task.md
+Change: Replaced the Task 4.3 (Internationalization) execution boundary with
+       the statement that Task 4.3 is completed and verified (docs/7-done.md),
+       naming the next task (Task 4.4 — Presence) WITHOUT defining its scope,
+       and marking the file as a placeholder pending maintainer approval.
+       Task 4.4 is not started.
+Reason: Task 4.3 completed and verified (recorded in done.md); the normal
+       lifecycle requires current-task.md to describe the next approved task,
+       but Task 4.4 scope is not yet approved so it is only named.
+Approved By: Mohammad Mehdi.
 ```
 
 ---
