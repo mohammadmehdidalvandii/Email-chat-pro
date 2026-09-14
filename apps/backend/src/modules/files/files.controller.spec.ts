@@ -14,6 +14,7 @@ describe('FilesController', () => {
 
   const filesService = {
     uploadImage: jest.fn(),
+    uploadVideo: jest.fn(),
   }
 
   beforeEach(async () => {
@@ -60,5 +61,34 @@ describe('FilesController', () => {
         buffer: Buffer.from('x'),
       } as Express.Multer.File),
     ).rejects.toThrow('not reached')
+  })
+
+  it('delegates to uploadVideo when dto.type is video', async () => {
+    const uploaded = { url: 'https://res.cloudinary.com/example-cloud/vid.mp4' }
+    filesService.uploadVideo.mockResolvedValue(uploaded)
+    const file = { buffer: Buffer.from('video-bytes') } as Express.Multer.File
+
+    const result = await controller.upload(
+      { user: { id: 'uuid-1' } } as never,
+      { type: 'video' },
+      file,
+    )
+
+    expect(filesService.uploadVideo).toHaveBeenCalledWith(file)
+    expect(filesService.uploadImage).not.toHaveBeenCalled()
+    expect(result.success).toBe(true)
+    expect(result.data).toEqual(uploaded)
+  })
+
+  it('delegates to uploadImage when dto.type is absent (image default)', async () => {
+    const uploaded = { url: 'https://res.cloudinary.com/example-cloud/img.png' }
+    filesService.uploadImage.mockResolvedValue(uploaded)
+    const file = { buffer: Buffer.from('image-bytes') } as Express.Multer.File
+
+    const result = await controller.upload({ user: { id: 'uuid-1' } } as never, {}, file)
+
+    expect(filesService.uploadImage).toHaveBeenCalledWith(file)
+    expect(filesService.uploadVideo).not.toHaveBeenCalled()
+    expect(result.success).toBe(true)
   })
 })

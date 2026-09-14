@@ -15,8 +15,9 @@ import { FileInterceptor } from '@nestjs/platform-express'
 import {
   ERROR_CODES,
   ERROR_MESSAGES,
-  IMAGE_MAX_SIZE_BYTES,
   IMAGE_MIME_TYPES,
+  VIDEO_MAX_SIZE_BYTES,
+  VIDEO_MIME_TYPES,
 } from '@email-chat-pro/constants'
 import type { ApiResponse, FileUploadResponse } from '@email-chat-pro/types'
 import type { Request } from 'express'
@@ -30,17 +31,20 @@ import { FileSizeExceptionFilter } from './filters/file-size.exception.filter'
 /** Request enriched with the authenticated user by the JWT strategy. */
 type AuthenticatedRequest = Request & { user: User }
 
+/** MIME types the shared upload route accepts (image + video). */
+const ALLOWED_MIME_TYPES = new Set<string>([...IMAGE_MIME_TYPES, ...VIDEO_MIME_TYPES])
+
 /**
  * Multer fileFilter — a cheap MIME pre-check before the authoritative
  * magic-byte inspection in FilesService. The client-supplied mime type alone
  * is never trusted; it only rejects clearly-wrong uploads early.
  */
-function imageFileFilter(
+function uploadFileFilter(
   _req: Express.Request,
   file: Express.Multer.File,
   callback: (error: Error | null, acceptFile: boolean) => void,
 ): void {
-  if ((IMAGE_MIME_TYPES as readonly string[]).includes(file.mimetype)) {
+  if (ALLOWED_MIME_TYPES.has(file.mimetype)) {
     callback(null, true)
   } else {
     callback(
@@ -57,9 +61,11 @@ function imageFileFilter(
  * File upload endpoints (architecture.md §File Endpoints — POST /files/upload).
  *
  * Uploads are stored in memory by Multer (memoryStorage), capped at
- * IMAGE_MAX_SIZE_BYTES, and validated + persisted by FilesService. An oversized
- * file is mapped to a standardized 400 by FileSizeExceptionFilter (a
- * controller-scoped filter that precedes the global @Catch() filter).
+ * VIDEO_MAX_SIZE_BYTES (the largest cap, so the shared route never truncates a
+ * valid upload), and validated + persisted by FilesService. Each type's own cap
+ * (images ≤10MB, videos ≤50MB) is enforced service-side. An oversized file is
+ * mapped to a standardized 400 by FileSizeExceptionFilter (a controller-scoped
+ * filter that precedes the global @Catch() filter).
  */
 @Controller('files')
 @UseFilters(FileSizeExceptionFilter)
@@ -67,12 +73,12 @@ export class FilesController {
   constructor(private readonly filesService: FilesService) {}
 
   /**
-   * POST /files/upload — uploads a single image.
+   * POST /files/upload — uploads a single image or video.
    *
    * Multipart/form-data fields:
-   *   - `file` (required): the image binary.
-   *   - `type` (optional): upload category; only `image` is accepted today
-   *     (`video` is Task 4.2). Validated by UploadFileDto.
+   *   - `file` (required): the media binary.
+   *   - `type` (optional): upload category, `'image'` or `'video'` (Task 4.2);
+   *     absent defaults to image. Validated by UploadFileDto.
    *
    * Response 200 with the shared ApiResponse envelope containing the
    * Cloudinary-hosted secure URL in `data.url`.
@@ -82,17 +88,20 @@ export class FilesController {
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
-      limits: { fileSize: IMAGE_MAX_SIZE_BYTES },
-      fileFilter: imageFileFilter,
+      limits: { fileSize: VIDEO_MAX_SIZE_BYTES },
+      fileFilter: uploadFileFilter,
     }),
   )
   @HttpCode(HttpStatus.OK)
   async upload(
     @Req() _req: AuthenticatedRequest,
-    @Body() _dto: UploadFileDto,
+    @Body() dto: UploadFileDto,
     @UploadedFile() file?: Express.Multer.File,
   ): Promise<ApiResponse<FileUploadResponse>> {
-    const data = await this.filesService.uploadImage(file)
+    const data =
+      dto.type === 'video'
+        ? await this.filesService.uploadVideo(file)
+        : await this.filesService.uploadImage(file)
     return {
       success: true,
       data,

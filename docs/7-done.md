@@ -1365,7 +1365,9 @@ realities; both are unit-tested and documented as approved decisions in
 
 ## Task 4.2 — Video Messages
 
-**Status:** Not Started
+**Status:** Completed with Known Issues
+
+**Date:** 2026-09-14
 
 **Scope:**
 
@@ -1374,11 +1376,159 @@ realities; both are unit-tested and documented as approved decisions in
 * Video validation
 * Video message contracts
 
+**Implemented:**
+
+* **Video upload path** (`POST /files/upload`, `FilesModule`): the optional
+  `type` field now validates against `['image', 'video']` (`UploadFileDto`
+  `@IsIn`), absent still defaults to `image`. `FilesController.upload` dispatches
+  on `dto.type` — `'video'` → `FilesService.uploadVideo`, otherwise the existing
+  `uploadImage`. The shared Multer `FileInterceptor` limit is raised to
+  `VIDEO_MAX_SIZE_BYTES` (50MB) and the MIME pre-filter (`uploadFileFilter`)
+  accepts the video MIME types (mp4/webm/mov/avi) in addition to the image
+  MIME types. The client `Content-Type` remains a cheap pre-check — the magic
+  bytes stay authoritative.
+* **Authoritative video validation** (`FilesService.uploadVideo` +
+  `video-file.ts`):
+  - `video-file.ts` is a new dependency-free container-header parser (the
+    documented Task 4.2 decision — no video-metadata library is in `stack.md`).
+    `detectVideoFormat` sniffs magic bytes: MP4/MOV via the `ftyp` box (major
+    brand `qt  ` → mov, else mp4), WebM via the EBML signature `1A 45 DF A3`
+    with DocType verified as `webm` (keeps mkv out), AVI via `RIFF` + `AVI `.
+    `readVideoDuration` parses each container's header: MP4/MOV `mvhd`
+    duration/timescale (v0 + v1, unknown 0xFFFFFFFF sentinels rejected), WebM
+    Segment → Info `Duration` × `TimecodeScale`, AVI `hdrl`/`avih`
+    `dwMicroSecPerFrame` × `dwTotalFrames`.
+  - Missing/empty file → `400 VALIDATION_ERROR` `FILE_REQUIRED`.
+  - Size per type, service-side: images now also checked against
+    `IMAGE_MAX_SIZE_BYTES` (the shared route carries only the 50MB Multer cap;
+    an image >10MB → `400 VALIDATION_ERROR` `FILE_SIZE_EXCEEDED` — unchanged
+    contract, moved from Multer to the service). Video >50MB →
+    `FILE_SIZE_EXCEEDED`; anything beyond the 50MB Multer limit still maps via
+    `FileSizeExceptionFilter`.
+  - Non-video content on the video path → `400 VALIDATION_ERROR`
+    `FILE_TYPE_INVALID`.
+  - Duration >5 minutes (`VIDEO_MAX_DURATION_SECONDS` = 300) → `400
+    VALIDATION_ERROR` `VIDEO_DURATION_EXCEEDED`.
+  - A recognized-format video whose duration cannot be read from the header →
+    `400 VALIDATION_ERROR` `VIDEO_DURATION_INVALID` (strict: an unverifiable
+    duration never passes the ≤5-minute guarantee).
+* **Cloudinary integration** (video): the lazy `ensureCloudinaryConfigured` and
+  the `FILE_UPLOAD_FAILED` wrapping are reused unchanged; `uploadToCloudinary`
+  is generalized to mime type + `resource_type` + folder. Video uploads use
+  `resource_type: 'video'` and folder `email-chat-pro/videos` (images keep
+  `email-chat-pro/images`). Missing provider config / provider rejection /
+  missing `secure_url` → controlled `500 INTERNAL_ERROR` `FILE_UPLOAD_FAILED`,
+  logged without secrets.
+* **Message-side video support** (features.md "stored media reference is
+  associated with the message"): `CreateMessageDto` now accepts
+  `messageType: 'video'` (`@IsIn(['text', 'image', 'video'])`,
+  `MESSAGE_TYPE_INVALID` message updated accordingly). `MessagesService.sendMessage`
+  owns the per-type rules in an explicit three-way branch (text / image /
+  video): `video` requires `mediaUrl` → `VIDEO_MEDIA_URL_REQUIRED` when absent,
+  a valid `http(s)` URL via the shared `isValidHttpUrl` → `VIDEO_MEDIA_URL_INVALID`
+  when not, and stores `content ?? ''` (the `messages.content` column is
+  `NOT NULL`; no caption model — the documented Task 4.1 decision). Image/text
+  behavior is unchanged (the former two-branch `text`/else now distinguishes
+  `image` from `video`). Authorization (participant + accepted-contact gate)
+  and the `message:received` broadcast are unchanged — video rides the same
+  send path.
+* **Shared contracts / constants** (`packages/types`,
+  `packages/constants`):
+  - `packages/types`: no change — `UploadFileType = 'image' | 'video'` and
+    `MessageType` already include `'video'` (Task 4.1).
+  - `packages/constants/validation.constants.ts`: `VIDEO_MAX_SIZE_BYTES` (50MB),
+    `VIDEO_MAX_DURATION_SECONDS` (300), `VIDEO_FILE_EXTENSIONS`
+    (`['mp4', 'webm', 'mov', 'avi']`), `VIDEO_MIME_TYPES`. `MEDIA_URL_MAX_LENGTH`
+    (500) reused.
+  - `packages/constants/error.constants.ts`: `VIDEO_DURATION_EXCEEDED`,
+    `VIDEO_DURATION_INVALID`, `VIDEO_MEDIA_URL_REQUIRED`,
+    `VIDEO_MEDIA_URL_INVALID`. Task 4.1 wording no longer accurate once videos
+    are supported was corrected: `FILE_REQUIRED` ("A file is required"),
+    `FILE_TYPE_INVALID` (lists image + video formats), `FILE_SIZE_EXCEEDED`
+    (states both type caps), `UPLOAD_TYPE_INVALID` ('type must be "image" or
+    "video"'), and `MESSAGE_TYPE_INVALID` (adds video). The existing test
+    assertions reference the constants symbolically, so no assertion text
+    changed.
+* **Dependencies**: none added — the duration parser is dependency-free.
+  No migration/data-model change (the `messages` table already supports
+  `message_type = 'video'` and `media_url`).
+
+**Tests:** 32 new, **187/187 total across 18 suites** — `video-file.spec.ts`
+(18: mp4/mov format detection by brand, mvhd duration incl. v0, missing-mvhd and
+zero-timescale → null, webm format + doctype rejection, webm duration via
+Duration × TimecodeScale, missing-Info → null, avi detection + duration,
+zero-microPerFrame → null, unknown-format null, and over-limit mp4 duration
+value for the service to reject), `files.service.spec.ts` (+3 video-for-type
+size/duration error cases, valid video upload asserting the `resource_type:
+'video'` + `email-chat-pro/videos` Cloudinary contract, video provider-failure
+500, one-time lazy config across image+video, and the new service-side image
+>10MB `FILE_SIZE_EXCEEDED` check), `files.controller.spec.ts` (+ `type: 'video'`
+→ `uploadVideo` dispatch and absent type → image default), and
+`messages.service.spec.ts` (+ video message persisted with empty content,
+video caption, `VIDEO_MEDIA_URL_REQUIRED`, `VIDEO_MEDIA_URL_INVALID`). The specs
+keep the established `jest.mock('@nestjs/jwt', ...)` + mocked Cloudinary `v2`
+patterns; no real upload occurs in tests.
+
 **Verification:**
 
 ```text
-Not Started
+Executed 2026-09-14.
+
+- npm run build:packages: PASS
+- npx tsc --noEmit (backend): PASS
+- npx eslint "src/**/*.ts" --max-warnings=0 (backend): PASS
+- npx jest (backend): PASS — 18 suites / 187 tests (+32 for Task 4.2; Task 4.1
+  recorded 17/155)
+- npm run build (nest build): PASS
+- npm run format:check: PARTIAL — all Task 4.2 files pass Prettier; the
+  pre-existing Task 2.2 migration file (1789050600000-CreateMessagesTable.ts)
+  remains unformatted (unchanged, out of scope — known issue carried from
+  Tasks 2.2/3.1/3.2/3.3/4.1).
+- Live endpoint tests (current-task.md checks 1-8): NOT EXECUTED — blocked by
+  the same environment blocker documented for Tasks 3.1/3.2/3.3/4.1 (host port
+  5432 is held by the Windows PostgreSQL service, which rejects the app
+  credentials; the Docker postgres container is unreachable from the Windows
+  host via WSL2 NAT; no admin to stop the Windows service; real Cloudinary
+  credentials are not available). Not claimed passed.
 ```
+
+**Files Changed:**
+
+```text
+Modified:
+packages/constants/src/error.constants.ts                   (+ 4 Task 4.2 VIDEO_* messages;
+                                                             FILE_*/UPLOAD_TYPE_INVALID/
+                                                             MESSAGE_TYPE_INVALID wording updated)
+packages/constants/src/validation.constants.ts              (+ VIDEO_MAX_SIZE_BYTES,
+                                                             VIDEO_MAX_DURATION_SECONDS,
+                                                             VIDEO_FILE_EXTENSIONS,
+                                                             VIDEO_MIME_TYPES)
+apps/backend/src/modules/files/dto/upload-file.dto.ts       (type validates ['image','video'])
+apps/backend/src/modules/files/files.controller.ts          (50MB Multer cap; image+video MIME
+                                                             filter; type dispatch -> uploadVideo)
+apps/backend/src/modules/files/files.controller.spec.ts     (+ video-dispatch / image-default tests)
+apps/backend/src/modules/files/files.service.ts             (+ uploadVideo; service-side per-type
+                                                             size caps; generalized uploadToCloudinary
+                                                             resource_type+folder)
+apps/backend/src/modules/files/files.service.spec.ts        (+ video path + image size check tests)
+apps/backend/src/modules/messages/dto/create-message.dto.ts (messageType includes 'video')
+apps/backend/src/modules/messages/messages.service.spec.ts  (+ video-message validation tests)
+apps/backend/src/modules/messages/messages.service.ts       (three-way text/image/video branch)
+
+Created:
+apps/backend/src/modules/files/video-file.ts
+apps/backend/src/modules/files/video-file.spec.ts
+```
+
+**Note:** No frontend work, no data-model/migration change, no Cloudinary
+transformations/transcoding/trimming, no new libraries (duration parsing is
+dependency-free header reading), no message editing/deletion, no rate
+limiting/i18n/presence/Winston/Redis (later Phase 4 tasks). The Task 4.1
+`IMAGE_*` message constants are unchanged. The `FILE_REQUIRED` /
+`FILE_TYPE_INVALID` / `FILE_SIZE_EXCEEDED` / `UPLOAD_TYPE_INVALID` /
+`MESSAGE_TYPE_INVALID` message strings were updated because their Task 4.1
+image-only wording became inaccurate once video uploads were enabled; the user
+explicitly requested these wording fixes before the commit.
 
 ---
 
@@ -1858,6 +2008,36 @@ Unauthorized scope changes:
 - None
 ```
 
+```text
+Task: 4.2
+Date: 2026-09-14
+
+Environment:
+- Node.js v24.17.0
+- npm 11.13.0
+- Docker (Docker Desktop / WSL2 backend), daemon running
+- Windows PostgreSQL 18 service still owns host TCP 5432 (recurring port
+  conflict — see Task 0.1/1.1 known issues)
+
+Checks:
+- npm run build:packages: PASS
+- npx tsc --noEmit (backend): PASS
+- npx eslint "src/**/*.ts" --max-warnings=0 (backend): PASS
+- npx jest (backend): PASS (18 suites / 187 tests; +32 for Task 4.2)
+- npm run build (nest build): PASS
+- npm run format:check: PARTIAL (all Task 4.2 files pass; pre-existing
+  Task 2.2 migration file 1789050600000-CreateMessagesTable.ts remains
+  unformatted — not modified here, out of scope; carried known issue)
+- Live endpoint tests (current-task.md checks 1-8): NOT EXECUTED — blocked by
+  the environment (host 5432 held by the Windows PostgreSQL service rejecting
+  app credentials; Docker postgres unreachable from the Windows host via WSL2
+  NAT; no admin to stop the Windows service; no real Cloudinary credentials).
+  Not claimed passed.
+
+Unauthorized scope changes:
+- None
+```
+
 ---
 
 # Known Issues
@@ -2191,6 +2371,33 @@ Current Status: Resolved in code and covered by tests.
 Next Action: None.
 ```
 
+```text
+Issue: The Task 4.2 live endpoint checks (current-task.md checks 1-8) could not
+       be executed. The identical environment blocker from Tasks 3.1/3.2/3.3/4.1
+       persists: host port 5432 is held by the Windows PostgreSQL service
+       (postgresql-x64-18), which rejects the app credentials; the approved
+       Docker postgres container is unreachable from the Windows host (bridge IP
+       172.20.0.2 TCP probe timed out — WSL2 NAT); stopping the Windows service
+       requires admin, which is unavailable. Additionally, real Cloudinary
+       credentials are not available, so a real video upload through the provider
+       cannot be exercised.
+Impact: The 8 live HTTP/DB/upload-path checks were NOT run and are NOT claimed
+       passed. Static verification is green (build:packages, tsc, eslint, 187
+       jest tests, nest build, format PARTIAL only on the pre-existing Task 2.2
+       migration file). The video magic-byte format detection, container-header
+       duration parsing, per-type upload dispatch, per-type message validation,
+       and message persistence are covered by unit tests; the live path (a real
+       multipart MP4 through Multer, the computed Cloudinary video folder/URL,
+       the ApiResponse envelope) is unverified against real infrastructure.
+Discovered During: Task 4.2 live verification attempt (environment blocked).
+Current Status: Open. The Windows PostgreSQL service still owns host 5432 and
+       no Cloudinary credentials are configured.
+Next Action: Run the 8 live checks per current-task.md once the environment is
+       resolvable (admin available to stop the Windows service, or Docker
+       Desktop reachable on the host port) and real Cloudinary credentials are
+       provided, then re-record the result here.
+```
+
 ---
 
 # Architecture Changes
@@ -2518,6 +2725,29 @@ Reason: Required by the Task 4.1 completion workflow; recorded honestly with the
        live-verification blocker instead of claiming unexecuted checks.
 Approved By: Mohammad Mehdi (Task 4.1 authorized via docs/6-current-task.md,
        2026-09-14).
+```
+
+```text
+Context Change: Task 4.2 record completed.
+File: docs/7-done.md
+Change: Task 4.2 status moved from "Not Started" to "Completed with Known
+       Issues", with the video-message implementation (video upload path on
+       POST /files/upload with `type: 'video'` dispatch, the dependency-free
+       video-file.ts container-header parser for format + duration, per-type
+       size caps service-side, Cloudinary `resource_type: 'video'` +
+       `email-chat-pro/videos`, the three-way text/image/video message branch,
+       shared VIDEO_* constants + corrected FILE_*/UPLOAD_TYPE/MESSAGE_TYPE
+       wording, 32 new tests -> 187 total). The executed static-verification
+       results are recorded (build:packages, tsc, eslint, jest, nest build all
+       PASS; format PARTIAL on the pre-existing Task 2.2 file), and the
+       environment blocker (host 5432 port conflict + no real Cloudinary
+       credentials) is recorded explicitly — the 8 live checks were NOT executed
+       and are NOT claimed passed.
+Reason: Required by the Task 4.2 completion workflow; recorded honestly with the
+       live-verification blocker instead of claiming unexecuted checks.
+Approved By: Mohammad Mehdi (Task 4.2 authorized via docs/6-current-task.md on
+       2026-09-14; the duration-enforcement approach — dependency-free header
+       parsing — was selected by the maintainer on 2026-09-14).
 ```
 
 ---

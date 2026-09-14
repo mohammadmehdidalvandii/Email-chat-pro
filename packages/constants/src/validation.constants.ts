@@ -128,3 +128,24 @@ export const UPLOAD_TYPES = ['image', 'video'] as const
 
 /** Maximum media_url length (architecture.md — messages.media_url VARCHAR(500)). */
 export const MEDIA_URL_MAX_LENGTH = 500
+
+// ---------------------------------------------------------------------------
+// Task 4.2 — Video upload validation (architecture.md §File Upload Validation)
+// ---------------------------------------------------------------------------
+
+/** Maximum uploaded video size in bytes (architecture.md — Videos: max 50MB). */
+export const VIDEO_MAX_SIZE_BYTES = 50 * 1024 * 1024
+
+/** Maximum video duration in seconds (architecture.md — Videos: max 5 minutes). */
+export const VIDEO_MAX_DURATION_SECONDS = 300
+
+/** Video extensions accepted by the upload endpoint (architecture.md — Videos). */
+export const VIDEO_FILE_EXTENSIONS = ['mp4', 'webm', 'mov', 'avi'] as const
+
+/** Video MIME types accepted by the upload endpoint (mirrors VIDEO_FILE_EXTENSIONS). */
+export const VIDEO_MIME_TYPES = [
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
+  'video/x-msvideo',
+] as const

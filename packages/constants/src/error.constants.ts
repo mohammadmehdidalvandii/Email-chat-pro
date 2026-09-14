@@ -2,7 +2,12 @@
  * Shared error codes and messages (architecture.md: packages/constants/error-messages.ts).
  * Used to keep error responses consistent with the standardized API contract.
  */
-import { IMAGE_MAX_SIZE_BYTES, MESSAGE_CONTENT_MAX_LENGTH } from './validation.constants'
+import {
+  IMAGE_MAX_SIZE_BYTES,
+  MESSAGE_CONTENT_MAX_LENGTH,
+  VIDEO_MAX_SIZE_BYTES,
+  VIDEO_MAX_DURATION_SECONDS,
+} from './validation.constants'
 
 /** Standard error codes used in API error responses (architecture.md §Error Handling). */
 export const ERROR_CODES = {
@@ -56,7 +61,7 @@ export const ERROR_MESSAGES = {
   NOT_CHAT_PARTICIPANT: 'You are not a participant of this chat',
   MESSAGE_CONTENT_REQUIRED: 'Message content is required',
   MESSAGE_CONTENT_TOO_LONG: `Message content must be no more than ${MESSAGE_CONTENT_MAX_LENGTH} characters`,
-  MESSAGE_TYPE_INVALID: 'messageType must be "text" or "image"',
+  MESSAGE_TYPE_INVALID: 'messageType must be "text", "image", or "video"',
   MESSAGE_MEDIA_NOT_ALLOWED: 'Text messages cannot include a media URL',
   // Task 2.3 — Real-time Messaging (WebSocket)
   WS_CONNECTION_FAILED: 'WebSocket connection failed',
@@ -75,12 +80,18 @@ export const ERROR_MESSAGES = {
   // Task 3.3 — Contact List & Messaging Access Control
   CONTACT_RELATIONSHIP_REQUIRED: 'Messaging requires an accepted contact relationship',
   // Task 4.1 — File Upload & Image Messages
-  FILE_REQUIRED: 'An image file is required',
-  FILE_TYPE_INVALID: 'Unsupported file type. Supported formats: JPEG, PNG, GIF, WebP',
-  FILE_SIZE_EXCEEDED: `Image must be no more than ${IMAGE_MAX_SIZE_BYTES / (1024 * 1024)}MB`,
+  FILE_REQUIRED: 'A file is required',
+  FILE_TYPE_INVALID:
+    'Unsupported file type. Supported formats: JPEG, PNG, GIF, WebP, MP4, WebM, MOV, AVI',
+  FILE_SIZE_EXCEEDED: `File must be no more than ${IMAGE_MAX_SIZE_BYTES / (1024 * 1024)}MB for images and ${VIDEO_MAX_SIZE_BYTES / (1024 * 1024)}MB for videos`,
   FILE_DIMENSIONS_INVALID: 'Image dimensions must be between 100x100 and 5000x5000 pixels',
-  UPLOAD_TYPE_INVALID: 'type must be "image" — video uploads are not supported yet',
+  UPLOAD_TYPE_INVALID: 'type must be "image" or "video"',
   IMAGE_MEDIA_URL_REQUIRED: 'mediaUrl is required for image messages',
   IMAGE_MEDIA_URL_INVALID: 'mediaUrl must be a valid http(s) URL',
   FILE_UPLOAD_FAILED: 'File upload failed',
+  // Task 4.2 — Video Messages
+  VIDEO_DURATION_EXCEEDED: `Video duration must be no more than ${VIDEO_MAX_DURATION_SECONDS / 60} minutes`,
+  VIDEO_DURATION_INVALID: 'Video duration could not be validated',
+  VIDEO_MEDIA_URL_REQUIRED: 'mediaUrl is required for video messages',
+  VIDEO_MEDIA_URL_INVALID: 'mediaUrl must be a valid http(s) URL',
 } as const

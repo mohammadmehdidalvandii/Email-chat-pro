@@ -93,13 +93,15 @@ export class MessagesService {
       })
     }
 
-    // Task 4.1 — Image messages. Validation is type-specific at the service
-    // layer (the DTO covers shape/length; the service owns the per-type rules):
+    // Task 4.1/4.2 — Image and video messages. Validation is type-specific at
+    // the service layer (the DTO covers shape/length; the service owns the
+    // per-type rules):
     //   - text: content required (non-empty), mediaUrl forbidden.
     //   - image: mediaUrl required and a valid http(s) URL; content optional
     //     (stored as '' when absent — messages.content is NOT NULL).
-    // Video messages never reach here (the DTO restricts messageType to
-    // text|image; video is Task 4.2).
+    //   - video: mediaUrl required (/VIDEO_MEDIA_URL_REQUIRED) and a valid
+    //     http(s) URL; content optional, stored as '' when absent (same
+    //     decision as image — captions are not in scope).
     let content: string
     let mediaUrl: string | null
     if (dto.messageType === 'text') {
@@ -117,7 +119,7 @@ export class MessagesService {
       }
       content = dto.content
       mediaUrl = null
-    } else {
+    } else if (dto.messageType === 'image') {
       if (!dto.mediaUrl) {
         throw new BadRequestException({
           code: ERROR_CODES.VALIDATION_ERROR,
@@ -128,6 +130,21 @@ export class MessagesService {
         throw new BadRequestException({
           code: ERROR_CODES.VALIDATION_ERROR,
           message: ERROR_MESSAGES.IMAGE_MEDIA_URL_INVALID,
+        })
+      }
+      content = dto.content ?? ''
+      mediaUrl = dto.mediaUrl
+    } else {
+      if (!dto.mediaUrl) {
+        throw new BadRequestException({
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message: ERROR_MESSAGES.VIDEO_MEDIA_URL_REQUIRED,
+        })
+      }
+      if (!isValidHttpUrl(dto.mediaUrl)) {
+        throw new BadRequestException({
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message: ERROR_MESSAGES.VIDEO_MEDIA_URL_INVALID,
         })
       }
       content = dto.content ?? ''

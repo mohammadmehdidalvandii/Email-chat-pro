@@ -311,6 +311,100 @@ describe('MessagesService', () => {
       expect(repository.create).not.toHaveBeenCalled()
     })
 
+    it('persists a video message with a mediaUrl and empty content', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+      const videoDto: CreateMessageDto = {
+        messageType: 'video',
+        mediaUrl: 'https://res.cloudinary.com/example-cloud/vid.mp4',
+      }
+      const messageEntity = {
+        id: 'msg-vid',
+        chatId: 'chat-1',
+        sender: baseUser,
+        content: '',
+        messageType: 'video',
+        mediaUrl: videoDto.mediaUrl,
+        createdAt: new Date('2026-06-01T00:00:00Z'),
+      }
+      repository.create.mockReturnValue(messageEntity)
+      repository.save.mockResolvedValue(messageEntity)
+      authService.toUserDto.mockReturnValue({ id: baseUser.id })
+
+      const result = await service.sendMessage(baseUser, 'chat-1', videoDto)
+
+      expect(repository.create).toHaveBeenCalledWith({
+        chatId: 'chat-1',
+        sender: baseUser,
+        content: '',
+        messageType: 'video',
+        mediaUrl: videoDto.mediaUrl,
+      })
+      expect(result.messageType).toBe('video')
+      expect(result.content).toBe('')
+      expect(result.mediaUrl).toBe(videoDto.mediaUrl)
+    })
+
+    it('persists a video message with a caption when content is provided', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+      const videoDto: CreateMessageDto = {
+        messageType: 'video',
+        content: 'Check this out!',
+        mediaUrl: 'https://res.cloudinary.com/example-cloud/vid.mp4',
+      }
+      const messageEntity = {
+        id: 'msg-vid2',
+        chatId: 'chat-1',
+        sender: baseUser,
+        content: videoDto.content,
+        messageType: 'video',
+        mediaUrl: videoDto.mediaUrl,
+        createdAt: new Date('2026-06-01T00:00:00Z'),
+      }
+      repository.create.mockReturnValue(messageEntity)
+      repository.save.mockResolvedValue(messageEntity)
+      authService.toUserDto.mockReturnValue({ id: baseUser.id })
+
+      const result = await service.sendMessage(baseUser, 'chat-1', videoDto)
+
+      expect(repository.create).toHaveBeenCalledWith(
+        expect.objectContaining({ content: 'Check this out!', messageType: 'video' }),
+      )
+      expect(result.content).toBe('Check this out!')
+    })
+
+    it('throws VIDEO_MEDIA_URL_REQUIRED when a video message omits mediaUrl', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+
+      await expect(
+        service.sendMessage(baseUser, 'chat-1', { messageType: 'video' }),
+      ).rejects.toMatchObject({
+        status: 400,
+        response: {
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message: ERROR_MESSAGES.VIDEO_MEDIA_URL_REQUIRED,
+        },
+      })
+      expect(repository.create).not.toHaveBeenCalled()
+    })
+
+    it('throws VIDEO_MEDIA_URL_INVALID when a video message has an invalid mediaUrl', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+
+      await expect(
+        service.sendMessage(baseUser, 'chat-1', {
+          messageType: 'video',
+          mediaUrl: 'not-a-url',
+        }),
+      ).rejects.toMatchObject({
+        status: 400,
+        response: {
+          code: ERROR_CODES.VALIDATION_ERROR,
+          message: ERROR_MESSAGES.VIDEO_MEDIA_URL_INVALID,
+        },
+      })
+      expect(repository.create).not.toHaveBeenCalled()
+    })
+
     it('throws BadRequestException when a text message has no content', async () => {
       chatsService().findById.mockResolvedValue(baseChat)
 
