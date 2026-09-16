@@ -1670,7 +1670,7 @@ in Open Issues; no SSR-first language negotiation was attempted.
 
 ## Task 4.4 — Presence
 
-**Status:** Not Started
+**Status:** Completed
 
 **Scope:**
 
@@ -1678,11 +1678,103 @@ in Open Issues; no SSR-first language negotiation was attempted.
 * Last seen
 * Online/offline state
 
+**Completed (re-executed 2026-09-16):**
+
+* Implemented per `features.md` §User Presence — online/offline state is
+  **derived from the real-time connection state** (a user is online while at
+  least one authenticated socket is connected), not from client-sent status.
+  Because features.md outranks architecture.md (CLAUDE.md §4), the
+  `presence:update` client→server event (`{userId, status}`) is declared in the
+  shared contract for protocol-surface completeness but is **not** handled
+  server-side: a client cannot report a status the connection does not support.
+* `users.last_seen_at` (column already exists since Task 1.4) is written on
+  each offline→online and online→offline transition; additional device sockets
+  toggle nothing.
+* On each status transition, a `presence:changed` server→client event
+  (`{ userId, status, lastSeenAt }`) is broadcast to the online sockets of the
+  user's **accepted contacts** only (via `ContactsService.getContacts`, the same
+  accepted-contact resolution used by Task 3.x). The changing user does not
+  receive their own event.
+* In-memory presence tracking per `userId → Set<socketId>` (multi-device
+  support with no re-broadcast until the last socket leaves). No new
+  infrastructure — no Redis, no clustering (not approved).
+* The gateway adopts the presence flow at the connection/disconnect lifecycle
+  only: `registerOnline` after a successful authenticated connect,
+  `unregisterOnline` on disconnect. Both are isolated in their own try/catch so
+  a presence failure (DB or contacts lookup) can never reject a valid
+  connection or surface a socket-level error.
+
+**Tests:**
+
+* `apps/backend/src/modules/websocket/websocket.service.spec.ts` (new, 8 tests):
+  first-socket online (last_seen_at write + online broadcast to online contacts
+  only); additional device no re-broadcast/no DB write; unregister keeps online
+  while a socket remains; last-socket offline (last_seen_at write + offline
+  broadcast); no-op for unknown user; broadcast no-op when no server attached
+  while last_seen_at is still written; no self-broadcast (a user is not their
+  own contact).
+* `apps/backend/src/modules/websocket/websocket.gateway.spec.ts` (+5 tests):
+  authenticated connection registers presence with the resolved user; rejected
+  connections (no token, invalid token, unknown user, inactive user) never call
+  `registerOnline`; disconnect unregisters; an unauthenticated socket does not
+  unregister.
+* The spec uses the established `jest.mock('@nestjs/jwt', ...)` pattern because
+  `WebSocketService`→`ContactsService`→`AuthService` transitively imports the
+  ESM-only `@nestjs/jwt` (see Known Issues).
+
 **Verification:**
 
 ```text
-Not Started
+Executed 2026-09-16. All static checks recorded as actually run and passed.
+
+- npm run build:packages (repo root): PASS — new shared presence exports
+  compiled into dist (shared packages are consumed as built dist)
+- npx tsc --noEmit (apps/backend): PASS
+- npx eslint "src/**/*.ts" --max-warnings=0 (apps/backend): PASS
+- npx jest (apps/backend): PASS — 19 suites / 200 tests (187 prior +
+  13 new: 8 service + 5 gateway); no regressions
+- npm run build (apps/backend, nest build): PASS
+- npm run format:check (repo root): PARTIAL — all Task 4.4 files pass Prettier;
+  only the pre-existing Task 2.2 migration file
+  1789050600000-CreateMessagesTable.ts is flagged (carried known issue,
+  not modified here)
+- Live endpoint / socket round-trip tests: NOT EXECUTED — blocked by the
+  carried environment blocker (Windows PostgreSQL service owns host TCP 5432
+  and rejects app credentials; Docker postgres unreachable from the Windows
+  host via WSL2 NAT; no real Cloudinary credentials). Not claimed passed.
 ```
+
+**Files Changed:**
+
+```text
+Modified:
+packages/types/src/websocket.types.ts         (PresenceStatus, PresenceUpdatePayload,
+                                              PresenceChangedEvent; WS_CLIENT_EVENTS.
+                                              PRESENCE_UPDATE, WS_SERVER_EVENTS.
+                                              PRESENCE_CHANGED)
+apps/backend/src/modules/websocket/websocket.gateway.ts    (attachServer in afterInit;
+                                                           registerOnline on connect;
+                                                           unregisterOnline on disconnect,
+                                                           each isolated try/catch)
+apps/backend/src/modules/websocket/websocket.module.ts    (+ ContactsModule import,
+                                                           + WebSocketService provider)
+apps/backend/src/modules/websocket/websocket.gateway.spec.ts (+5 presence tests)
+
+Created:
+apps/backend/src/modules/websocket/websocket.service.ts           (WebSocketService)
+apps/backend/src/modules/websocket/websocket.service.spec.ts      (8 tests)
+```
+
+**Note:** Backend-first task. The shared WS contracts in `packages/types` were
+updated because the presence event protocol surface belongs to the shared
+contract (same pattern as Task 2.3). The frontend display of presence (per
+features.md — "Presence information is displayed in approved contact /
+conversation interfaces") is a **known, bounded limitation**: the scaffold has
+no contact/conversation UI that currently displays presence, and building that
+UI is part of a later task, not Task 4.4. The client can consume
+`presence:changed` from this task's gateway; initial presence state for a
+freshly-rendered contact list has no snapshot/sync endpoint yet (see Open
+Issues). No migration, no new env vars, no new dependencies.
 
 ---
 
@@ -2194,6 +2286,38 @@ Unauthorized scope changes:
 - None
 ```
 
+```text
+Task: 4.4
+Date: 2026-09-16
+
+Environment:
+- Node.js v24.17.0
+- npm 11.13.0
+- The shell session sets a global non-standard NODE_ENV=production (carried;
+  backend commands in this task ran without needing it unset)
+- Windows PostgreSQL 18 service still owns host TCP 5432 (recurring port
+  conflict — see Task 0.1/1.1 known issues); no reachable PostgreSQL for live
+  backend checks
+
+Checks:
+- npm run build:packages: PASS (new shared presence exports compiled into dist)
+- npx tsc --noEmit (backend): PASS
+- npx eslint "src/**/*.ts" --max-warnings=0 (backend): PASS
+- npx jest (backend): PASS (19 suites / 200 tests; +13 for Task 4.4: 8 service
+  + 5 gateway; prior 187 unchanged and passing)
+- npm run build (nest build): PASS
+- npm run format:check: PARTIAL (all Task 4.4 files pass Prettier; pre-existing
+  Task 2.2 migration file 1789050600000-CreateMessagesTable.ts remains
+  unformatted — not modified here, out of scope; carried known issue)
+- Live endpoint / WebSocket round-trip tests: NOT EXECUTED — blocked by the
+  carried environment blocker (host 5432 held by the Windows PostgreSQL service
+  rejecting app credentials; Docker postgres unreachable from the Windows host
+  via WSL2 NAT; no real Cloudinary credentials). Not claimed passed.
+
+Unauthorized scope changes:
+- None
+```
+
 ---
 
 # Known Issues
@@ -2615,6 +2739,74 @@ Next Action: Decide a frontend test runner when a future frontend task requires
        edit.
 ```
 
+## Open Issues After Task 4.4
+
+```text
+Issue: No presence snapshot / initial-state sync endpoint exists. When a
+       contact list renders, the backend has no way to answer "what are my
+       contacts' current online status and last-seen times?" with a single
+       request; only transition events (`presence:changed`) are emitted going
+       forward. A client that connects later than its contacts misses their
+       online events unless it was live.
+Impact: The presence display in the future contact/conversation UI (Task 4.4
+       frontend display is deliberately out of scope — see the task record)
+       will need a snapshot payload (e.g. a `{ contacts: [{ userId, status,
+       lastSeenAt }] }` response on the contacts read path or a
+       `presence:sync` request/response on the socket) before it can render
+       accurate initial state. The event stream delivered in this task is the
+       increment that keeps that UI live once it exists.
+Discovered During: Task 4.4 design (event-only presence, no read model).
+Current Status: Open — deferred to the task that builds the contact/
+       conversation UI where presence is displayed.
+Next Action: When the frontend presence display task begins, decide and add a
+       snapshot mechanism, and record it as a Task record in this file.
+```
+
+```text
+Issue: In-memory presence (`onlineSockets` map in WebSocketService) is
+       per-process. Presence is not shared across backend instances.
+Impact: With a single Nest instance this is exact. The project has no approved
+       WebSocket clustering or shared state infrastructure (CLAUDE.md §11,
+       §30), so multi-instance deployments would see independent presence sets.
+       Correct under the current architecture.
+Discovered During: Task 4.4 implementation (state-location decision).
+Current Status: Accepted constraint of the current single-instance
+       architecture. Revisit only if a clustering decision is approved.
+Next Action: None — do not introduce Redis or a distributed presence store
+       without approval.
+```
+
+```text
+Issue: Carried environment blocker — live backend verification is not possible
+       in this session. The Windows PostgreSQL 18 service owns host TCP 5432 and
+       rejects the app's credentials, Docker postgres is unreachable from the
+       Windows host via WSL2 NAT, and no real Cloudinary credentials exist.
+Impact: Task 4.4 (backend task) could not be verified against a live database or
+       over a real Socket.IO round trip. All static checks (tsc, eslint, jest,
+       nest build, prettier) passed; the presence behavior is covered by 13 new
+       unit tests. The real `@nestjs/jwt` module is only exercised by live
+       verification because tests mock it (ESM/CJS issue, below).
+Discovered During: Every backend task since Task 0.1 (re-recorded each time).
+Current Status: Open — environment-level. Not re-recorded as "fixed".
+Next Action: When an environment with a reachable PostgreSQL and valid
+       Cloudinary credentials is available, re-run the live checks described in
+       the Task 4.4 verification record and record the outcome.
+```
+
+```text
+Issue: `@nestjs/jwt` v12 ships ESM-only, which the CJS ts-jest pipeline cannot
+       require; every spec that transitively imports AuthService (here via
+       ContactsService) must `jest.mock('@nestjs/jwt', ...)` at the top.
+Impact: The JWT issuer is mocked in tests; the real module is only exercised by
+       live verification (which is blocked here). This is the established repo
+       pattern (AuthService, ContactsService, and now WebSocketService specs all
+       do it), so it is a known test-runner limitation, not a new defect.
+Discovered During: Task 4.4 test authoring (contacts.service.spec reference).
+Current Status: Open — test-infrastructure level.
+Next Action: If the test runner migrates to an ESM-capable pipeline the mocks
+       can be dropped; until then the established pattern remains.
+```
+
 ---
 
 # Architecture Changes
@@ -3006,6 +3198,37 @@ Change: Replaced the Task 4.3 (Internationalization) execution boundary with
 Reason: Task 4.3 completed and verified (recorded in done.md); the normal
        lifecycle requires current-task.md to describe the next approved task,
        but Task 4.4 scope is not yet approved so it is only named.
+Approved By: Mohammad Mehdi.
+```
+
+```text
+Context Change: Task 4.4 record completed.
+File: docs/7-done.md
+Change: Task 4.4 status moved from Not Started to "Completed", with the
+       presence service + gateway integration, the presence:changed /
+       presence:update shared WS contracts, the connection-derived (not
+       client-reported) presence decision, the bounded frontend-display
+       limitation, actual verification results (build:packages, backend tsc,
+       eslint, jest 19 suites / 200 tests, nest build; format PARTIAL on the
+       carried Task 2.2 file; live checks NOT EXECUTED — carried environment
+       blocker), the open-issues record, and the changed-file list. Work was
+       re-executed and re-verified as of 2026-09-16.
+Reason: Required by the Task 4.4 completion workflow.
+Approved By: Mohammad Mehdi (Task 4.4 authorized via docs/6-current-task.md
+       scope note and the approved plan, 2026-09-16).
+```
+
+```text
+Context Change: Execution boundary advanced to Task 4.5 placeholder.
+File: docs/6-current-task.md
+Change: Replaced the Task 4.4 execution boundary with the statement that
+       Task 4.4 is completed and verified (docs/7-done.md), naming the next
+       task (Task 4.5 — Rate Limiting and Security Hardening) WITHOUT defining
+       its scope, and marking the file as a placeholder pending maintainer
+       approval. Task 4.5 is not started.
+Reason: Task 4.4 completed and verified (recorded in done.md); the normal
+       lifecycle requires current-task.md to describe the next approved task,
+       but Task 4.5 scope is not yet approved so it is only named.
 Approved By: Mohammad Mehdi.
 ```
 

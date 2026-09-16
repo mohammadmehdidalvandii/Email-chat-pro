@@ -19,6 +19,7 @@ import { WS_CLIENT_EVENTS, WS_SERVER_EVENTS } from '@email-chat-pro/types'
 import { User } from '../auth/entities/user.entity'
 import { ChatsService } from '../chats/chats.service'
 import type { JwtPayload } from '../auth/strategies/jwt.strategy'
+import { WebSocketService } from './websocket.service'
 
 /**
  * Chat-specific Socket.IO namespace (architecture.md §WebSocket Events).
@@ -60,9 +61,13 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
     private readonly chatsService: ChatsService,
+    private readonly webSocketService: WebSocketService,
   ) {}
 
   afterInit(): void {
+    // Presence emission needs the socket.io server; the gateway is the only
+    // component wired to the namespace decorator.
+    this.webSocketService.attachServer(this.server)
     this.logger.log('WebSocket gateway initialized — namespace /chats')
   }
 
@@ -100,6 +105,15 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       }
 
       this.connectedUsers.set(client.id, user)
+      // Presence (Task 4.4): derive online state from the connection. The
+      // service records last_seen_at and notifies contacts. A presence failure
+      // must not reject an otherwise-valid connection, so it is logged and
+      // swallowed separately from the auth checks above.
+      try {
+        await this.webSocketService.registerOnline(user, client.id)
+      } catch (error) {
+        this.logger.warn(`Presence registration failed for ${user.id}: ${(error as Error).message}`)
+      }
       this.logger.log(`Client connected — ${user.id} [${client.id}]`)
     } catch {
       this.logger.warn(`Connection rejected — invalid token [${client.id}]`)
@@ -113,9 +127,24 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
   /**
    * Cleans up the connected-users map when a client disconnects.
+   *
+   * Presence (Task 4.4): the service unregisters the socket and, when it was
+   * the user's last connection, records last_seen_at and notifies contacts.
    */
-  handleDisconnect(client: Socket): void {
+  async handleDisconnect(client: Socket): Promise<void> {
+    const user = this.connectedUsers.get(client.id)
     this.connectedUsers.delete(client.id)
+    if (user) {
+      // Presence recording is auxiliary — a failure here must not surface as a
+      // socket-level error, so it is logged and swallowed.
+      try {
+        await this.webSocketService.unregisterOnline(user.id, client.id)
+      } catch (error) {
+        this.logger.warn(
+          `Presence unregistration failed for ${user.id}: ${(error as Error).message}`,
+        )
+      }
+    }
     this.logger.log(`Client disconnected [${client.id}]`)
   }
 

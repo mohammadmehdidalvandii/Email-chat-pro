@@ -9,6 +9,7 @@ import { User } from '../auth/entities/user.entity'
 import { ChatsService } from '../chats/chats.service'
 import { Chat } from '../chats/entities/chat.entity'
 import { ChatGateway } from './websocket.gateway'
+import { WebSocketService } from './websocket.service'
 
 // @nestjs/jwt v12 ships ESM-only (type: module), which the CJS ts-jest pipeline
 // cannot require. JwtService is mocked here; the real module is exercised by
@@ -30,6 +31,12 @@ describe('ChatGateway', () => {
 
   const chatsService = {
     findById: jest.fn(),
+  }
+
+  const webSocketService = {
+    attachServer: jest.fn(),
+    registerOnline: jest.fn().mockResolvedValue(undefined),
+    unregisterOnline: jest.fn().mockResolvedValue(undefined),
   }
 
   const server = {
@@ -92,6 +99,7 @@ describe('ChatGateway', () => {
         { provide: JwtService, useValue: jwtService },
         { provide: getRepositoryToken(User), useValue: usersRepository },
         { provide: ChatsService, useValue: chatsService },
+        { provide: WebSocketService, useValue: webSocketService },
       ],
     }).compile()
 
@@ -167,19 +175,71 @@ describe('ChatGateway', () => {
       // The user must be stored in the internal connected-users map.
       expect(gateway['connectedUsers'].get('socket-1')).toEqual(baseUser)
     })
+
+    it('registers the authenticated user for presence tracking', async () => {
+      const client = makeClient({ handshake: { auth: { token: 'valid-token' } } })
+      jwtService.verify.mockReturnValue({ sub: baseUser.id, email: baseUser.email })
+      usersRepository.findOne.mockResolvedValue(baseUser)
+
+      await gateway.handleConnection(client)
+
+      expect(webSocketService.registerOnline).toHaveBeenCalledWith(baseUser, 'socket-1')
+    })
+
+    it.each([
+      ['no token', undefined, {}],
+      ['invalid token', 'bad-token', {}],
+      ['unknown user', 'valid-token', { findOne: null }],
+      ['inactive user', 'valid-token', { inactive: true }],
+    ])(
+      'does not register presence for a rejected connection (%s)',
+      async (
+        _label: string,
+        token: string | undefined,
+        opts: { findOne?: null; inactive?: boolean },
+      ) => {
+        const client = makeClient({ handshake: { auth: { token } } })
+        if (token === 'valid-token') {
+          jwtService.verify.mockReturnValue({ sub: baseUser.id, email: baseUser.email })
+        } else if (token === 'bad-token') {
+          jwtService.verify.mockImplementation(() => {
+            throw new Error('invalid')
+          })
+        }
+        if (opts.findOne === null) {
+          usersRepository.findOne.mockResolvedValue(null)
+        } else if (opts.inactive) {
+          usersRepository.findOne.mockResolvedValue({ ...baseUser, isActive: false })
+        }
+
+        await gateway.handleConnection(client)
+
+        expect(webSocketService.registerOnline).not.toHaveBeenCalled()
+      },
+    )
   })
 
   describe('handleDisconnect', () => {
-    it('removes the client from the connected-users map', async () => {
+    it('removes the client and unregisters presence for the connected user', async () => {
       const client = makeClient({ handshake: { auth: { token: 'valid-token' } } })
       jwtService.verify.mockReturnValue({ sub: baseUser.id, email: baseUser.email })
       usersRepository.findOne.mockResolvedValue(baseUser)
       await gateway.handleConnection(client)
       expect(gateway['connectedUsers'].has('socket-1')).toBe(true)
 
-      gateway.handleDisconnect(client)
+      await gateway.handleDisconnect(client)
 
       expect(gateway['connectedUsers'].has('socket-1')).toBe(false)
+      expect(webSocketService.unregisterOnline).toHaveBeenCalledWith(baseUser.id, 'socket-1')
+    })
+
+    it('does not unregister presence for an unauthenticated socket', async () => {
+      const client = makeClient()
+      gateway['connectedUsers'].clear()
+
+      await gateway.handleDisconnect(client)
+
+      expect(webSocketService.unregisterOnline).not.toHaveBeenCalled()
     })
   })
 

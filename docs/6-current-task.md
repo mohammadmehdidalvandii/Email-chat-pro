@@ -18,14 +18,14 @@ When the task is completed and verified, the completed work MUST be recorded in 
 
 **No task is currently authorized.**
 
-Task 4.3 — Internationalization is completed and verified, recorded in `docs/7-done.md` (2026-09-14).
+Task 4.4 — Presence is completed and verified, recorded in `docs/7-done.md` (2026-09-16).
 
-By roadmap order the next Phase 4 task is **Task 4.4 — Presence**, but its scope has **not** been approved. This file is a **placeholder**: it names the next task only and does NOT authorize any implementation.
+By roadmap order the next Phase 4 task is **Task 4.5 — Rate Limiting and Security Hardening**, but its scope has **not** been approved. This file is a **placeholder**: it names the next task only and does NOT authorize any implementation.
 
-> **STOP → REPORT → ASK** before beginning Task 4.4.
+> **STOP → REPORT → ASK** before beginning Task 4.5.
 
 ---
 
 # Golden Rule
 
-> Do not start Task 4.4 or any later Phase 4 task until the maintainer approves a Task 4.4 scope. None is defined here by design.
+> Do not start Task 4.5 or any later Phase 4 task until the maintainer approves a Task 4.5 scope. None is defined here by design.

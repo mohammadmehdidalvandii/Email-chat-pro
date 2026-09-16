@@ -6,7 +6,8 @@
  * remain consistent.
  *
  * Task 2.3 — Real-time Messaging: message delivery events.
- * Typing indicators and presence events are out of scope (Phase 4).
+ * Task 4.4 — Presence: online/offline + last-seen events.
+ * Typing indicators remain out of scope.
  */
 
 import type { Message } from './chat.types'
@@ -42,6 +43,23 @@ export interface SendMessagePayload {
   mediaUrl?: string | null
 }
 
+/**
+ * Online/offline presence status (Task 4.4 — Presence).
+ */
+export type PresenceStatus = 'online' | 'offline'
+
+/**
+ * Payload the client may emit to mark presence on login/logout
+ * (architecture.md §presence:update). The gateway derives server-state
+ * presence from the real-time connection state instead (features.md — "Online
+ * state is derived from the real-time connection state"), so this event is
+ * defined for the protocol contract but is not handled by the server.
+ */
+export interface PresenceUpdatePayload {
+  userId: string
+  status: PresenceStatus
+}
+
 // ---------------------------------------------------------------------------
 // Server → Client events
 // ---------------------------------------------------------------------------
@@ -63,6 +81,18 @@ export interface ErrorEvent {
   message: string
 }
 
+/**
+ * Server → client: broadcast to a user's contacts when that user's presence
+ * changes (architecture.md §presence:changed). `lastSeenAt` is the recorded
+ * online/offline timestamp; for `offline` it is the moment the last socket
+ * disconnected.
+ */
+export interface PresenceChangedEvent {
+  userId: string
+  status: PresenceStatus
+  lastSeenAt: string
+}
+
 // ---------------------------------------------------------------------------
 // Client → Server event name constants
 // ---------------------------------------------------------------------------
@@ -71,6 +101,7 @@ export const WS_CLIENT_EVENTS = {
   JOIN_CHAT: 'chat:join',
   LEAVE_CHAT: 'chat:leave',
   SEND_MESSAGE: 'message:send',
+  PRESENCE_UPDATE: 'presence:update',
 } as const
 
 // ---------------------------------------------------------------------------
@@ -82,4 +113,5 @@ export const WS_SERVER_EVENTS = {
   ERROR: 'error:event',
   CHAT_JOINED: 'chat:joined',
   CHAT_LEFT: 'chat:left',
+  PRESENCE_CHANGED: 'presence:changed',
 } as const
