@@ -16,16 +16,18 @@ When the task is completed and verified, the completed work MUST be recorded in 
 
 ## Phase 4 — Media, Polish, and Deployment
 
-**No task is currently authorized.**
+**No new task is currently authorized.**
 
-Task 4.4 — Presence is completed and verified, recorded in `docs/7-done.md` (2026-09-16).
+Task 4.5 — Rate Limiting and Security Hardening is completed with the executed verification recorded in `docs/7-done.md` (2026-09-17).
 
-By roadmap order the next Phase 4 task is **Task 4.5 — Rate Limiting and Security Hardening**, but its scope has **not** been approved. This file is a **placeholder**: it names the next task only and does NOT authorize any implementation.
+**Approval reconciliation:** On 2026-09-17, the maintainer explicitly approved the existing Task 4.5 working-tree changes as the scope and authorized closeout only. This supersedes the stale statement that Task 4.5 was unapproved. The approved scope and verification limitations are recorded in `docs/7-done.md`; remaining authorization is limited to final diff review and committing Task 4.5. No unrelated code changes or push are authorized.
 
-> **STOP → REPORT → ASK** before beginning Task 4.5.
+By roadmap order the next Phase 4 task is **Task 4.6 — Structured Logging and Error Monitoring Foundation**, but its scope has **not** been approved. This file is a **placeholder**: it names the next task only and does NOT authorize its implementation.
+
+> **STOP → REPORT → ASK** before beginning Task 4.6.
 
 ---
 
 # Golden Rule
 
-> Do not start Task 4.5 or any later Phase 4 task until the maintainer approves a Task 4.5 scope. None is defined here by design.
+> Do not start Task 4.6 or any later task until the maintainer approves its execution boundary. Do not push.

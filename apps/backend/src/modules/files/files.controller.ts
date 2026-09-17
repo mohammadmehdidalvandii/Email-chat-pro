@@ -12,6 +12,7 @@ import {
   UseInterceptors,
 } from '@nestjs/common'
 import { FileInterceptor } from '@nestjs/platform-express'
+import { Throttle } from '@nestjs/throttler'
 import {
   ERROR_CODES,
   ERROR_MESSAGES,
@@ -22,6 +23,7 @@ import {
 import type { ApiResponse, FileUploadResponse } from '@email-chat-pro/types'
 import type { Request } from 'express'
 import { memoryStorage } from 'multer'
+import { endpointThrottles } from '../../config/rate-limit.config'
 import { User } from '../auth/entities/user.entity'
 import { JwtAuthGuard } from '../auth/guards/jwt.guard'
 import { UploadFileDto } from './dto/upload-file.dto'
@@ -85,6 +87,7 @@ export class FilesController {
    */
   @Post('upload')
   @UseGuards(JwtAuthGuard)
+  @Throttle(endpointThrottles.UPLOAD_FILE)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),

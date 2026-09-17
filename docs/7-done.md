@@ -1780,7 +1780,9 @@ Issues). No migration, no new env vars, no new dependencies.
 
 ## Task 4.5 — Rate Limiting and Security Hardening
 
-**Status:** Not Started
+**Status:** Completed
+
+**Date:** 2026-09-17
 
 **Scope:**
 
@@ -1789,11 +1791,72 @@ Issues). No migration, no new env vars, no new dependencies.
 * Request protection
 * Relevant validation
 
+**Implemented / Verified State:**
+
+- **Rate-limit configuration** (`apps/backend/src/config/rate-limit.config.ts`):
+  - `GLOBAL_THROTTLE` — 100 requests / 15 minutes per tracker (architecture.md §Global).
+  - `endpointThrottles` — per-route overrides for the five endpoints architecture.md §Endpoint-Specific Limits names: `LOGIN` (5/15m), `REGISTER` (3/h), `SEND_MESSAGE` (100/h), `SEARCH_USERS` (50/h), `UPLOAD_FILE` (5/h).
+  - `throttlerModuleOptions()` — wires `ThrottlerModule.forRootAsync` with the global throttle and the shared `ERROR_MESSAGES.TOO_MANY_REQUESTS` 429 message.
+  - Exact limits are configuration values, not invented here (features.md — "Exact limits are defined in the technical configuration and must not be invented during implementation"); the spec pins them and the spec asserts the exact figures.
+- **Global throttling key** (`apps/backend/src/common/guards/throttler.guard.ts`): `AppThrottlerGuard` extends NestJS `ThrottlerGuard` and overrides `getTracker` to throttle by the authenticated user id when a valid JWT is present (Bearer `Authorization` header or the httpOnly `auth_token` cookie — reusing the existing `extractJwtFromCookie`), and by the client IP otherwise. This makes the endpoint-specific limits per user (architecture.md — "Endpoint-Specific Limits (per user)") while unauthenticated auth endpoints remain bounded per source IP. The identity is resolved statelessly (JWT `sub` verification, no DB access) because the global guard runs before Passport's `JwtAuthGuard` fills `req.user`.
+- **Endpoint decorators**: `@Throttle(...)` applied to `POST /auth/register`, `POST /auth/login`, `POST /chats/:chatId/messages`, `GET /users/search`, and `POST /files/upload` (auth.controller.ts, messages.controller.ts, users.controller.ts, files.controller.ts).
+- **Module wiring** (`apps/backend/src/app.module.ts`): `ThrottlerModule.forRootAsync` imported and `AppThrottlerGuard` bound as `APP_GUARD` for HTTP routes. Endpoint decorators override the default; this is not a separate cumulative, cross-route per-IP quota.
+- **Security hardening** (`apps/backend/src/main.ts`): `app.use(helmet())` added after the global prefix and before CORS, included in the maintainer-approved existing Task 4.5 scope.
+- **Shared error contract** (`packages/constants/src/error.constants.ts`): `TOO_MANY_REQUESTS` ("Too many requests. Try again later.") added; the 429 envelope is produced by the existing `HttpExceptionFilter`.
+- **Cookie extractor reuse** (`apps/backend/src/modules/auth/strategies/jwt.strategy.ts`): `extractJwtFromCookie` exported so the global guard can re-use the same cookie source without duplicating cookie parsing.
+- **Tests:** 15 new, **215/215 total across 22 suites** — `rate-limit.config.spec.ts` (7: global default, all five endpoint limits, module options), `throttler.guard.spec.ts` (6: user-id from `req.user`, Bearer token, cookie, IP fallback on no token, IP fallback on invalid token, `ip:unknown`), `http-exception.filter.spec.ts` (2: `ThrottlerException` → 429 `RATE_LIMIT_EXCEEDED` envelope, fallback message). The guard spec uses the established `jest.mock('@nestjs/jwt', ...)` pattern for the ESM-only `@nestjs/jwt` v12.
+
 **Verification:**
 
 ```text
-Not Started
+Executed 2026-09-17. All static checks recorded as actually run and passed.
+
+- npm run type-check: PASS (all 5 workspaces — build:packages + tsc --noEmit
+  for backend, frontend, types, constants, utils)
+- npm run lint: PASS (backend eslint "src/**/*.ts" + frontend eslint .)
+- npm test: PASS — 22 suites / 215 tests (200 prior + 15 new for Task 4.5);
+  no regressions
+- npm run build: PASS — shared packages, backend nest build, and frontend
+  next build (4 static pages). Next.js warned that multiple lockfiles caused
+  it to infer C:\Users\Rayanrajoo as the workspace root; no configuration
+  changes were made during closeout.
+- format:check, live endpoint / 429 round-trip tests, security-header checks,
+  and infrastructure checks: NOT EXECUTED for this closeout; no pass or failure
+  is claimed. Prior environment and formatting issues are historical records,
+  not re-verified here.
 ```
+
+**Files Changed:**
+
+```text
+Modified:
+apps/backend/package.json                              (+ @nestjs/throttler, + helmet)
+apps/backend/src/app.module.ts                         (+ ThrottlerModule,
+                                                        + AppThrottlerGuard as APP_GUARD)
+apps/backend/src/main.ts                                (+ app.use(helmet()))
+apps/backend/src/modules/auth/auth.controller.ts       (+ @Throttle LOGIN/REGISTER)
+apps/backend/src/modules/auth/strategies/jwt.strategy.ts (extractJwtFromCookie exported)
+apps/backend/src/modules/files/files.controller.ts      (+ @Throttle UPLOAD_FILE)
+apps/backend/src/modules/messages/messages.controller.ts (+ @Throttle SEND_MESSAGE)
+apps/backend/src/modules/users/users.controller.ts      (+ @Throttle SEARCH_USERS)
+packages/constants/src/error.constants.ts              (+ TOO_MANY_REQUESTS)
+package-lock.json                                       (reify @nestjs/throttler, helmet)
+
+Created:
+apps/backend/src/common/guards/throttler.guard.ts
+apps/backend/src/common/guards/throttler.guard.spec.ts
+apps/backend/src/config/rate-limit.config.ts
+apps/backend/src/config/rate-limit.config.spec.ts
+apps/backend/src/common/filters/http-exception.filter.spec.ts
+```
+
+**Note:** Backend-only task. No frontend, no WebSocket, no new infrastructure
+(no Redis/Kafka/brokers). `@nestjs/throttler` and `helmet` are the only new
+dependencies and both are approved by `stack.md`. The global guard's per-user
+tracker deliberately does not touch the database; it verifies the existing JWT
+statelessly so it can run before `req.user` is populated. `docs/6-current-task.md`
+was reconciled from the stale Task 4.5 placeholder to the approved closeout
+boundary on 2026-09-17.
 
 ---
 

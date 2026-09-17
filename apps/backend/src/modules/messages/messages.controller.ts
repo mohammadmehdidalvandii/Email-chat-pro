@@ -13,12 +13,14 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 import type {
   ApiResponse,
   Message as MessageContract,
   PaginatedResponse,
 } from '@email-chat-pro/types'
 import type { Request } from 'express'
+import { endpointThrottles } from '../../config/rate-limit.config'
 import { User } from '../auth/entities/user.entity'
 import { JwtAuthGuard } from '../auth/guards/jwt.guard'
 import { CreateMessageDto } from './dto/create-message.dto'
@@ -49,6 +51,7 @@ export class MessagesController {
    */
   @Post(':chatId/messages')
   @UseGuards(JwtAuthGuard)
+  @Throttle(endpointThrottles.SEND_MESSAGE)
   @HttpCode(HttpStatus.CREATED)
   async sendMessage(
     @Req() req: AuthenticatedRequest,

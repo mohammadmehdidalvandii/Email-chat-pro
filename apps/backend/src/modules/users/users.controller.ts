@@ -12,6 +12,7 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 import type {
   ApiResponse,
   DeleteAccountResponse,
@@ -20,6 +21,7 @@ import type {
 } from '@email-chat-pro/types'
 import type { Request } from 'express'
 import { ERROR_MESSAGES, SEARCH_LIMIT_DEFAULT } from '@email-chat-pro/constants'
+import { endpointThrottles } from '../../config/rate-limit.config'
 import { AuthService } from '../auth/auth.service'
 import { User } from '../auth/entities/user.entity'
 import { JwtAuthGuard } from '../auth/guards/jwt.guard'
@@ -99,6 +101,7 @@ export class UsersController {
    */
   @Get('search')
   @UseGuards(JwtAuthGuard)
+  @Throttle(endpointThrottles.SEARCH_USERS)
   @HttpCode(HttpStatus.OK)
   async searchUsers(
     @Query('q') q: string | undefined,

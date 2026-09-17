@@ -94,4 +94,6 @@ export const ERROR_MESSAGES = {
   VIDEO_DURATION_INVALID: 'Video duration could not be validated',
   VIDEO_MEDIA_URL_REQUIRED: 'mediaUrl is required for video messages',
   VIDEO_MEDIA_URL_INVALID: 'mediaUrl must be a valid http(s) URL',
+  // Task 4.5 — Rate Limiting
+  TOO_MANY_REQUESTS: 'Too many requests. Try again later.',
 } as const

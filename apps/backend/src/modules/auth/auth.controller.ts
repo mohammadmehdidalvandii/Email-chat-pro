@@ -9,6 +9,7 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 import type {
   ApiResponse,
   LoginResponse,
@@ -18,6 +19,7 @@ import type {
   VerifyEmailResponse,
 } from '@email-chat-pro/types'
 import type { Request, Response } from 'express'
+import { endpointThrottles } from '../../config/rate-limit.config'
 import { AuthService } from './auth.service'
 import { LoginDto } from './dto/login.dto'
 import { RegisterDto } from './dto/register.dto'
@@ -35,6 +37,7 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
+  @Throttle(endpointThrottles.REGISTER)
   @HttpCode(HttpStatus.CREATED)
   async register(@Body() dto: RegisterDto): Promise<ApiResponse<RegisterResponse>> {
     const data = await this.authService.register(dto)
@@ -64,6 +67,7 @@ export class AuthController {
    * token in JavaScript (rules.md §Session Cookie — httpOnly).
    */
   @Post('login')
+  @Throttle(endpointThrottles.LOGIN)
   @HttpCode(HttpStatus.OK)
   async login(
     @Body() dto: LoginDto,

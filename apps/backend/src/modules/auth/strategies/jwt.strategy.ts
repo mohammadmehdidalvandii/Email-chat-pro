@@ -58,8 +58,11 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
 /**
  * Reads the JWT from the httpOnly cookie set at login. Added as a manual
  * extractor because the approved stack does not include cookie-parser.
+ *
+ * Exported so the global rate-limit guard (Task 4.5) can re-use the same
+ * cookie source when deriving the throttling key for authenticated requests.
  */
-function extractJwtFromCookie(req: Request): string | null {
+export function extractJwtFromCookie(req: Request): string | null {
   const header = req.headers.cookie
   if (!header) return null
 
