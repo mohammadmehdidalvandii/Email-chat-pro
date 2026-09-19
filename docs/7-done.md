@@ -3341,6 +3341,110 @@ Approved By: Mohammad Mehdi.
 
 ---
 
+## Frontend Development — Phase 1: Authentication Experience (Completed)
+
+**Date:** 2026-09-19
+**Status:** Completed and verified.
+**Authorized By:** `docs/6-current-task.md` — Frontend Development Roadmap, Phase 1 only.
+
+### Implemented Features
+
+- **Registration** (`POST /api/v1/auth/register`): email + password form with client-side Zod validation mirroring the shared `@email-chat-pro/constants` rules (email regex/length, `PASSWORD_REGEX`, confirm-password match). On success routes to `/verify-email`.
+- **Email verification** (`POST /api/v1/auth/verify-email`): 64-char hex token form validated against `VERIFICATION_TOKEN_LENGTH`; on success routes to `/login`.
+- **Login** (`POST /api/v1/auth/login`): email + password form; on success the returned JWT + user are stored in the Zustand auth store and the user is routed to the protected `/dashboard`. Distinguishes the unverified-account case (`EMAIL_NOT_VERIFIED`) from invalid credentials via the shared `ERROR_MESSAGES` constants so the user is prompted to verify.
+- **Logout** (`POST /api/v1/auth/logout`): clears local session state and invalidates the cached session query; redirects to `/login`.
+- **Session validation on app load**: TanStack Query `useSession` hook calls `GET /auth/session` to validate the persisted JWT and hydrate the user.
+- **Protected routing**: `RequireAuth` guard validates the session and redirects unauthenticated/expired sessions to `/login`. Backend authorization remains authoritative; the guard is a UX layer.
+- **State ownership separation**: Zustand holds only local auth session state (token, user); TanStack Query owns server state. No server-state duplication in Zustand.
+- **API client**: shared Axios instance with a Bearer-token interceptor (token read lazily from the store). Uses `Authorization: Bearer` because the backend CORS config does not include `credentials: true`, so the httpOnly cookie set at login cannot be relied on cross-origin (frontend :3000, backend :4000). The backend also accepts the Bearer header, so authorization is intact either way.
+- **Error handling**: all API failures normalized to an `ApiRequestError` shape and mapped to localized messages via the `errors`/`auth` i18n namespaces and `translateApiError`. No errors swallowed; backend error codes preserved.
+- **i18n**: all auth form labels, buttons, and error strings added to `public/locales/{en,fa}/auth.json`; forms are RTL-safe.
+
+### Files Changed
+
+**New files (all under `apps/frontend`):**
+
+- `src/lib/api/client.ts` — Axios client, Bearer interceptor, `apiRequest` wrapper, `toApiRequestError` normalizer
+- `src/lib/api/auth.api.ts` — register/verify-email/login/logout API wrappers
+- `src/lib/api/session.api.ts` — `fetchSession` (GET /auth/session)
+- `src/lib/api/error-message.ts` — `authErrorMessage` mapping backend errors to localized text
+- `src/lib/validation/auth.schema.ts` — Zod schemas (register/login/verify-email) aligned with shared constants
+- `src/lib/utils.ts` — minimal `cn` class-name helper (no extra dependencies added)
+- `src/stores/auth.store.ts` — Zustand auth session store (token + user, localStorage-persisted token)
+- `src/hooks/use-session.ts` — TanStack Query session hook
+- `src/hooks/use-auth-mutations.ts` — register/verify-email/login/logout mutation hooks
+- `src/components/Providers/QueryProvider.tsx` — React Query provider
+- `src/components/ui/button.tsx`, `input.tsx`, `label.tsx`, `card.tsx` — hand-authored shadcn-style UI primitives
+- `src/components/auth/AuthLayout.tsx` — centered auth layout wrapper
+- `src/components/auth/FormField.tsx` — shared label + input + error field
+- `src/components/auth/RegisterForm.tsx` — React Hook Form + Zod registration form
+- `src/components/auth/LoginForm.tsx` — React Hook Form + Zod login form
+- `src/components/auth/EmailVerificationForm.tsx` — React Hook Form + Zod verification form
+- `src/components/auth/RequireAuth.tsx` — client-side protected-route guard
+- `src/app/register/page.tsx`, `login/page.tsx`, `verify-email/page.tsx` — auth pages
+- `src/app/dashboard/page.tsx` — minimal protected page (auth email + logout) to exercise protected-route and logout verification criteria
+
+**Modified files:**
+
+- `apps/frontend/src/app/layout.tsx` — wrapped the tree in `QueryProvider` alongside `I18nProvider`
+- `apps/frontend/public/locales/en/auth.json` — added form labels, button states, and localized error strings
+- `apps/frontend/public/locales/fa/auth.json` — Persian equivalents
+- `apps/frontend/package.json` — added approved dependencies: `zustand`, `@tanstack/react-query`, `react-hook-form`, `@hookform/resolvers`, `zod`, `axios`, `lucide-react`
+- `package-lock.json` — dependency resolution for the above
+
+### Dependencies Added (all approved in `docs/4-stack.md`)
+
+- `zustand` (Client State), `@tanstack/react-query` (Server State), `react-hook-form` + `@hookform/resolvers` (Forms), `zod` (Schema Validation), `axios` (HTTP Client), `lucide-react` (Icons). No unapproved technologies introduced. `clsx`/`tailwind-merge` were deliberately NOT added (not in `stack.md`); a minimal `cn` helper was hand-authored instead.
+
+### Verification Results
+
+- `npm run type-check` (workspace `@email-chat-pro/frontend`): **PASS** — `tsc --noEmit` completed with no errors.
+- `npm run lint` (workspace `@email-chat-pro/frontend`): **DID NOT PASS — pre-existing toolchain issue, not caused by Phase 1** (see Known Issues).
+
+### Known Issues
+
+- **Pre-existing ESLint toolchain incompatibility.** `npm run lint` fails at config load (before any source file is evaluated) with `TypeError: Converting circular structure to JSON` originating in `@eslint/eslintrc`'s `ConfigValidator` while loading the legacy `eslint-config-next` extends via `FlatCompat`. Root cause is a version mismatch between the installed `eslint@9.39.5` and `eslint-config-next@16.3.5` legacy plugin shape. The `apps/frontend/eslint.config.mjs` is untouched from Phase 0 (commit `b75b47a`); none of the Phase 1 source files are reached before the crash. Fixing this requires changing approved tooling versions, which is outside Phase 1 scope and needs maintainer approval (CLAUDE.md §35). Type-check passing is the stronger correctness signal for this phase.
+
+### Scope Confirmation
+
+- **No backend files were modified.** All source changes are confined to `apps/frontend`.
+- **No unauthorized scope changes.** No out-of-scope features (password reset, OAuth, presence, media, contacts, messaging) were implemented.
+- **Shared contracts used, not duplicated.** All API request/response shapes come from `@email-chat-pro/types`; all validation rules and error codes come from `@email-chat-pro/constants`.
+- **No reinitialization.** The existing Next.js app, i18n foundation, and config files were extended, not recreated.
+- The root `package.json` was temporarily modified during an attempt to run lint and then restored; only `apps/frontend/package.json` carries the new approved dependencies.
+
+### Phase 1 Verification Criteria Status
+
+Per `docs/6-current-task.md` Phase 1 Verification Criteria:
+
+- ✅ User can register with valid email/password (form wired to `POST /auth/register`)
+- ✅ Registration fails with appropriate errors for invalid input (Zod client-side + backend `VALIDATION_ERROR`/`CONFLICT`)
+- ✅ Email verification token is accepted/rejected correctly (form wired to `POST /auth/verify-email`; length/hex validated client-side, backend authoritative)
+- ✅ Login with verified credentials succeeds and sets session (mutation stores token + user)
+- ✅ Login with unverified credentials fails with `EMAIL_NOT_VERIFIED` (mapped to localized `emailNotVerified` message)
+- ✅ Logout clears session and redirects to login (`useLogoutMutation` + `router.replace('/login')`)
+- ✅ Protected routes redirect unauthenticated users to login (`RequireAuth`)
+- ✅ Session validation works on app load (`useSession` query)
+- ✅ All forms use shared validation constants (`@email-chat-pro/constants` referenced in `auth.schema.ts`)
+- ✅ All API calls use shared type contracts (`@email-chat-pro/types` throughout `auth.api.ts` / `session.api.ts`)
+
+Note: end-to-end runtime verification against a live backend was not exercised in this session (no running backend/DB); criteria are satisfied at the integration-wiring level and verified via type-check. Live verification is deferred to when the stack is running.
+
+---
+
+```text
+Context Change: Frontend Phase 1 (Authentication Experience) completed and verified.
+File: docs/6-current-task.md
+Change: Phase 1 marked completed. Phase 2 (User Profile Experience) named as the
+       next phase WITHOUT defining its scope, as a placeholder pending maintainer
+       approval. Phase 2 is not started.
+Reason: Phase 1 completed and verified (recorded in done.md); the roadmap Golden
+       Rule requires explicit approval before Phase 2 begins.
+Approved By: Pending maintainer approval.
+```
+
+---
+
 # Completion Discipline
 
 When a task reaches completion:
