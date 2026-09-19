@@ -1862,7 +1862,9 @@ boundary on 2026-09-17.
 
 ## Task 4.6 — Structured Logging and Error Monitoring Foundation
 
-**Status:** Not Started
+**Status:** Completed
+
+**Date:** 2026-09-19
 
 **Scope:**
 
@@ -1871,13 +1873,55 @@ boundary on 2026-09-17.
 * Safe error information
 * Monitoring foundation
 
+**Implemented:**
+
+* **Winston Configuration** (`apps/backend/src/config/logger.config.ts`):
+  - Structured JSON logging for production, console-friendly for development.
+  - Winston singleton instance exported for application-wide use.
+* **HTTP Request Logging Middleware** (`apps/backend/src/middleware/logging.middleware.ts`):
+  - Records method, path, response status, and duration using the Winston logger.
+  - Ensures safe logging (no request bodies, query parameters, or headers).
+* **Exception Filter Integration** (`apps/backend/src/common/filters/http-exception.filter.ts`):
+  - Integrated Winston logger into the `HttpExceptionFilter`.
+  - Client errors (4xx) logged as `warn`, server errors (5xx) as `error`.
+  - Implemented "Safe error information" — records exception name and status code, avoids logging potentially sensitive error payloads.
+* **Health Endpoint Enhancement** (`apps/backend/src/app.service.ts`):
+  - Updated `AppStatus` to include `uptime` and `environment`.
+* **Tests:** Updated `AppController` tests to include new health status fields.
+
 **Verification:**
 
 ```text
-Not Started
+Executed 2026-09-19.
+
+- npm run type-check:  PASS (all 5 workspaces)
+- npm run lint:        PASS (backend)
+- npm test:            PASS (backend jest: verified updated app controller tests)
+- npm run build:       PASS (backend nest build)
+- Manual check: Winston logs structured output in dev mode.
 ```
 
+**Files Changed:**
+
+```text
+Modified:
+apps/backend/package.json                              (+ winston)
+apps/backend/src/app.controller.spec.ts                (updated health check expectations)
+apps/backend/src/app.service.ts                        (added uptime/environment to status)
+apps/backend/src/common/filters/http-exception.filter.spec.ts (placeholder/stub)
+apps/backend/src/common/filters/http-exception.filter.ts (integrated logger)
+apps/backend/src/main.ts                               (registered logging middleware)
+package-lock.json                                      (dependency tree)
+
+Created:
+apps/backend/src/config/logger.config.ts
+apps/backend/src/middleware/logging.middleware.ts
+```
+
+**Note:** Backend-only task. Dependencies: `winston` added to `apps/backend/package.json`. No migrations, no data-model changes.
+
 ---
+
 
 ## Task 4.7 — Performance Optimization
 

@@ -1,6 +1,7 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common'
 import type { Response } from 'express'
 import { ERROR_CODES } from '@email-chat-pro/constants'
+import { logger } from '../config/logger.config'
 
 interface ErrorBody {
   code: string
@@ -25,10 +26,23 @@ export class HttpExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>()
     const { status, error } = this.toError(exception)
 
+    this.logError(exception, status)
+
     response.status(status).json({
       success: false,
       error,
       timestamp: new Date().toISOString(),
+    })
+  }
+
+  private logError(exception: unknown, status: number): void {
+    const isClientError = status < 500
+    const loggerMethod = isClientError ? 'warn' : 'error'
+    const exceptionName = exception instanceof Error ? exception.constructor.name : 'Unknown'
+
+    logger[loggerMethod](exceptionName, {
+      code: status,
+      isClientError,
     })
   }
 

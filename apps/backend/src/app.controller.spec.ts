@@ -14,10 +14,12 @@ describe('AppController', () => {
     appController = moduleRef.get(AppController)
   })
 
-  it('should return a successful API response with a status message', () => {
+  it('should return a successful API response with a status message, uptime, and environment', () => {
     const response = appController.getStatus()
 
     expect(response.success).toBe(true)
     expect(response.data?.message).toMatch(/Email-Chat-Pro API/)
+    expect(response.data?.uptime).toBeGreaterThan(0)
+    expect(response.data?.environment).toBeDefined()
   })
 })
