@@ -1,7 +1,7 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, HttpStatus } from '@nestjs/common'
 import type { Response } from 'express'
 import { ERROR_CODES } from '@email-chat-pro/constants'
-import { logger } from '../config/logger.config'
+import { logger } from '../../config/logger.config'
 
 interface ErrorBody {
   code: string
