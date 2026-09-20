@@ -4,10 +4,12 @@ import enAuth from '../../public/locales/en/auth.json'
 import enChat from '../../public/locales/en/chat.json'
 import enCommon from '../../public/locales/en/common.json'
 import enErrors from '../../public/locales/en/errors.json'
+import enProfile from '../../public/locales/en/profile.json'
 import faAuth from '../../public/locales/fa/auth.json'
 import faChat from '../../public/locales/fa/chat.json'
 import faCommon from '../../public/locales/fa/common.json'
 import faErrors from '../../public/locales/fa/errors.json'
+import faProfile from '../../public/locales/fa/profile.json'
 
 /** Languages supported by the application (stack.md §11: Persian + English). */
 export const SUPPORTED_LOCALES = ['en', 'fa'] as const
@@ -18,7 +20,7 @@ export type Locale = (typeof SUPPORTED_LOCALES)[number]
 export const DEFAULT_LOCALE: Locale = 'en'
 
 /** Translation namespaces (architecture.md: public/locales/{en,fa}/...). */
-export const LOCALE_NAMESPACES = ['common', 'auth', 'chat', 'errors'] as const
+export const LOCALE_NAMESPACES = ['common', 'auth', 'chat', 'errors', 'profile'] as const
 
 export type LocaleNamespace = (typeof LOCALE_NAMESPACES)[number]
 
@@ -39,8 +41,8 @@ export const LOCALE_META: Record<Locale, LocaleMeta> = {
 
 /** Translation resources, loaded synchronously from the locale JSON files. */
 export const resources: Record<Locale, Record<LocaleNamespace, object>> = {
-  en: { common: enCommon, auth: enAuth, chat: enChat, errors: enErrors },
-  fa: { common: faCommon, auth: faAuth, chat: faChat, errors: faErrors },
+  en: { common: enCommon, auth: enAuth, chat: enChat, errors: enErrors, profile: enProfile },
+  fa: { common: faCommon, auth: faAuth, chat: faChat, errors: faErrors, profile: faProfile },
 }
 
 /**

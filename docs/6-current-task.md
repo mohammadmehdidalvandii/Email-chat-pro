@@ -8,503 +8,147 @@ This file defines the **exact work currently authorized** for Claude Code.
 
 Claude Code MUST NOT implement work outside the scope explicitly defined in this file.
 
-When the task is completed and verified, the completed work MUST be recorded in `done.md`, and this file MUST be updated or replaced with the next approved task.
-
 ---
 
 # Current Phase
 
-## Frontend Development — Phase 1: Authentication Experience
+## Frontend Development — Phase 2: User Profile Experience
 
-**Authorization:** Approved Frontend Development Roadmap — Phase 1 only.
+**Authorization:** Approved Frontend Development Roadmap — Phase 2 only. Phase 1 (Authentication Experience) is completed, verified, documented in `docs/7-done.md`, and committed.
 
-**Date:** 2026-09-19
-
----
-
-# Frontend Development Roadmap
-
-This roadmap defines the complete frontend development plan based on the already-implemented backend capabilities. Phases must be completed in order. Each phase must be verified, documented in `done.md`, committed, and explicitly approved before proceeding to the next phase.
+**Date:** 2026-09-20
 
 ---
 
-## Phase 1: Authentication Experience
+# Scope
 
-### Goal
+## Goal
 
-Provide full registration, email verification, and session management.
+Allow authenticated users to view, edit, and delete their profile.
 
-### Backend Features Consumed
-
-- `auth` module (registration, email verification, login/logout, session management)
-- Shared contracts from `@email-chat-pro/types` (auth.types.ts, user.types.ts, api.types.ts)
-- Shared constants from `@email-chat-pro/constants` (error.constants.ts, validation.constants.ts)
-
-### Pages/Screens
-
-- `/register` — Account creation form
-- `/verify-email` — Verification token entry/submission
-- `/login` — User authentication
-- Protected routes (redirect unauthenticated users to `/login`)
-
-### Components Required
-
-- `AuthLayout` — Layout wrapper for authentication pages
-- `RegisterForm` — Registration form with email/password validation
-- `EmailVerificationForm` — Verification token submission
-- `LoginForm` — Login form with email/password
-
-### State Management Requirements
-
-- **Zustand:** `authStore` for managing local auth session state (user, token, isAuthenticated)
-- **TanStack Query:** Caching session and user profile data (`/auth/session`)
-
-### API Integration
-
-- `POST /api/v1/auth/register` — Registration
-- `POST /api/v1/auth/verify-email` — Email verification
-- `POST /api/v1/auth/login` — Login (sets httpOnly cookie)
-- `POST /api/v1/auth/logout` — Logout (clears httpOnly cookie)
-- `GET /api/v1/auth/session` — Session validation
-
-### Validation Requirements
-
-- Zod schemas aligned with shared `@email-chat-pro/constants`:
-  - Email format (RFC 5322 simplified)
-  - Password complexity (8+ chars, uppercase, lowercase, digit, special character)
-  - Verification token length (64 hex chars)
-- Client-side validation for immediate feedback
-- Backend validation remains authoritative
-
-### Authentication/Authorization Requirements
-
-- Protected routes require valid JWT (httpOnly cookie or Bearer header)
-- Unauthenticated users redirected to `/login`
-- Verified email required before accessing protected features
-- Session validation on app load
-
-### Real-time Requirements
-
-- None for this phase
-
-### Dependencies
-
-- None (first frontend phase)
-- Existing backend auth endpoints must be operational
-
-### Explicit Exclusions
-
-- Password reset flow
-- OAuth or social login
-- Presence features
-- Media uploads
-- Contact management
-- Messaging
-
-### Verification Criteria
-
-- User can register with valid email/password
-- Registration fails with appropriate errors for invalid input
-- Email verification token is accepted/rejected correctly
-- Login with verified credentials succeeds and sets session
-- Login with unverified credentials fails with `EMAIL_NOT_VERIFIED`
-- Logout clears session and redirects to login
-- Protected routes redirect unauthenticated users to login
-- Session validation works on app load
-- All forms use shared validation constants
-- All API calls use shared type contracts
-
----
-
-## Phase 2: User Profile Experience
-
-### Goal
-
-Enable profile setup, viewing, and modification.
-
-### Backend Features Consumed
-
-- `users` module (get/patch profile, delete account)
-- Shared contracts from `@email-chat-pro/types` (user.types.ts)
-- Shared constants from `@email-chat-pro/constants` (validation.constants.ts, error.constants.ts)
-
-### Pages/Screens
-
-- `/settings/profile` — Profile viewing and editing form
-
-### Components Required
-
-- `ProfileForm` — Profile editing form
-- `AvatarUploader` — Placeholder until Media Phase
-- `AccountDeletionModal` — Confirmation modal for account deletion
-
-### State Management Requirements
-
-- **Zustand:** UI state for modals, form state
-- **TanStack Query:** User profile fetching and updating mutations
-
-### API Integration
+## Backend APIs Consumed (no backend changes)
 
 - `GET /api/v1/users/me` — Fetch current user profile
 - `PATCH /api/v1/users/me` — Update profile (username, fullName, bio, avatarUrl)
 - `DELETE /api/v1/users/me` — Delete account (requires password confirmation)
 
-### Validation Requirements
+## Shared Contracts Consumed
 
-- Zod schemas for:
-  - Username (3–30 chars, alphanumeric + underscore/hyphen)
-  - Full name (max 100 chars)
-  - Bio (max 500 chars)
-- Username uniqueness enforced by backend
-- Client-side validation for immediate feedback
-
-### Authentication/Authorization Requirements
-
-- All profile routes protected by JWT authentication
-- Account deletion requires password confirmation
-
-### Real-time Requirements
-
-- None for this phase
-
-### Dependencies
-
-- Phase 1: Authentication Experience
-
-### Explicit Exclusions
-
-- Cloudinary image uploads (scheduled for Media Phase)
-- Email change flow
-- Profile picture uploads
-
-### Verification Criteria
-
-- Profile fields are fetched and displayed correctly
-- Profile updates persist to backend
-- Username uniqueness is enforced by backend
-- Account deletion anonymizes user data correctly
-- Account deletion invalidates sessions
-- All forms use shared validation constants
+- `@email-chat-pro/types`: `User`, `UpdateProfileInput`, `ProfileResponse`, `DeleteAccountInput`, `DeleteAccountResponse`
+- `@email-chat-pro/constants`: validation constants (username, full name, bio rules), error codes/messages
 
 ---
 
-## Phase 3: Contacts and User Discovery Experience
+# Pages / Screens
 
-### Goal
-
-Enable searching for users, managing contact requests, and maintaining a contact list.
-
-### Backend Features Consumed
-
-- `users` module (search)
-- `contacts` module (requests, incoming, accept/decline, accepted contact list)
-- Shared contracts from `@email-chat-pro/types` (user.types.ts, contact.types.ts)
-- Shared constants from `@email-chat-pro/constants` (error.constants.ts, validation.constants.ts)
-
-### Pages/Screens
-
-- `/search` — Search interface for finding users
-- `/contacts` — Contact request management, accepted contact list
-
-### Components Required
-
-- `UserSearchBar` — Search input with debouncing
-- `UserSearchResult` — Display search results
-- `ContactRequestItem` — Display pending requests with accept/decline actions
-- `ContactItem` — Display accepted contacts
-
-### State Management Requirements
-
-- **Zustand:** UI state for search input, request status
-- **TanStack Query:** Search results, contact lists, incoming requests
-
-### API Integration
-
-- `GET /api/v1/users/search` — Search users by username or email
-- `POST /api/v1/contacts/requests` — Send contact request
-- `GET /api/v1/contacts/requests/incoming` — Fetch incoming requests
-- `PATCH /api/v1/contacts/requests/:requestId` — Accept or decline request
-- `GET /api/v1/contacts` — Fetch accepted contacts
-
-### Validation Requirements
-
-- Query parameter validation (search query, limit)
-- Client-side validation for search input (non-empty, trimmed)
-
-### Authentication/Authorization Requirements
-
-- All contact routes protected by JWT authentication
-- Backend enforces messaging restrictions based on contact status
-
-### Real-time Requirements
-
-- None for this phase
-
-### Dependencies
-
-- Phase 1: Authentication Experience
-- Phase 2: User Profile Experience
-
-### Explicit Exclusions
-
-- Messaging access
-- Presence features
-- Group chat
-- Blocking/muting
-
-### Verification Criteria
-
-- User search returns active users only
-- Search results exclude deleted users
-- Contact requests can be sent to valid users
-- Self-requests are rejected
-- Duplicate requests are rejected
-- Incoming requests are displayed correctly
-- Accept request creates contact relationship
-- Decline request does not enable messaging
-- Contact list displays accepted contacts only
-- All API calls use shared type contracts
+- `/settings/profile` — Profile viewing and editing form (protected route)
 
 ---
 
-## Phase 4: Real-time Chat Experience
+# Components Required
 
-### Goal
+- `ProfileForm` — Profile editing form (username, fullName, bio)
+- `AccountDeletionModal` — Confirmation modal for account deletion (password confirmation)
+- Required profile UI components only (no AvatarUploader placeholder, no media components)
 
-Enable viewing conversations and real-time messaging.
+**Explicit exclusions:**
 
-### Backend Features Consumed
-
-- `chats` module (conversation list)
-- `messages` module (message history, send messages)
-- `websocket` module (real-time message delivery)
-- Shared contracts from `@email-chat-pro/types` (chat.types.ts, websocket.types.ts)
-- Shared constants from `@email-chat-pro/constants` (error.constants.ts, validation.constants.ts)
-
-### Pages/Screens
-
-- `/chats` — Conversation list
-- `/chats/[chatId]` — Chat window with message history
-
-### Components Required
-
-- `ChatList` — Display conversations with last message preview
-- `ChatWindow` — Full chat interface
-- `MessageItem` — Display individual message (text only)
-- `MessageInput` — Message composition and sending
-
-### State Management Requirements
-
-- **Zustand:** Socket.IO connection state, real-time message arrival
-- **TanStack Query:** Chat lists, message history, message sending mutations
-
-### API Integration
-
-- `GET /api/v1/chats` — Fetch conversation list
-- `GET /api/v1/chats/:chatId/messages` — Fetch message history (paginated)
-- `POST /api/v1/chats/:chatId/messages` — Send message
-- Socket.IO events:
-  - `chat:join` — Join chat room
-  - `chat:leave` — Leave chat room
-  - `message:received` — Receive real-time message
-  - `error:event` — Handle WebSocket errors
-
-### Validation Requirements
-
-- Message content validation (1–5000 chars)
-- Client-side validation for empty messages
-- Backend enforces contact relationship requirement
-
-### Authentication/Authorization Requirements
-
-- All chat routes protected by JWT authentication
-- WebSocket connections require valid JWT
-- Backend enforces chat membership and contact relationship
-
-### Real-time Requirements
-
-- Socket.IO client integration
-- Join chat rooms on conversation open
-- Leave chat rooms on conversation close
-- Receive real-time messages
-- Handle connection failures and reconnection
-- Display online/offline status (from user.lastSeenAt)
-
-### Dependencies
-
-- Phase 1: Authentication Experience
-- Phase 3: Contacts and User Discovery Experience (for gating messaging)
-
-### Explicit Exclusions
-
-- Typing indicators
-- Read receipts
-- Media messages (scheduled for Media Phase)
-- Unread counters
-- Message editing/deletion
-
-### Verification Criteria
-
-- Conversation list displays all user's chats
-- Conversations sorted by recent activity
-- Chat window displays message history in chronological order
-- Messages are persisted and survive page refresh
-- Real-time messages are received without page refresh
-- Messaging between non-contacts is rejected by backend
-- WebSocket connection is authenticated
-- Chat rooms are joined/left correctly
-- All API calls use shared type contracts
+- Avatar upload
+- Cloudinary/media
+- Contacts
+- Search
+- Messaging
+- Backend modifications
+- New dependencies without approval
 
 ---
 
-## Phase 5: Media Upload Experience
+# API Integration
 
-### Goal
-
-Enable sending images and videos.
-
-### Backend Features Consumed
-
-- `files` module (image/video upload)
-- Updated `messages` module (media message support)
-- Shared contracts from `@email-chat-pro/types` (file.types.ts, chat.types.ts)
-- Shared constants from `@email-chat-pro/constants` (error.constants.ts, validation.constants.ts)
-
-### Pages/Screens
-
-- Integration into `/chats/[chatId]` — Media attachment in chat
-
-### Components Required
-
-- `MediaUploader` — File selection and upload
-- `ImagePreview` — Display uploaded images
-- `VideoPlayer` — Display uploaded videos
-- `UploadProgress` — Display upload progress
-
-### State Management Requirements
-
-- **Zustand:** Upload progress, file selection state
-- **TanStack Query:** File upload mutations
-
-### API Integration
-
-- `POST /api/v1/files/upload` — Upload image or video
-- `POST /api/v1/chats/:chatId/messages` — Send media message with mediaUrl
-
-### Validation Requirements
-
-- Image format validation (jpg, jpeg, png, gif, webp)
-- Video format validation (mp4, webm, mov, avi)
-- File size validation (images: 10MB max, videos: 50MB max)
-- Image dimension validation (100×100 to 5000×5000)
-- Video duration validation (max 5 minutes)
-- Client-side validation for immediate feedback
-
-### Authentication/Authorization Requirements
-
-- All upload routes protected by JWT authentication
-- Backend enforces file type and size limits
-
-### Real-time Requirements
-
-- Real-time delivery of media messages
-
-### Dependencies
-
-- Phase 4: Real-time Chat Experience
-
-### Explicit Exclusions
-
-- Video trimming/transcoding
-- Rich captions
-- Arbitrary file sharing
-- Cloudinary transformations
-
-### Verification Criteria
-
-- Valid images are uploaded successfully
-- Valid videos are uploaded successfully
-- Invalid formats are rejected
-- Oversized files are rejected
-- Upload progress is displayed
-- Media messages are rendered correctly
-- Cloudinary URLs are stored correctly
-- All API calls use shared type contracts
+- Use the existing `apiClient` (Axios instance from `apps/frontend/src/lib/api/client.ts`)
+- Use the existing API call patterns (`apiRequest<T>` wrapper for typed responses)
+- Typed API contracts from `@email-chat-pro/types`:
+  - `GET /users/me` → `ProfileResponse` (= `User`)
+  - `PATCH /users/me` → `UpdateProfileInput` request → `ProfileResponse` response
+  - `DELETE /users/me` → `DeleteAccountInput` request → `DeleteAccountResponse` response
+- No new API call files beyond what is needed for profile operations
+- No backend changes of any kind
 
 ---
 
-## Phase 6: Internationalization and UI System
+# State Ownership
 
-### Goal
+## TanStack Query (server state — single source of truth)
 
-Enable Persian/English support, RTL/LTR, and finalized UI polish.
+- Profile fetching: query key `['profile']` or `['users', 'me']`, fetches `GET /users/me`
+- Profile updating mutation: `PATCH /users/me`, on success update query cache
+- Account deletion mutation: `DELETE /users/me`, on success invalidate profile query and trigger session invalidation
 
-### Backend Features Consumed
+## Zustand (local UI state only)
 
-- Backend static i18n error keys (from `@email-chat-pro/constants`)
-- Existing frontend i18n foundation (i18next, locale files)
+- Modal open/closed state for `AccountDeletionModal`
+- Form state that is purely presentational
+- Do NOT duplicate server profile state (username, fullName, bio, etc.) in Zustand — that belongs in TanStack Query
+- The auth store (`useAuthStore`) remains for auth session state only (token, user, hasSessionResolved)
 
-### Pages/Screens
+---
 
-- Global updates to all views
+# Validation
 
-### Components Required
+- Use Zod schemas aligned with shared constants from `@email-chat-pro/constants`
+- Reuse existing validation patterns from Phase 1 (see `apps/frontend/src/lib/validation/auth.schema.ts` for the established pattern)
+- Client-side validation for immediate feedback; backend validation remains authoritative
+- Profile field rules from shared constants:
+  - Username: `USERNAME_REGEX` (`^[a-zA-Z0-9_-]+$`), 3–30 chars (`USERNAME_MIN_LENGTH`/`USERNAME_MAX_LENGTH`)
+  - Full name: max 100 chars (`FULL_NAME_MAX_LENGTH`)
+  - Bio: max 500 chars (`BIO_MAX_LENGTH`)
+- Error messages from `@email-chat-pro/constants` (`USERNAME_REQUIRED`, `USERNAME_TOO_SHORT`, `USERNAME_TOO_LONG`, `USERNAME_INVALID`, `FULL_NAME_TOO_LONG`, `BIO_TOO_LONG`, etc.)
 
-- `LanguageSwitcher` — Language selection component
-- `RtlProvider` — RTL/LTR layout provider
-- Updated UI components for i18n support
+---
 
-### State Management Requirements
+# Authentication / Authorization
 
-- **Zustand:** Current locale, RTL state
-- **TanStack Query:** None (UI-only)
+- `/settings/profile` must be a protected route
+- Reuse existing `RequireAuth` component (`apps/frontend/src/components/auth/RequireAuth.tsx`) and session infrastructure (`useSession` hook, `useAuthStore`)
+- Unauthenticated users redirect to `/login` (handled by `RequireAuth`)
+- Account deletion requires password confirmation (confirmed via `DeleteAccountInput`)
 
-### API Integration
+---
 
-- None (UI-only phase)
+# Verification Requirements
 
-### Validation Requirements
+## Automated
 
-- None (UI-only phase)
+- Frontend type-check passes (`npm run type-check`)
+- Frontend lint passes (`npm run lint`)
+- Existing tests continue to pass (`npm test`)
 
-### Authentication/Authorization Requirements
+## Manual — Profile Lifecycle
 
-- Existing protected routes remain protected
-
-### Real-time Requirements
-
-- None (UI-only phase)
-
-### Dependencies
-
-- Phase 1: Authentication Experience
-- Phase 2: User Profile Experience
-- Phase 3: Contacts and User Discovery Experience
-- Phase 4: Real-time Chat Experience
-- Phase 5: Media Upload Experience
-
-### Explicit Exclusions
-
-- Spanish localization
-- New features
-
-### Verification Criteria
-
-- UI displays correctly in Persian (RTL)
-- UI displays correctly in English (LTR)
-- Language switcher toggles between languages
-- Locale persists across sessions
-- All text is translated
-- Error messages use backend error codes
-- RTL layout is correct for Persian
-- All components support i18n
+1. View profile — authenticated user fetches and sees their profile data
+2. Update profile — user edits username/fullName/bio, changes persist to backend via `PATCH /users/me`
+3. Delete account — user confirms deletion with password via `AccountDeletionModal`, `DELETE /users/me` succeeds
+4. Session invalidation after deletion — after account deletion, the session is no longer valid; subsequent API calls and route guards redirect to `/login`
 
 ---
 
 # Golden Rule
 
-> **Do not start Phase 2 or any later phase until Phase 1 is completed, verified, documented in `done.md`, committed, and explicitly approved.**
+> **Do not start Phase 3 or any later phase until Phase 2 is completed, verified, documented in `docs/7-done.md`, committed, and explicitly approved.**
 
 > **Do not modify backend code. Frontend only.**
 
 > **Follow existing architecture and shared contracts. Use Zustand for UI state only. Use TanStack Query for server state.**
+---
+# Phase 2 — Completed (2026-09-20)
+
+User Profile Experience (view/edit/delete profile) is verified complete.
+- Page /settings/profile built with RequireAuth
+- ProfileForm + AccountDeletionModal implemented
+- Type-check / lint / build PASS
+- API verification blocked by PostgreSQL 5432 environment conflict
+- No unauthorized scope changes
+
+Next approved placeholder (NOT authorized until approved):
+Phase 3 — Contacts and Search (placeholder only; do not implement).
+Refer to features.md §Contacts and Search for scope when authorized.

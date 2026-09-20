@@ -1,0 +1,20 @@
+{
+  "profileTitle": "Profile Settings",
+  "username": "Username",
+  "usernameHint": "3-30 characters, letters, numbers, underscores, and hyphens",
+  "fullName": "Full name",
+  "bio": "Bio",
+  "bioHint": "Max 500 characters",
+  "save": "Save",
+  "saving": "Saving...",
+  "loading": "Loading...",
+  "loadError": "Failed to load profile. Please try again.",
+  "deleteTitle": "Delete account",
+  "deleteDescription": "Are you sure? This action cannot be undone.",
+  "deleteAccount": "Delete account",
+  "password": "Password",
+  "cancel": "Cancel",
+  "delete": "Delete",
+  "deleteError": "Failed to delete account. Please try again.",
+  "deleted": "Account deleted. Redirecting..."
+}

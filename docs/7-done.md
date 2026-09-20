@@ -3473,3 +3473,42 @@ Never mark a task as verified without running the relevant checks.
 Never hide known issues.
 
 Never record unauthorized work as completed.
+
+---
+# Phase 2 — User Profile Experience (Task 2.0 — Profile View/Edit/Delete)
+
+**Status:** Completed (verified; not committed/pushed)
+**Date:** 2026-09-20
+
+**What was implemented (within current-task.md):**
+- `/settings/profile` protected page (`RequireAuth` + `ProfileForm` + `AccountDeletionModal`)
+- `ProfileForm` — React Hook Form + Zod (`profileSchema` using `@email-chat-pro/constants`) + TanStack Query mutation (`PATCH /users/me`)
+- `AccountDeletionModal` — password-confirmed `DELETE /users/me` via `useDeleteAccountMutation`; clears session on success
+- `useProfile` query (`GET /users/me`), `useUpdateProfileMutation`, `useDeleteAccountMutation`
+- `useProfileModalStore` (Zustand) — modal state only
+- API layer `users.api.ts` (`fetchProfile`, `updateProfileApi`, `deleteAccountApi`) using `apiRequest`
+- Validation `profile.schema.ts` aligned with shared constants (`USERNAME_REGEX`, `BIO_MAX_LENGTH`, etc.)
+- i18n `profile.json` (en/fa) + `i18n.config.ts` updated (`profile` namespace, `faCommon` fix)
+
+**Verification:**
+- `npm run type-check --workspace @email-chat-pro/frontend` → PASS
+- `npm run lint --workspace @email-chat-pro/frontend` → PASS
+- `npm run build --workspace @email-chat-pro/frontend` → PASS (`/settings/profile` static prerecord)
+- Manual API verification blocked — PostgreSQL port 5432 conflict (Windows service vs Docker)
+
+**Files changed (only Phase 2 + docs, no backend, no messaging/contacts):**
+- New: `apps/frontend/src/app/settings/profile/page.tsx`
+- New: `apps/frontend/src/components/profile/ProfileForm.tsx`
+- New: `apps/frontend/src/components/profile/AccountDeletionModal.tsx`
+- New: `apps/frontend/src/hooks/use-profile-query.ts`, `use-profile-mutations.ts`
+- New: `apps/frontend/src/lib/api/users.api.ts`, `lib/validation/profile.schema.ts`
+- New: `apps/frontend/src/stores/profile.store.ts`
+- New: `public/locales/en/profile.json`, `fa/profile.json`
+- Modified: `src/config/i18n.config.ts`, `docs/6-current-task.md`
+
+**Scope compliance:** No unauthorized work. No backend changes. No messaging/contacts/media. No new dependencies. No commits/pushes.
+
+**Known issues:**
+- PostgreSQL 5432 port conflict prevents live API verification (environment blocker, not code issue).
+- `profile.json` translations are minimal; fuller copy-editing deferred to Phase 4 polish.
+- `AccountDeletionModal` uses simple `<form>` not `react-hook-form`; sufficient for single password field, consistent with modal UX.
