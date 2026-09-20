@@ -49,3 +49,11 @@ export const profileSchema = z.object({
 })
 
 export type ProfileFormValues = z.infer<typeof profileSchema>
+
+// Phase 3 — contact request validation (shared constants, no new rules needed)
+export const contactSchema = z.object({
+  receiverId: z.string().uuid(),
+})
+export const respondSchema = z.object({
+  status: z.enum(['accepted', 'declined']),
+})
