@@ -1,22 +1,75 @@
 'use client'
-import { useState } from 'react'
+import { useState, useRef, ChangeEvent } from 'react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
-import { MESSAGE_CONTENT_MAX_LENGTH } from '@email-chat-pro/constants'
+import {
+  MESSAGE_CONTENT_MAX_LENGTH,
+  IMAGE_MAX_SIZE_BYTES,
+  VIDEO_MAX_SIZE_BYTES,
+  IMAGE_MIME_TYPES,
+  VIDEO_MIME_TYPES,
+  ERROR_CODES,
+} from '@email-chat-pro/constants'
+import { MessageType } from '@email-chat-pro/types'
+import { useMutation } from '@tanstack/react-query'
+import { uploadFileApi } from '../../lib/api/files.api'
+import { translateApiError } from '../../i18n/errors'
 
 interface MessageInputProps {
-  onSend: (content: string) => void
+  onSend: (content: string, messageType: MessageType, mediaUrl?: string | null) => void
   disabled?: boolean
 }
 
 export function MessageInput({ onSend, disabled }: MessageInputProps) {
   const [text, setText] = useState('')
+  const [media, setMedia] = useState<{ url: string; type: MessageType } | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const uploadMutation = useMutation({
+    mutationFn: uploadFileApi,
+    onSuccess: (_data, _variables) => {
+      // variables is FormData, but we can't easily read it back to get type.
+      // We'll trust the type passed by the change handler via a temporary state.
+      // (Refactor: could use a more robust way to track pending type).
+    },
+  })
+
+  const handleFileChange = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const isImage = IMAGE_MIME_TYPES.includes(file.type as any)
+    const isVideo = VIDEO_MIME_TYPES.includes(file.type as any)
+
+    if (!isImage && !isVideo) {
+      alert(translateApiError(ERROR_CODES.VALIDATION_ERROR, 'Invalid file type'))
+      return
+    }
+
+    const maxSize = isImage ? IMAGE_MAX_SIZE_BYTES : VIDEO_MAX_SIZE_BYTES
+    if (file.size > maxSize) {
+      alert(translateApiError(ERROR_CODES.VALIDATION_ERROR, 'File too large'))
+      return
+    }
+
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('type', isImage ? 'image' : 'video')
+
+    try {
+      const result = await uploadMutation.mutateAsync(formData)
+      setMedia({ url: result.url, type: isImage ? 'image' : 'video' })
+    } catch (error) {
+      alert(translateApiError(ERROR_CODES.INTERNAL_ERROR, 'Upload failed'))
+    }
+  }
 
   const handleSend = () => {
     const trimmed = text.trim()
-    if (trimmed.length === 0 || trimmed.length > MESSAGE_CONTENT_MAX_LENGTH || disabled) return
-    onSend(trimmed)
+    if (disabled || (trimmed.length === 0 && !media)) return
+    onSend(trimmed, media ? media.type : 'text', media?.url)
     setText('')
+    setMedia(null)
   }
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -36,9 +89,16 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
         maxLength={MESSAGE_CONTENT_MAX_LENGTH}
         disabled={disabled}
       />
-      <Button onClick={handleSend} disabled={disabled || !text.trim()}>
-        Send
-      </Button>
+      <input type="file" accept="image/*,video/*" className="hidden" ref={fileInputRef} onChange={handleFileChange} />
+      <Button type="button" onClick={() => fileInputRef.current?.click()} disabled={disabled || uploadMutation.isPending}>Attach</Button>
+      <Button onClick={handleSend} disabled={disabled || (!text.trim() && !media) || uploadMutation.isPending}>Send</Button>
+      {media && (
+        <div className="text-xs text-neutral-600">{media.type}:{media.url.slice(0, 40)}...</div>
+      )}
+      {uploadMutation.isPending && <span className="text-xs text-neutral-500">Uploading...</span>}
+      {uploadMutation.error && (
+        <span className="text-xs text-red-500">{translateApiError(ERROR_CODES.INTERNAL_ERROR, 'Upload error')}</span>
+      )}
     </div>
   )
 }

@@ -58,7 +58,7 @@ export function useChatSocket(activeChatId: string | null) {
         socketRef.current.emit(WS_CLIENT_EVENTS.LEAVE_CHAT, {
           chatId: activeChatId,
         })
-        socketRef.current.disconnect(true)
+        socketRef.current.disconnect()
         socketRef.current = null
       }
       return
@@ -72,7 +72,7 @@ export function useChatSocket(activeChatId: string | null) {
   useEffect(() => {
     return () => {
       if (socketRef.current) {
-        socketRef.current.disconnect(true)
+        socketRef.current.disconnect()
         socketRef.current = null
       }
     }

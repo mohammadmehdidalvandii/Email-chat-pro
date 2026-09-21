@@ -16,7 +16,7 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
         <MessageList chatId={chatId} />
       </div>
       <MessageInput
-        onSend={(content) => send.mutate({ chatId, content, messageType: 'text', mediaUrl: null })}
+        onSend={(content, messageType, mediaUrl) => send.mutate({ chatId, content, messageType, mediaUrl })}
         disabled={send.isPending}
       />
     </div>
