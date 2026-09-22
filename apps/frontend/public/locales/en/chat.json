@@ -1,9 +1,1 @@
-{
-  "conversations": "Conversations",
-  "newMessage": "New message",
-  "messageInput": "Type a message…",
-  "send": "Send",
-  "noMessages": "No messages yet",
-  "emptyConversations": "No conversations yet",
-  "chatError": "Couldn't load the conversation"
-}
+{"conversations": "Conversations", "newMessage": "New message", "messageInput": "Type a message…", "send": "Send", "noMessages": "No messages yet", "emptyConversations": "No conversations yet", "chatError": "Couldn't load the conversation", "noConversations": "No conversations", "loadError": "Couldn't load messages", "uploading": "Uploading..."}

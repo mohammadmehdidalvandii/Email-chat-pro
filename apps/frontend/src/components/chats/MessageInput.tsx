@@ -14,6 +14,7 @@ import { MessageType } from '@email-chat-pro/types'
 import { useMutation } from '@tanstack/react-query'
 import { uploadFileApi } from '../../lib/api/files.api'
 import { translateApiError } from '../../i18n/errors'
+import { useTranslation } from 'react-i18next'
 
 interface MessageInputProps {
   onSend: (content: string, messageType: MessageType, mediaUrl?: string | null) => void
@@ -21,8 +22,10 @@ interface MessageInputProps {
 }
 
 export function MessageInput({ onSend, disabled }: MessageInputProps) {
+  const { t } = useTranslation(['chat', 'errors'], { useSuspense: false })
   const [text, setText] = useState('')
   const [media, setMedia] = useState<{ url: string; type: MessageType } | null>(null)
+  const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const uploadMutation = useMutation({
@@ -31,6 +34,11 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
       // variables is FormData, but we can't easily read it back to get type.
       // We'll trust the type passed by the change handler via a temporary state.
       // (Refactor: could use a more robust way to track pending type).
+      setUploadError(null)
+    },
+    onError: (error: unknown) => {
+      const message = error instanceof Error ? error.message : ''
+      setUploadError(translateApiError(ERROR_CODES.INTERNAL_ERROR, message || 'Upload failed'))
     },
   })
 
@@ -38,17 +46,19 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
     const file = e.target.files?.[0]
     if (!file) return
 
+    setUploadError(null)
+
     const isImage = IMAGE_MIME_TYPES.includes(file.type as any)
     const isVideo = VIDEO_MIME_TYPES.includes(file.type as any)
 
     if (!isImage && !isVideo) {
-      alert(translateApiError(ERROR_CODES.VALIDATION_ERROR, 'Invalid file type'))
+      setUploadError(translateApiError(ERROR_CODES.VALIDATION_ERROR, 'Invalid file type'))
       return
     }
 
     const maxSize = isImage ? IMAGE_MAX_SIZE_BYTES : VIDEO_MAX_SIZE_BYTES
     if (file.size > maxSize) {
-      alert(translateApiError(ERROR_CODES.VALIDATION_ERROR, 'File too large'))
+      setUploadError(translateApiError(ERROR_CODES.VALIDATION_ERROR, 'File too large'))
       return
     }
 
@@ -59,8 +69,8 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
     try {
       const result = await uploadMutation.mutateAsync(formData)
       setMedia({ url: result.url, type: isImage ? 'image' : 'video' })
-    } catch (error) {
-      alert(translateApiError(ERROR_CODES.INTERNAL_ERROR, 'Upload failed'))
+    } catch {
+      // Error is handled via onError above and displayed inline.
     }
   }
 
@@ -85,7 +95,7 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
         value={text}
         onChange={(e) => setText(e.target.value)}
         onKeyDown={handleKeyDown}
-        placeholder="Type a message..."
+        placeholder={t('chat:messageInput')}
         maxLength={MESSAGE_CONTENT_MAX_LENGTH}
         disabled={disabled}
       />
@@ -95,9 +105,12 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
       {media && (
         <div className="text-xs text-neutral-600">{media.type}:{media.url.slice(0, 40)}...</div>
       )}
-      {uploadMutation.isPending && <span className="text-xs text-neutral-500">Uploading...</span>}
-      {uploadMutation.error && (
+      {uploadMutation.isPending && <span className="text-xs text-neutral-500">{t('chat:uploading')}</span>}
+      {uploadMutation.error ? (
         <span className="text-xs text-red-500">{translateApiError(ERROR_CODES.INTERNAL_ERROR, 'Upload error')}</span>
+      ) : null}
+      {uploadError && (
+        <span className="text-xs text-red-500">{uploadError}</span>
       )}
     </div>
   )

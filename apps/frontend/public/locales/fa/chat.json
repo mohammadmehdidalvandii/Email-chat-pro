@@ -1,9 +1,1 @@
-{
-  "conversations": "گفتگوها",
-  "newMessage": "پیام جدید",
-  "messageInput": "پیامی بنویسید…",
-  "send": "ارسال",
-  "noMessages": "هنوز پیامی وجود ندارد",
-  "emptyConversations": "هنوز گفتگویی وجود ندارد",
-  "chatError": "گفتگو بارگیری نشد"
-}
+{"conversations": "گفتگوها", "newMessage": "پیام جدید", "messageInput": "پیامی بنویسید…", "send": "ارسال", "noMessages": "هنوز پیامی وجود ندارد", "emptyConversations": "هنوز گفتگویی وجود ندارد", "chatError": "گفتگو بارگیری نشد", "noConversations": "گفتگویی وجود ندارد", "loadError": "پیام‌ها بارگیری نشد", "uploading": "در حال آپلود..."}

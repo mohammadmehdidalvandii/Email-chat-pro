@@ -4,12 +4,14 @@ import { useChatSocket } from '../../hooks/useChatSocket'
 import { useAuthStore } from '../../stores/auth.store'
 import { useChatHistory } from '../../hooks/use-chat-query'
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 
 interface MessageListProps {
   chatId: string
 }
 
 export function MessageList({ chatId }: MessageListProps) {
+  const { t } = useTranslation(['chat', 'common'], { useSuspense: false })
   const { data, isLoading, error } = useChatHistory(chatId)
   useChatSocket(chatId)
   const userId = useAuthStore((s) => s.user?.id)
@@ -19,8 +21,8 @@ export function MessageList({ chatId }: MessageListProps) {
     scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   }, [data?.data.length])
 
-  if (error) return <p>Error loading messages</p>
-  if (isLoading) return <p>Loading...</p>
+  if (error) return <p>{t('chat:loadError')}</p>
+  if (isLoading) return <p>{t('common:loading')}</p>
 
   return (
     <div

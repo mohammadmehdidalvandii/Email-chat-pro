@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Message } from '@email-chat-pro/types'
 
 interface MessageItemProps {
@@ -5,7 +6,7 @@ interface MessageItemProps {
   isOwn: boolean
 }
 
-export function MessageItem({ message, isOwn }: MessageItemProps) {
+export const MessageItem = memo(function MessageItem({ message, isOwn }: MessageItemProps) {
   return (
     <div
       className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
@@ -28,4 +29,4 @@ export function MessageItem({ message, isOwn }: MessageItemProps) {
       </div>
     </div>
   )
-}
+})

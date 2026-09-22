@@ -2,8 +2,10 @@ import { useEffect, useRef, useCallback } from 'react'
 import { io, type Socket } from 'socket.io-client'
 import { useQueryClient } from '@tanstack/react-query'
 import { useAuthStore } from '../stores/auth.store'
+import { usePresenceStore } from '../stores/presence.store'
 import { WS_CLIENT_EVENTS, WS_SERVER_EVENTS } from '@email-chat-pro/types'
 import { CHAT_HISTORY_KEY } from './use-chat-query'
+import type { PresenceChangedEvent } from '@email-chat-pro/types'
 
 const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL ?? 'http://localhost:4000'
 
@@ -36,6 +38,14 @@ export function useChatSocket(activeChatId: string | null) {
       )
     })
 
+    socket.on(WS_SERVER_EVENTS.PRESENCE_CHANGED, (event: PresenceChangedEvent) => {
+      const setPresence = usePresenceStore.getState().setPresence
+      setPresence(event.userId, {
+        status: event.status,
+        lastSeenAt: event.lastSeenAt,
+      })
+    })
+
     socket.connect()
     socketRef.current = socket
 
@@ -46,6 +56,7 @@ export function useChatSocket(activeChatId: string | null) {
 
     return () => {
       socket.off(WS_SERVER_EVENTS.MESSAGE_RECEIVED)
+      socket.off(WS_SERVER_EVENTS.PRESENCE_CHANGED)
       socket.disconnect()
       socketRef.current = null
     }

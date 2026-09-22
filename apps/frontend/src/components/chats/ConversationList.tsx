@@ -2,14 +2,15 @@
 import { useConversations } from '../../hooks/use-chat-query'
 import { useRouter } from 'next/navigation'
 import { useTranslation } from 'react-i18next'
+
 import { Card } from '../ui/card'
 
 export function ConversationList() {
   const router = useRouter()
-  const { t } = useTranslation('chats', { useSuspense: false })
+  const { t } = useTranslation(['chat', 'common'], { useSuspense: false })
   const { data: conversations, isLoading } = useConversations()
 
-  if (isLoading) return <p>{t('loading')}</p>
+  if (isLoading) return <p>{t('common:loading')}</p>
 
   return (
     <div className="flex flex-col gap-2">
