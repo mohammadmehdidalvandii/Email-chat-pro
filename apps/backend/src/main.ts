@@ -5,7 +5,6 @@ import helmet from 'helmet'
 import { API_BASE_PATH } from '@email-chat-pro/constants'
 import { AppModule } from './app.module'
 import { HttpExceptionFilter } from './common/filters/http-exception.filter'
-import { LoggingMiddleware } from './middleware/logging.middleware'
 
 /** Origin allowed to call the API during local development. */
 const DEFAULT_CORS_ORIGIN = 'http://localhost:3000'
@@ -18,7 +17,6 @@ async function bootstrap(): Promise<void> {
   app.enableCors({
     origin: process.env.CORS_ORIGIN ?? DEFAULT_CORS_ORIGIN,
   })
-  app.use(new LoggingMiddleware())
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,

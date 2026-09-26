@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common'
+import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common'
 import { APP_GUARD } from '@nestjs/core'
 import { ThrottlerModule } from '@nestjs/throttler'
 import { TypeOrmModule } from '@nestjs/typeorm'
@@ -7,6 +7,7 @@ import { AppService } from './app.service'
 import { AppThrottlerGuard } from './common/guards/throttler.guard'
 import { getDatabaseConfig } from './config/database.config'
 import { throttlerModuleOptions } from './config/rate-limit.config'
+import { LoggingMiddleware } from './middleware/logging.middleware'
 import { AuthModule } from './modules/auth/auth.module'
 import { ChatsModule } from './modules/chats/chats.module'
 import { ContactsModule } from './modules/contacts/contacts.module'
@@ -40,4 +41,8 @@ import { WebSocketModule } from './modules/websocket/websocket.module'
     },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer): void {
+    consumer.apply(LoggingMiddleware).forRoutes('*')
+  }
+}
