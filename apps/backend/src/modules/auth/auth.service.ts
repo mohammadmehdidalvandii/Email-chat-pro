@@ -28,6 +28,7 @@ import { RegisterDto } from './dto/register.dto'
 import { VerifyEmailDto } from './dto/verify-email.dto'
 import { User } from './entities/user.entity'
 import type { JwtPayload } from './strategies/jwt.strategy'
+import { EmailService } from '../email/email.service'
 
 /** bcrypt salt rounds defined in architecture.md §Password Validation. */
 const BCRYPT_SALT_ROUNDS = 10
@@ -52,6 +53,7 @@ export class AuthService {
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
     private readonly jwtService: JwtService,
+    private readonly emailService: EmailService,
   ) {}
 
   /**
@@ -63,8 +65,8 @@ export class AuthService {
    * - password is hashed with bcryptjs (salt rounds 10) and never stored in
    *   plaintext.
    * - a verification token is generated (Task 1.2) and only its SHA-256 hash is
-   *   stored; the plaintext token has no delivery channel yet (no email
-   *   transport in the approved stack), so it is not returned or logged.
+   *   stored; the plaintext token is delivered to the user's inbox via Resend
+   *   (EmailService) and is never returned in the API response or logged.
    */
   async register(dto: RegisterDto): Promise<RegisterResponse> {
     const email = dto.email.toLowerCase()
@@ -89,6 +91,7 @@ export class AuthService {
 
     try {
       const saved = await this.usersRepository.save(user)
+      await this.emailService.sendVerificationEmail(email, verificationToken)
       return {
         id: saved.id,
         email: saved.email,

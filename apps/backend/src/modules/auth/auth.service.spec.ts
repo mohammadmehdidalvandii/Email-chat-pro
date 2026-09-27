@@ -13,6 +13,7 @@ import {
 import { AuthService } from './auth.service'
 import { RegisterDto } from './dto/register.dto'
 import { User } from './entities/user.entity'
+import { EmailService } from '../email/email.service'
 
 // @nestjs/jwt v12 ships ESM-only (type: module), which the CJS ts-jest pipeline
 // cannot require. Unit tests mock the token issuer; the real module is
@@ -30,6 +31,10 @@ describe('AuthService', () => {
     save: jest.fn(),
   }
 
+  const emailService = {
+    sendVerificationEmail: jest.fn(),
+  }
+
   beforeEach(async () => {
     jest.clearAllMocks()
     const moduleRef = await Test.createTestingModule({
@@ -37,6 +42,7 @@ describe('AuthService', () => {
         AuthService,
         { provide: getRepositoryToken(User), useValue: repository },
         { provide: JwtService, useValue: { signAsync: jest.fn() } },
+        { provide: EmailService, useValue: emailService },
       ],
     }).compile()
 
@@ -48,6 +54,25 @@ describe('AuthService', () => {
       email: 'User@Example.com',
       password: 'SecurePass123!',
     }
+
+    it('sends the verification email with the plaintext token', async () => {
+      repository.findOne.mockResolvedValue(null)
+      repository.create.mockImplementation((input: Partial<User>) => ({ ...input }))
+      repository.save.mockImplementation((user: Partial<User>) =>
+        Promise.resolve({ ...user, id: 'uuid-1' }),
+      )
+
+      await service.register(dto)
+
+      expect(emailService.sendVerificationEmail).toHaveBeenCalledTimes(1)
+      const [recipient, token] = emailService.sendVerificationEmail.mock.calls[0]
+      expect(recipient).toBe('user@example.com')
+      // The plaintext token is delivered by email; only its hash is persisted.
+      expect(token).toHaveLength(VERIFICATION_TOKEN_LENGTH)
+      const storedHash = repository.create.mock.calls[0][0].verificationTokenHash
+      expect(storedHash).not.toBe(token)
+      expect(createHash('sha256').update(token).digest('hex')).toBe(storedHash)
+    })
 
     it('normalizes email to lowercase before storing', async () => {
       repository.findOne.mockResolvedValue(null)
@@ -283,6 +308,7 @@ describe('AuthService', () => {
           AuthService,
           { provide: getRepositoryToken(User), useValue: repository },
           { provide: JwtService, useValue: jwtService },
+          { provide: EmailService, useValue: emailService },
         ],
       }).compile()
       const svc = moduleRef.get(AuthService)

@@ -49,6 +49,7 @@ The project uses the following technology stack:
 | Password Hashing     | bcryptjs                       |
 | Real-time Server     | Socket.IO                      |
 | File Storage         | Cloudinary                     |
+| Email Delivery       | Resend                         |
 | API Documentation    | Swagger / `@nestjs/swagger`    |
 | Logging              | Winston                        |
 | Rate Limiting        | `@nestjs/throttler`            |
@@ -530,6 +531,20 @@ Cloudinary credentials must be provided through environment variables and must n
 
 ---
 
+# 17.1 Email Delivery
+
+## Resend
+
+Resend is used for transactional email delivery.
+
+Current scope includes:
+
+* account verification emails.
+
+Resend credentials must be provided through environment variables and must never be committed to the repository.
+
+---
+
 # 18. File Upload Handling
 
 ## Multer
@@ -731,6 +746,8 @@ JWT_EXPIRATION
 CLOUDINARY_NAME
 CLOUDINARY_API_KEY
 CLOUDINARY_API_SECRET
+RESEND_API_KEY
+MAIL_FROM
 ```
 
 The exact environment variable names may be adjusted only through an explicit project decision.

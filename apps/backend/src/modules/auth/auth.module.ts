@@ -4,6 +4,7 @@ import type { JwtSignOptions } from '@nestjs/jwt'
 import { PassportModule } from '@nestjs/passport'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { getJwtConfig } from '../../config/jwt.config'
+import { EmailModule } from '../email/email.module'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
 import { User } from './entities/user.entity'
@@ -14,6 +15,7 @@ import { JwtStrategy } from './strategies/jwt.strategy'
   imports: [
     TypeOrmModule.forFeature([User]),
     PassportModule,
+    EmailModule,
     JwtModule.registerAsync({
       global: true,
       useFactory: () => {
