@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import type { ReactNode } from 'react'
 import { I18nProvider } from '../components/Providers/I18nProvider'
 import { QueryProvider } from '../components/Providers/QueryProvider'
+import { SocketProvider } from '../components/Providers/SocketProvider'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -17,7 +18,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" dir="ltr">
       <body>
         <I18nProvider>
-          <QueryProvider>{children}</QueryProvider>
+          {/* QueryProvider must wrap SocketProvider: the socket writes incoming
+              messages into the query cache and calls useQueryClient(). The
+              socket still sits above the router, so one connection spans every
+              authenticated page — see SocketProvider for why it is session-scoped. */}
+          <QueryProvider>
+            <SocketProvider>{children}</SocketProvider>
+          </QueryProvider>
         </I18nProvider>
       </body>
     </html>

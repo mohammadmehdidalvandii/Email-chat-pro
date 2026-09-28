@@ -1,0 +1,13 @@
+{
+  "greeting": "Welcome back, {{name}}",
+  "greetingGeneric": "Welcome back",
+  "subtitle": "Pick up a conversation or find someone new.",
+  "statConversations": "Conversations",
+  "statContacts": "Contacts",
+  "statPending": "Pending requests",
+  "profileIncomplete": "Your profile isn't complete yet — add a username so people can find you.",
+  "completeProfile": "Complete profile",
+  "recentConversations": "Recent conversations",
+  "noRecentConversations": "No conversations yet. Find a user to get started.",
+  "findUsers": "Find users"
+}

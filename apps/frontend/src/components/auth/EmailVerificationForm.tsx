@@ -5,9 +5,11 @@
  * (current-task.md §Phase 1 — Components Required).
  *
  * Submits the 64-character hex token to POST /auth/verify-email. On success it
- * routes the user to login. Field-level validation enforces the token shape
- * (length + hex) using the shared VERIFICATION_TOKEN_LENGTH constant; the
- * backend remains authoritative for token validity.
+ * confirms the address is verified and offers the next step (login) rather
+ * than redirecting instantly, so the user sees what happened. Field-level
+ * validation enforces the token shape (length + hex) using the shared
+ * VERIFICATION_TOKEN_LENGTH constant; the backend remains authoritative for
+ * token validity.
  */
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useRouter } from 'next/navigation'
@@ -45,13 +47,23 @@ export function EmailVerificationForm() {
     try {
       await mutation.mutateAsync({ token: values.token })
       setSuccess(true)
-      router.push('/login')
     } catch (error) {
       setSubmitError(authErrorMessage(toApiRequestError(error)))
     }
   })
 
   const loading = isSubmitting || mutation.isPending
+
+  if (success) {
+    return (
+      <div className="flex flex-col gap-3" role="status" aria-live="polite">
+        <p className="text-sm text-green-700">{t('verifySuccess')}</p>
+        <Button type="button" className="mt-2 w-full" onClick={() => router.push('/login')}>
+          {t('goToLogin')}
+        </Button>
+      </div>
+    )
+  }
 
   return (
     <form onSubmit={onSubmit} className="flex flex-col gap-4" noValidate>
@@ -64,11 +76,6 @@ export function EmailVerificationForm() {
         error={errors.token}
       />
 
-      {success && (
-        <p className="text-sm text-green-600" dir="auto" role="status">
-          {t('verifySuccess')}
-        </p>
-      )}
       {submitError && (
         <p className="text-sm text-red-600" dir="auto" role="alert">
           {submitError}

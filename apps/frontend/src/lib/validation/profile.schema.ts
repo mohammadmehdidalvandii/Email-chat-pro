@@ -2,42 +2,48 @@
  * Profile validation schemas (rules.md §Validation — Zod).
  *
  * All fields are optional so a partial update is allowed; individual fields
- * are validated only when provided. Rules mirror the shared constants in
- * `@email-chat-pro/constants` (validation.constants.ts) — the same source
- * the backend DTOs reference — so client-side feedback and server-side
+ * are validated only when provided. Rules and lengths mirror the shared
+ * constants in `@email-chat-pro/constants` (validation.constants.ts) — the same
+ * source the backend DTOs reference — so client-side feedback and server-side
  * validation stay aligned. Backend validation remains authoritative.
+ *
+ * As in the auth schemas, messages are `validation:` keys translated at render
+ * time by {@link validationMessage} rather than English literals.
  */
 import {
   BIO_MAX_LENGTH,
-  ERROR_MESSAGES,
   FULL_NAME_MAX_LENGTH,
   USERNAME_MAX_LENGTH,
   USERNAME_MIN_LENGTH,
   USERNAME_REGEX,
 } from '@email-chat-pro/constants'
 import { z } from 'zod'
+import { validationMessage } from '../../i18n/validation'
+
+/** Builds a Zod message that is a `validation` namespace key. */
+const msg = (key: string) => ({ message: `validation:${key}` })
 
 /** Username field — validated when provided. */
 const usernameField = z
   .string()
-  .min(1, ERROR_MESSAGES.USERNAME_REQUIRED)
-  .min(USERNAME_MIN_LENGTH, ERROR_MESSAGES.USERNAME_TOO_SHORT)
-  .max(USERNAME_MAX_LENGTH, ERROR_MESSAGES.USERNAME_TOO_LONG)
-  .regex(USERNAME_REGEX, ERROR_MESSAGES.USERNAME_INVALID)
+  .min(1, msg('usernameRequired').message)
+  .min(USERNAME_MIN_LENGTH, msg('usernameTooShort').message)
+  .max(USERNAME_MAX_LENGTH, msg('usernameTooLong').message)
+  .regex(USERNAME_REGEX, msg('usernameInvalid').message)
   .optional()
   .transform((val) => (val === undefined || val === '' ? undefined : val))
 
 /** Full name field — validated when provided. */
 const fullNameField = z
   .string()
-  .max(FULL_NAME_MAX_LENGTH, ERROR_MESSAGES.FULL_NAME_TOO_LONG)
+  .max(FULL_NAME_MAX_LENGTH, msg('fullNameTooLong').message)
   .optional()
   .transform((val) => (val === '' ? undefined : val))
 
 /** Bio field — validated when provided. */
 const bioField = z
   .string()
-  .max(BIO_MAX_LENGTH, ERROR_MESSAGES.BIO_TOO_LONG)
+  .max(BIO_MAX_LENGTH, msg('bioTooLong').message)
   .optional()
   .transform((val) => (val === '' ? undefined : val))
 

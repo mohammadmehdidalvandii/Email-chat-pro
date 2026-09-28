@@ -1,0 +1,17 @@
+{
+  "confirmPasswordRequired": "Please confirm your password",
+  "passwordsDoNotMatch": "Passwords do not match",
+  "emailRequired": "Email is required",
+  "emailInvalid": "Please enter a valid email address",
+  "emailTooLong": "That email address is too long",
+  "passwordRequired": "Password is required",
+  "passwordWeak": "Use 8+ characters with an uppercase letter, a lowercase letter, a digit, and a special character",
+  "tokenRequired": "Verification token is required",
+  "tokenInvalid": "The token must be 64 hexadecimal characters",
+  "usernameRequired": "Username is required",
+  "usernameTooShort": "Username must be at least 3 characters",
+  "usernameTooLong": "Username must be no more than 30 characters",
+  "usernameInvalid": "Use only letters, numbers, underscores, and hyphens",
+  "fullNameTooLong": "Full name must be no more than 100 characters",
+  "bioTooLong": "Bio must be no more than 500 characters"
+}

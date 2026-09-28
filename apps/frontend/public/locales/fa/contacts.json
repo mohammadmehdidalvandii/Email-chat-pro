@@ -1,1 +1,34 @@
-{"searchPlaceholder":"جستجوی کاربران","sendRequest":"ارسال درخواست","noResults":"نتیجه‌ای یافت نشد","incomingRequests":"درخواست‌های دریافتی","noIncoming":"درخواست دریافتی وجود ندارد","acceptedContacts":"تماس‌های پذیرفته شده","noContacts":"تماس پذیرفته شده وجود ندارد","accept":"پذیرش","decline":"رد"}
+{
+  "title": "تماس‌ها",
+  "searchPlaceholder": "جستجو با نام کاربری یا ایمیل",
+  "search": "جستجو",
+  "searching": "در حال جستجو...",
+  "searchPrompt": "برای یافتن کاربران، نام کاربری یا ایمیل را وارد کنید.",
+  "noResults": "کاربری با جستجوی شما مطابقت نداشت.",
+  "searchFailed": "جستجو انجام نشد. لطفاً دوباره تلاش کنید.",
+  "sendRequest": "ارسال درخواست",
+  "requestSent": "درخواست ارسال شد",
+  "requestPending": "درخواست در انتظار",
+  "openChat": "باز کردن گفتگو",
+  "alreadyContact": "تماس",
+  "incomingRequests": "درخواست‌های دریافتی",
+  "noIncoming": "درخواست دریافتی وجود ندارد",
+  "accept": "پذیرش",
+  "decline": "رد",
+  "acceptedContacts": "تماس‌های پذیرفته شده",
+  "noContacts": "تماس پذیرفته شده وجود ندارد",
+  "loadError": "بارگذاری تماس‌ها انجام نشد. لطفاً دوباره تلاش کنید.",
+  "actionFailed": "این اقدام انجام نشد. لطفاً دوباره تلاش کنید.",
+  "bio": "بیوگرافی",
+  "status": {
+    "label": "وضعیت",
+    "pending": "در انتظار",
+    "accepted": "پذیرفته شده",
+    "declined": "رد شده"
+  },
+  "presence": {
+    "online": "آنلاین",
+    "offline": "آفلاین",
+    "lastSeen": "آخرین بازدید {{time}}"
+  }
+}

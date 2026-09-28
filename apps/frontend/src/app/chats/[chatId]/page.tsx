@@ -1,5 +1,6 @@
 'use client'
 import { RequireAuth } from '../../../components/auth/RequireAuth'
+import { AppShell } from '../../../components/Layout/AppShell'
 import { ChatWindow } from '../../../components/chats/ChatWindow'
 import { useParams } from 'next/navigation'
 
@@ -9,9 +10,9 @@ export default function ChatPage() {
 
   return (
     <RequireAuth>
-      <main className="flex min-h-screen flex-col bg-neutral-100">
+      <AppShell>
         <ChatWindow chatId={chatId} />
-      </main>
+      </AppShell>
     </RequireAuth>
   )
 }

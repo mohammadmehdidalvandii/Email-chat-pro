@@ -3534,3 +3534,84 @@ Never record unauthorized work as completed.
 - TanStack Query used for all server state.
 - Locale files added.
 - All build, lint, and type-check steps passed.
+
+---
+
+# Frontend — App Shell and Session-Scoped WebSocket
+
+**Status:** Completed with Known Issues
+**Date:** 2026-09-28
+**Authorized by:** user confirmation on 2026-09-28 (the change set predates this
+entry and was not described by any `current-task.md`; the user explicitly
+authorized recording and committing it).
+
+**What was implemented:**
+
+*Architecture (architectural change — see note below):*
+- Socket ownership moved from a per-chat `useChatSocket` hook to a session-scoped
+  `SocketProvider` mounted in the root layout. Previously each `activeChatId`
+  opened and closed its own Socket.IO connection; now one connection is opened
+  per authenticated session and spans every page.
+- `SocketProvider` is nested **inside** `QueryProvider` in `apps/frontend/src/app/layout.tsx`
+  because the provider writes incoming `message:received` payloads into the
+  TanStack Query cache and calls `useQueryClient()`.
+- `useChatSocket(activeChatId)` was reduced to room membership only: it emits
+  `chat:join` when the active chat changes and `chat:leave` on unmount. Presence
+  is therefore no longer disturbed by navigating between conversations.
+- `socket.io-client@^4.8.4` added to `apps/frontend/package.json`.
+
+*Layout:*
+- New `AppShell` (`apps/frontend/src/components/Layout/AppShell.tsx`) — shared
+  authenticated chrome with nav (Dashboard, Chats, Contacts, User search,
+  Profile, Logout) and a responsive mobile drawer that closes on navigation.
+- Protected pages (`/dashboard`, `/chats`, `/chats/[chatId]`, `/contacts`,
+  `/search`, `/settings/profile`) render inside the shell.
+
+*Components:*
+- New shared `apps/frontend/src/components/common/`: `UserAvatar.tsx`,
+  `PresenceIndicator.tsx`.
+- New `apps/frontend/src/components/chats/ChatHeader.tsx`.
+- Restyled: auth forms, chat window/conversation list/message input/message
+  list/message item, contact and search components, profile form.
+
+*Internationalization:*
+- New namespaces `dashboard.json` and `validation.json` in `public/locales/en`
+  and `public/locales/fa`.
+- New `apps/frontend/src/i18n/validation.ts` for validation-message lookup.
+
+**Verification:**
+- `npm run type-check` (all workspaces) → PASS
+- `npm run lint` (all workspaces) → PASS — 0 errors, 4 warnings (see Known Issues)
+- `npm run build` (all workspaces) → PASS — 12 frontend routes generated; the
+  frontend build now runs ESLint as part of `next build` (it previously
+  silently skipped it)
+
+**Known issues:**
+- 4 ESLint warnings, no errors: unused `eslint-disable` directive in
+  `SocketProvider.tsx:113`, unused `_ignoredChatId` in `chats.api.ts:58`, and
+  unused `validationMessage` bindings in `auth.schema.ts:24` and
+  `profile.schema.ts:21`. Not fixed — outside the scope of this entry.
+- Live/manual workflow verification (the `current-task.md` manual checklist)
+  was not performed; the PostgreSQL 5432 port conflict recorded in earlier tasks
+  still blocks a running backend.
+
+**Environment note (not a code change):**
+`npm run lint` and the ESLint step of `next build` initially failed because
+`eslint` was declared in the frontend and backend manifests but absent from
+`node_modules`. Cause: `NODE_ENV=production` is set in the shell, which makes
+npm omit dev dependencies. Resolved by running
+`NODE_ENV=development npm install --include=dev`. No manifest was changed by
+this; the only dependency delta in this commit is `socket.io-client`. The
+`NODE_ENV=production` shell value is an environment-level issue — it must be
+unset to run lint, tests, or builds in this shell.
+
+**Architecture-change note (requires follow-up):**
+Moving socket ownership to a session-scoped provider changes the WebSocket
+boundary described in `architecture.md` (which documents a per-chat connection
+model) and is not reflected in that document. `architecture.md` and `stack.md`
+should be reconciled with the implemented behavior in a future authorized task.
+
+**Scope compliance:**
+No backend changes. No database changes. No new infrastructure. No Phase 6
+features. No changes to messaging authorization, persistence, or validation
+semantics — this entry is frontend-only.

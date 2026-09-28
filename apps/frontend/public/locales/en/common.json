@@ -4,5 +4,22 @@
   "foundationReady": "Project foundation is ready.",
   "apiLabel": "API",
   "language": "Language",
-  "loading": "Loading..."
+  "loading": "Loading...",
+  "retry": "Try again",
+  "nav": {
+    "dashboard": "Dashboard",
+    "chats": "Chats",
+    "contacts": "Contacts",
+    "search": "Search users",
+    "profile": "Profile",
+    "logout": "Log out",
+    "openMenu": "Open navigation menu",
+    "closeMenu": "Close navigation menu"
+  },
+  "state": {
+    "error": "Something went wrong. Please try again.",
+    "empty": "Nothing here yet."
+  },
+  "redirecting": "Taking you to your workspace...",
+  "sessionRestored": "Session restored — redirecting..."
 }

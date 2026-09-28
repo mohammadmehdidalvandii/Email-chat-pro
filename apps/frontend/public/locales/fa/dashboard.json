@@ -1,0 +1,13 @@
+{
+  "greeting": "خوش برگشتید، {{name}}",
+  "greetingGeneric": "خوش برگشتید",
+  "subtitle": "گفتگویی را ادامه دهید یا کاربر تازه‌ای بیابید.",
+  "statConversations": "گفتگوها",
+  "statContacts": "تماس‌ها",
+  "statPending": "درخواست‌های در انتظار",
+  "profileIncomplete": "پروفایل شما کامل نیست — برای اینکه دیگران شما را پیدا کنند، نام کاربری اضافه کنید.",
+  "completeProfile": "تکمیل پروفایل",
+  "recentConversations": "گفتگوهای اخیر",
+  "noRecentConversations": "هنوز گفتگویی ندارید. برای شروع کاربری را پیدا کنید.",
+  "findUsers": "یافتن کاربران"
+}

@@ -1,13 +1,15 @@
 /**
- * FormField — shared label + input + error row for the auth forms.
+ * FormField — shared label + input + error row for the auth and profile forms.
  *
- * Keeps the register/login/verify-email forms DRY and visually consistent.
- * Wires React Hook Form's `register` result through, surfacing the field-level
- * error message inline. Error text is localized by the caller via the
- * translation keys passed in.
+ * Keeps the register/login/verify-email/profile forms DRY and visually
+ * consistent. Wires React Hook Form's `register` result through, surfacing the
+ * field-level error message inline. Schemas emit `validation:` keys as the
+ * message, so the text is resolved through {@link validationMessage} here and
+ * re-resolves when the active language changes.
  */
 import type { ReactNode } from 'react'
 import type { FieldError, UseFormRegisterReturn } from 'react-hook-form'
+import { validationMessage } from '../../i18n/validation'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 
@@ -47,7 +49,7 @@ export function FormField({
       />
       {error ? (
         <p className="text-sm text-red-600" dir="auto" role="alert">
-          {error.message}
+          {validationMessage(error.message)}
         </p>
       ) : (
         hint && <p className="text-sm text-neutral-500">{hint}</p>
