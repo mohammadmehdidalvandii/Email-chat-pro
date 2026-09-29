@@ -53,6 +53,18 @@ function element(idBytes: readonly number[], data: Buffer): Buffer {
   return Buffer.concat([Buffer.from(idBytes), vintSize(data.length), data])
 }
 
+/**
+ * Builds an element whose size VINT declares `declaredSize` regardless of how
+ * many payload bytes are actually appended — the shape a truncated file has.
+ */
+function elementWithDeclaredSize(
+  idBytes: readonly number[],
+  declaredSize: number,
+  data: Buffer,
+): Buffer {
+  return Buffer.concat([Buffer.from(idBytes), Buffer.from([0x80 | declaredSize]), data])
+}
+
 function uint32be(value: number): Buffer {
   const buf = Buffer.alloc(4)
   buf.writeUInt32BE(value, 0)
@@ -193,6 +205,43 @@ describe('video-file', () => {
     it('inspectVideoBuffer returns format and duration for a valid buffer', () => {
       const buf = buildWebm(300, 1_000_000)
       expect(inspectVideoBuffer(buf)).toEqual({ format: 'webm', durationSeconds: 300 })
+    })
+
+    // Regression (P0-3): a truncated WebM whose Info declares an 8-byte
+    // Duration that is not actually present used to make readInfoDuration call
+    // buffer.readDoubleBE past the end, throwing a RangeError that escaped
+    // uploadVideo as a 500 instead of a VIDEO_DURATION_INVALID 400.
+    it('readVideoDuration returns null (not RangeError) for a truncated Duration payload', () => {
+      const docType = element(ELEM_DOC_TYPE, Buffer.from('webm', 'latin1'))
+      const ebmlHeader = Buffer.concat([
+        Buffer.from([0x1a, 0x45, 0xdf, 0xa3]),
+        vintSize(docType.length),
+        docType,
+      ])
+      const duration = elementWithDeclaredSize(ELEM_DURATION, 8, Buffer.alloc(0))
+      const segment = element(ELEM_SEGMENT, element(ELEM_INFO, duration))
+      const truncated = Buffer.concat([ebmlHeader, segment])
+
+      expect(detectVideoFormat(truncated)).toBe('webm')
+      expect(() => readVideoDuration(truncated, 'webm')).not.toThrow()
+      expect(readVideoDuration(truncated, 'webm')).toBeNull()
+      expect(inspectVideoBuffer(truncated)).toBeNull()
+    })
+
+    it('readVideoDuration returns null (not RangeError) for a truncated TimecodeScale payload', () => {
+      const docType = element(ELEM_DOC_TYPE, Buffer.from('webm', 'latin1'))
+      const ebmlHeader = Buffer.concat([
+        Buffer.from([0x1a, 0x45, 0xdf, 0xa3]),
+        vintSize(docType.length),
+        docType,
+      ])
+      // Declares 8 bytes, supplies 1 → readBigUInt64BE would read past the end.
+      const scale = elementWithDeclaredSize(ELEM_TIMECODE_SCALE, 8, Buffer.from([0x0f]))
+      const segment = element(ELEM_SEGMENT, element(ELEM_INFO, scale))
+      const truncated = Buffer.concat([ebmlHeader, segment])
+
+      expect(() => readVideoDuration(truncated, 'webm')).not.toThrow()
+      expect(readVideoDuration(truncated, 'webm')).toBeNull()
     })
   })
 

@@ -1,4 +1,4 @@
-import { HttpStatus } from '@nestjs/common'
+import { HttpException, HttpStatus } from '@nestjs/common'
 import { ThrottlerException } from '@nestjs/throttler'
 import { ERROR_CODES, ERROR_MESSAGES } from '@email-chat-pro/constants'
 import { logger } from '../../config/logger.config'

@@ -320,6 +320,14 @@ function readInfoDuration(buffer: Buffer, start: number, end: number): number | 
   while (offset + 2 <= end && offset + 2 <= buffer.length) {
     const element = readEbmlElement(buffer, offset)
     if (!element) return null
+    // An element's declared size VINT is not clamped to the buffer, so a
+    // truncated file can declare a TimecodeScale/Duration payload that runs
+    // past the last byte. readEbmlElement has already proved only the header
+    // is in range; the payload is not guaranteed to be. Reject such an element
+    // before the numeric reads below, which would otherwise throw a RangeError
+    // that escapes as a 500 instead of a validation error.
+    const dataEnd = element.dataStart + element.dataLength
+    if (dataEnd > buffer.length) return null
     if (elementIdEquals(element.idBytes, ELEM_TIMECODE_SCALE) && element.dataLength >= 1) {
       if (element.dataLength <= 4) {
         timecodeScale = buffer.readUIntBE(element.dataStart, element.dataLength)

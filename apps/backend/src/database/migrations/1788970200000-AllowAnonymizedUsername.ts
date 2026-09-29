@@ -46,6 +46,32 @@ export class AllowAnonymizedUsername1788970200000 implements MigrationInterface 
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
+    // Rollback safety: this migration widened `username` to varchar(64) and
+    // relaxed the CHECK constraints specifically to admit the reserved
+    // `deleted#<uuid>` form (44 chars) that account deletion writes. Restoring
+    // the pre-migration varchar(30) / 3-30-length state is impossible while
+    // such a row exists — the ADD CONSTRAINT and the ALTER TYPE both fail with
+    // "check constraint ... is violated by some row".
+    //
+    // This down() must never modify data, so it does not clear or rewrite the
+    // offending usernames. Instead it refuses to proceed and tells the operator
+    // exactly what to resolve, leaving the schema and the data untouched. The
+    // guard runs before any DDL, so a failed rollback is a no-op.
+    const offenders = await queryRunner.query(
+      `SELECT count(*)::int AS "count" FROM "users"
+       WHERE "username" ~ '^deleted#[0-9a-f-]{36}$'`,
+    )
+    const anonymizedCount = Number(offenders[0]?.count ?? 0)
+    if (anonymizedCount > 0) {
+      throw new Error(
+        `Cannot revert AllowAnonymizedUsername: ${anonymizedCount} user(s) have an ` +
+          `anonymized username matching ^deleted#[0-9a-f-]{36}$ (44 chars), which exceeds ` +
+          `the pre-migration varchar(30) limit. This migration does not modify data, so ` +
+          `resolve these rows manually first — clear the username of the affected ` +
+          `soft-deleted accounts (e.g. UPDATE "users" SET "username" = NULL WHERE ` +
+          `"username" ~ '^deleted#[0-9a-f-]{36}$';) — then re-run the revert.`,
+      )
+    }
     await queryRunner.query(`ALTER TABLE "users" DROP CONSTRAINT "chk_users_username_format"`)
     await queryRunner.query(`ALTER TABLE "users" DROP CONSTRAINT "chk_users_username_length"`)
     await queryRunner.query(
