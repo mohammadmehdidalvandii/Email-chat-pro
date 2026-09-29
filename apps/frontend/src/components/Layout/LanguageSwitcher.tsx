@@ -1,6 +1,7 @@
 'use client'
 
 import { useTranslation } from 'react-i18next'
+import { ChevronDown } from 'lucide-react'
 import { LOCALE_META, SUPPORTED_LOCALES, type Locale } from '../../config/i18n.config'
 
 /**
@@ -13,21 +14,29 @@ export function LanguageSwitcher() {
   const current = (i18n.resolvedLanguage ?? i18n.language ?? 'en') as string as Locale
 
   return (
-    <label className="flex items-center gap-2 text-sm text-neutral-400">
-      <span>{t('language')}</span>
-      <select
-        value={current}
-        onChange={(event) => {
-          void i18n.changeLanguage(event.target.value)
-        }}
-        className="rounded bg-neutral-800 px-2 py-1 text-neutral-200"
-      >
-        {SUPPORTED_LOCALES.map((code) => (
-          <option key={code} value={code}>
-            {LOCALE_META[code].label}
-          </option>
-        ))}
-      </select>
+    // Mirrors the SidebarItem control language: rounded-md, the same offset
+    // focus ring, and muted neutral text. The switch logic below is untouched.
+    <label className="block space-y-1.5">
+      <span className="block text-xs font-medium text-neutral-500">{t('language')}</span>
+      <span className="relative block">
+        <select
+          value={current}
+          onChange={(event) => {
+            void i18n.changeLanguage(event.target.value)
+          }}
+          className="w-full appearance-none rounded-md border-0 bg-neutral-100 py-2 ps-3 pe-8 text-sm font-medium text-neutral-900 transition-colors hover:bg-neutral-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
+        >
+          {SUPPORTED_LOCALES.map((code) => (
+            <option key={code} value={code}>
+              {LOCALE_META[code].label}
+            </option>
+          ))}
+        </select>
+        <ChevronDown
+          className="pointer-events-none absolute end-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-500"
+          aria-hidden
+        />
+      </span>
     </label>
   )
 }
