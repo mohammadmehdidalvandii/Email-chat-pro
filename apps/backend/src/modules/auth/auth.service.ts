@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   ConflictException,
+  HttpException,
   Injectable,
   InternalServerErrorException,
   UnauthorizedException,
@@ -20,11 +21,13 @@ import type {
   LoginResponse,
   LogoutResponse,
   RegisterResponse,
+  ResendVerificationResponse,
   User as SharedUser,
   VerifyEmailResponse,
 } from '@email-chat-pro/types'
 import { LoginDto } from './dto/login.dto'
 import { RegisterDto } from './dto/register.dto'
+import { ResendVerificationDto } from './dto/resend-verification.dto'
 import { VerifyEmailDto } from './dto/verify-email.dto'
 import { User } from './entities/user.entity'
 import type { JwtPayload } from './strategies/jwt.strategy'
@@ -91,12 +94,7 @@ export class AuthService {
 
     try {
       const saved = await this.usersRepository.save(user)
-      await this.emailService.sendVerificationEmail(email, verificationToken)
-      return {
-        id: saved.id,
-        email: saved.email,
-        message: 'Registration successful',
-      }
+      return await this.deliverVerificationEmail(saved, verificationToken)
     } catch (error) {
       if (this.isUniqueViolation(error)) {
         throw new ConflictException({
@@ -104,9 +102,48 @@ export class AuthService {
           message: ERROR_MESSAGES.EMAIL_ALREADY_REGISTERED,
         })
       }
+      if (error instanceof HttpException) {
+        throw error
+      }
       throw new InternalServerErrorException({
         code: ERROR_CODES.INTERNAL_ERROR,
         message: ERROR_MESSAGES.INTERNAL,
+      })
+    }
+  }
+
+  /**
+   * Sends the verification email for `user` and returns the registration result.
+   * Delivery failures are handled by {@link sendVerificationEmail}.
+   */
+  private async deliverVerificationEmail(user: User, token: string): Promise<RegisterResponse> {
+    await this.sendVerificationEmail(user, token)
+    return { id: user.id, email: user.email, message: 'Registration successful' }
+  }
+
+  /**
+   * Sends the verification email, clearing the stored token on failure.
+   *
+   * On a delivery error the stored token hash and expiry are nulled and the user
+   * is persisted before the error propagates. Without this the account would
+   * keep a verification token the user never received, leaving no way to
+   * complete verification: the only recovery would be to register again into a
+   * 409 conflict. The account itself is always kept — it is unverified, has no
+   * valid token, and POST /auth/resend-verification restores it.
+   *
+   * Throws a 500 carrying a fixed, non-enumerating message: never the provider
+   * error, the address, or the token.
+   */
+  private async sendVerificationEmail(user: User, token: string): Promise<void> {
+    try {
+      await this.emailService.sendVerificationEmail(user.email, token)
+    } catch {
+      user.verificationTokenHash = null
+      user.verificationTokenExpiresAt = null
+      await this.usersRepository.save(user)
+      throw new InternalServerErrorException({
+        code: ERROR_CODES.INTERNAL_ERROR,
+        message: ERROR_MESSAGES.EMAIL_SEND_FAILED,
       })
     }
   }
@@ -164,6 +201,40 @@ export class AuthService {
     await this.usersRepository.save(user)
 
     return { message: 'Email verified successfully' }
+  }
+
+  /**
+   * Issues a fresh verification token and re-sends the verification email
+   * (features.md §Email Verification — "Users can request another verification
+   * email").
+   *
+   * Account enumeration is deliberately avoided: an unknown address, a
+   * soft-deleted or inactive account, and an already-verified account all
+   * return the *same* 200 payload as a genuine resend, and none of them touch
+   * the token or the mail transport. This mirrors the single-generic-401 rule
+   * {@link login} already follows.
+   *
+   * A genuine resend rotates the stored token hash and expiry before sending, so
+   * a previously issued but un-used token stops working. If delivery then fails
+   * the rotated token is cleared, leaving the account recoverable by resending
+   * again rather than holding a token whose mail was never delivered.
+   */
+  async resendVerification(dto: ResendVerificationDto): Promise<ResendVerificationResponse> {
+    const email = dto.email.toLowerCase()
+    const generic = { message: ERROR_MESSAGES.RESEND_VERIFICATION_SENT }
+
+    const user = await this.usersRepository.findOne({ where: { email } })
+    if (!user || user.deletedAt !== null || !user.isActive || user.isVerified) {
+      return generic
+    }
+
+    const verificationToken = this.generateVerificationToken()
+    user.verificationTokenHash = this.hashVerificationToken(verificationToken)
+    user.verificationTokenExpiresAt = this.getVerificationTokenExpiry()
+    await this.usersRepository.save(user)
+
+    await this.sendVerificationEmail(user, verificationToken)
+    return generic
   }
 
   /**

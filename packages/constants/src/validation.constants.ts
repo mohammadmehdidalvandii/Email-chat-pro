@@ -77,6 +77,29 @@ export const MESSAGE_CONTENT_MIN_LENGTH = 1
 export const MESSAGE_CONTENT_MAX_LENGTH = 5000
 
 // ---------------------------------------------------------------------------
+// Task 2.2 — Message history pagination (architecture.md §API Endpoints —
+// GET /chats/:chatId/messages)
+// ---------------------------------------------------------------------------
+
+/** Default page for GET /chats/:chatId/messages when none is supplied. */
+export const MESSAGE_PAGE_DEFAULT = 1
+
+/** Pages are 1-indexed; 0 and negatives are rejected. */
+export const MESSAGE_PAGE_MIN = 1
+
+/** Default page size for GET /chats/:chatId/messages when none is supplied. */
+export const MESSAGE_LIMIT_DEFAULT = 50
+
+/** A page must contain at least one message. */
+export const MESSAGE_LIMIT_MIN = 1
+
+/**
+ * Maximum page size for GET /chats/:chatId/messages. A client cannot request
+ * an unbounded number of rows in a single call.
+ */
+export const MESSAGE_LIMIT_MAX = 100
+
+// ---------------------------------------------------------------------------
 // Task 3.1 — User search limits (architecture.md §API Endpoints — GET
 // /users/search: "limit: default 10, max 50")
 // ---------------------------------------------------------------------------
@@ -86,6 +109,19 @@ export const SEARCH_LIMIT_DEFAULT = 10
 
 /** Maximum result count for GET /users/search (results are capped at this). */
 export const SEARCH_LIMIT_MAX = 50
+
+/**
+ * Minimum `q` length for GET /users/search, counted after trimming.
+ * A query that is empty (or whitespace only) is rejected rather than
+ * turned into a full-table LIKE scan.
+ */
+export const SEARCH_QUERY_MIN_LENGTH = 1
+
+/**
+ * Maximum `q` length for GET /users/search. Bounded so a hostile or accidental
+ * very long fragment cannot drive an expensive unbounded-pattern scan.
+ */
+export const SEARCH_QUERY_MAX_LENGTH = 100
 
 // ---------------------------------------------------------------------------
 // Task 3.2 — Contact request validation (architecture.md §Contact Request

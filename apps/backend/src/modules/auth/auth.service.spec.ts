@@ -1,4 +1,4 @@
-import { ConflictException, UnauthorizedException } from '@nestjs/common'
+import { ConflictException, HttpException, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { createHash } from 'node:crypto'
 import { Test } from '@nestjs/testing'
@@ -12,6 +12,7 @@ import {
 } from '@email-chat-pro/constants'
 import { AuthService } from './auth.service'
 import { RegisterDto } from './dto/register.dto'
+import { ResendVerificationDto } from './dto/resend-verification.dto'
 import { User } from './entities/user.entity'
 import { EmailService } from '../email/email.service'
 
@@ -399,6 +400,187 @@ describe('AuthService', () => {
       const result = await service.logout()
 
       expect(result).toEqual({ message: ERROR_MESSAGES.LOGGED_OUT })
+    })
+  })
+
+  describe('resendVerification', () => {
+    const dto: ResendVerificationDto = { email: 'User@Example.com' }
+    const generic = { message: ERROR_MESSAGES.RESEND_VERIFICATION_SENT }
+
+    /** An unverified, active, non-deleted account awaiting verification. */
+    const pendingUser = (): Partial<User> => ({
+      id: 'uuid-1',
+      email: 'user@example.com',
+      isVerified: false,
+      isActive: true,
+      deletedAt: null,
+      verificationTokenHash: null,
+      verificationTokenExpiresAt: null,
+    })
+
+    it('lowercases the address before looking the account up', async () => {
+      repository.findOne.mockResolvedValue(null)
+
+      await service.resendVerification(dto)
+
+      expect(repository.findOne).toHaveBeenCalledWith({ where: { email: 'user@example.com' } })
+    })
+
+    it('rotates the stored token and sends the plaintext token by email', async () => {
+      const user = pendingUser()
+      repository.findOne.mockResolvedValue(user)
+      repository.save.mockImplementation((input: Partial<User>) => Promise.resolve(input))
+
+      const result = await service.resendVerification(dto)
+
+      expect(result).toEqual(generic)
+      expect(emailService.sendVerificationEmail).toHaveBeenCalledTimes(1)
+      const [recipient, token] = emailService.sendVerificationEmail.mock.calls[0]
+      expect(recipient).toBe('user@example.com')
+      expect(token).toHaveLength(VERIFICATION_TOKEN_LENGTH)
+      // Only the hash is persisted; the plaintext is delivered by email.
+      expect(user.verificationTokenHash).toMatch(/^[a-f0-9]{64}$/)
+      expect(user.verificationTokenHash).not.toBe(token)
+      expect(createHash('sha256').update(token).digest('hex')).toBe(user.verificationTokenHash)
+    })
+
+    it('persists an expiry for the rotated token', async () => {
+      const user = pendingUser()
+      repository.findOne.mockResolvedValue(user)
+      repository.save.mockImplementation((input: Partial<User>) => Promise.resolve(input))
+
+      await service.resendVerification(dto)
+
+      const expiresAt = (user.verificationTokenExpiresAt as Date).getTime()
+      const expected = VERIFICATION_TOKEN_EXPIRATION_HOURS * 60 * 60 * 1000
+      expect(expiresAt - Date.now()).toBeGreaterThan(expected - 60 * 1000)
+      expect(expiresAt - Date.now()).toBeLessThanOrEqual(expected)
+    })
+
+    it('invalidates a previously issued token on a repeated resend', async () => {
+      const user: Partial<User> = { ...pendingUser(), verificationTokenHash: 'a'.repeat(64) }
+      repository.findOne.mockResolvedValue(user)
+      repository.save.mockImplementation((input: Partial<User>) => Promise.resolve(input))
+
+      await service.resendVerification(dto)
+
+      // The old hash is overwritten, so the earlier token can no longer verify.
+      expect(user.verificationTokenHash).not.toBe('a'.repeat(64))
+    })
+
+    // Account enumeration: every non-eligible case must be indistinguishable
+    // from a genuine resend, both in payload and in side effects.
+    const ineligible = (): [string, Partial<User> | null][] => [
+      ['an unknown address', null],
+      ['an already-verified account', { ...pendingUser(), isVerified: true }],
+      ['a soft-deleted account', { ...pendingUser(), deletedAt: new Date() }],
+      ['a deactivated account', { ...pendingUser(), isActive: false }],
+    ]
+
+    it.each(ineligible([]))('returns the generic response for %s', async (_label, user) => {
+      repository.findOne.mockResolvedValue(user)
+
+      const result = await service.resendVerification(dto)
+
+      expect(result).toEqual(generic)
+    })
+
+    it.each(ineligible([]))(
+      'performs no email send and no token write for %s',
+      async (_label, user) => {
+        repository.findOne.mockResolvedValue(user)
+
+        await service.resendVerification(dto)
+
+        expect(emailService.sendVerificationEmail).not.toHaveBeenCalled()
+        expect(repository.save).not.toHaveBeenCalled()
+      },
+    )
+
+    it('returns a byte-identical payload for eligible and ineligible accounts', async () => {
+      repository.findOne.mockResolvedValue(pendingUser())
+      repository.save.mockImplementation((input: Partial<User>) => Promise.resolve(input))
+      const eligible = await service.resendVerification(dto)
+
+      repository.findOne.mockResolvedValue(null)
+      const unknown = await service.resendVerification(dto)
+
+      expect(eligible).toEqual(unknown)
+    })
+
+    it('reports a delivery failure with the fixed message and no provider detail', async () => {
+      const user = pendingUser()
+      repository.findOne.mockResolvedValue(user)
+      repository.save.mockImplementation((input: Partial<User>) => Promise.resolve(input))
+      emailService.sendVerificationEmail.mockRejectedValue(
+        new Error('Resend API error: recipient rejected, smtp 550'),
+      )
+
+      await expect(service.resendVerification(dto)).rejects.toMatchObject({
+        status: 500,
+        response: {
+          code: ERROR_CODES.INTERNAL_ERROR,
+          message: ERROR_MESSAGES.EMAIL_SEND_FAILED,
+        },
+      })
+    })
+
+    it('clears the rotated token when delivery fails so the account stays recoverable', async () => {
+      const user = pendingUser()
+      repository.findOne.mockResolvedValue(user)
+      repository.save.mockImplementation((input: Partial<User>) => Promise.resolve(input))
+      emailService.sendVerificationEmail.mockRejectedValue(new Error('smtp 550'))
+
+      await expect(service.resendVerification(dto)).rejects.toBeInstanceOf(HttpException)
+
+      // Cleared and persisted: the user never received this token, so keeping it
+      // would strand the account with no valid token and a 409 on re-register.
+      expect(user.verificationTokenHash).toBeNull()
+      expect(user.verificationTokenExpiresAt).toBeNull()
+      expect(repository.save).toHaveBeenLastCalledWith(
+        expect.objectContaining({ verificationTokenHash: null, verificationTokenExpiresAt: null }),
+      )
+    })
+  })
+
+  describe('register — verification email delivery failure', () => {
+    const dto: RegisterDto = { email: 'user@example.com', password: 'SecurePass123!' }
+
+    beforeEach(() => {
+      repository.findOne.mockResolvedValue(null)
+      repository.create.mockImplementation((input: Partial<User>) => ({ ...input }))
+      repository.save.mockImplementation((input: Partial<User>) =>
+        Promise.resolve({ ...input, id: 'uuid-1' }),
+      )
+    })
+
+    it('clears the verification token and keeps the account', async () => {
+      emailService.sendVerificationEmail.mockRejectedValue(new Error('smtp 550'))
+
+      await expect(service.register(dto)).rejects.toMatchObject({
+        status: 500,
+        response: {
+          code: ERROR_CODES.INTERNAL_ERROR,
+          message: ERROR_MESSAGES.EMAIL_SEND_FAILED,
+        },
+      })
+
+      // The account survives (recoverable via resend) but holds no usable token.
+      const lastSaved = repository.save.mock.calls.at(-1)?.[0] as Partial<User>
+      expect(lastSaved.id).toBe('uuid-1')
+      expect(lastSaved.verificationTokenHash).toBeNull()
+      expect(lastSaved.verificationTokenExpiresAt).toBeNull()
+    })
+
+    it('never leaks the provider error or the address into the response', async () => {
+      emailService.sendVerificationEmail.mockRejectedValue(
+        new Error('Resend API error: user@example.com smtp 550 token=secret'),
+      )
+
+      const error = await service.register(dto).catch((e: unknown) => e)
+
+      expect(JSON.stringify((error as { response: unknown }).response)).not.toContain('550')
+      expect(JSON.stringify((error as { response: unknown }).response)).not.toContain('secret')
     })
   })
 })

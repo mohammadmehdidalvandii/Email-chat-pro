@@ -8,7 +8,13 @@ import {
   Optional,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { ERROR_CODES, ERROR_MESSAGES } from '@email-chat-pro/constants'
+import {
+  ERROR_CODES,
+  ERROR_MESSAGES,
+  MESSAGE_LIMIT_MAX,
+  MESSAGE_LIMIT_MIN,
+  MESSAGE_PAGE_MIN,
+} from '@email-chat-pro/constants'
 import type { Message as MessageContract } from '@email-chat-pro/types'
 import { isValidHttpUrl } from '@email-chat-pro/utils'
 import { Repository } from 'typeorm'
@@ -199,11 +205,14 @@ export class MessagesService {
       })
     }
 
+    const safePage = Math.max(Math.trunc(page), MESSAGE_PAGE_MIN)
+    const safeLimit = Math.min(Math.max(Math.trunc(limit), MESSAGE_LIMIT_MIN), MESSAGE_LIMIT_MAX)
+
     const [entities, total] = await this.messagesRepository.findAndCount({
       where: { chatId },
       order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
+      skip: (safePage - 1) * safeLimit,
+      take: safeLimit,
       relations: ['sender'],
     })
 

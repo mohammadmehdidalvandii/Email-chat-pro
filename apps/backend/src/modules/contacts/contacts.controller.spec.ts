@@ -1,4 +1,6 @@
 import { Test } from '@nestjs/testing'
+import { THROTTLER_LIMIT, THROTTLER_TTL } from '@nestjs/throttler/dist/throttler.constants'
+import { endpointThrottles } from '../../config/rate-limit.config'
 import { User } from '../auth/entities/user.entity'
 import { ContactsController } from './contacts.controller'
 import { ContactsService } from './contacts.service'
@@ -112,5 +114,28 @@ describe('ContactsController', () => {
     expect(result.success).toBe(true)
     expect(result.data).toEqual(contacts)
     expect(typeof result.timestamp).toBe('string')
+  })
+
+  // P1-5: contact requests previously had no per-endpoint limit.
+  describe('rate limiting', () => {
+    /** The values @Throttle wrote onto the route handler, keyed 'default'. */
+    const appliedThrottle = () => {
+      const handler = ContactsController.prototype.sendRequest
+      return {
+        limit: Reflect.getMetadata(`${THROTTLER_LIMIT}default`, handler),
+        ttl: Reflect.getMetadata(`${THROTTLER_TTL}default`, handler),
+      }
+    }
+
+    it('applies the configured contact-request limit to POST contacts/requests', () => {
+      expect(appliedThrottle()).toEqual(endpointThrottles.CONTACT_REQUEST.default)
+    })
+
+    it('bounds the endpoint with a real, non-empty limit', () => {
+      const { limit, ttl } = appliedThrottle()
+
+      expect(limit).toBeGreaterThan(0)
+      expect(ttl).toBeGreaterThan(0)
+    })
   })
 })

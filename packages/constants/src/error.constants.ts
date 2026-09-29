@@ -5,6 +5,7 @@
 import {
   IMAGE_MAX_SIZE_BYTES,
   MESSAGE_CONTENT_MAX_LENGTH,
+  SEARCH_QUERY_MAX_LENGTH,
   VIDEO_MAX_SIZE_BYTES,
   VIDEO_MAX_DURATION_SECONDS,
 } from './validation.constants'
@@ -39,6 +40,19 @@ export const ERROR_MESSAGES = {
     'Password must be 8-255 characters and include an uppercase letter, a lowercase letter, a digit, and a special character (!@#$%^&*)',
   VERIFICATION_TOKEN_REQUIRED: 'Verification token is required',
   VERIFICATION_TOKEN_INVALID: 'Verification token is invalid or expired',
+  /**
+   * Single response for POST /auth/resend-verification. The same message is
+   * returned for a resent mail, an already-verified account, an unknown address,
+   * and a soft-deleted account, so the endpoint cannot be used to discover which
+   * addresses are registered (mirrors login()'s single generic 401).
+   */
+  RESEND_VERIFICATION_SENT:
+    'If the account exists and is not yet verified, a verification email has been sent.',
+  /**
+   * Returned when a verification email could not be delivered. Deliberately
+   * fixed text: it never carries the provider error, the address, or the token.
+   */
+  EMAIL_SEND_FAILED: 'Failed to send the email. Please try again later.',
   INVALID_CREDENTIALS: 'Invalid email or password',
   EMAIL_NOT_VERIFIED: 'Email is not verified. Please verify your email before logging in.',
   LOGGED_OUT: 'Logged out',
@@ -53,6 +67,7 @@ export const ERROR_MESSAGES = {
   FULL_NAME_TOO_LONG: 'Full name must be no more than 100 characters',
   BIO_TOO_LONG: 'Bio must be no more than 500 characters',
   AVATAR_URL_TOO_LONG: 'Avatar URL must be no more than 500 characters',
+  AVATAR_URL_INVALID: 'Avatar URL must be a valid http(s) URL',
   // Task 1.5 — Account Deletion
   PASSWORD_INCORRECT: 'Password is incorrect',
   ACCOUNT_DELETED: 'Account deleted',
@@ -69,6 +84,7 @@ export const ERROR_MESSAGES = {
   WS_CHAT_UNAUTHORIZED: 'You are not a participant of this chat',
   // Task 3.1 — User Search
   SEARCH_QUERY_REQUIRED: 'Search query is required',
+  SEARCH_QUERY_TOO_LONG: `Search query must be no more than ${SEARCH_QUERY_MAX_LENGTH} characters`,
   // Task 3.2 — Contact Requests
   CONTACT_REQUEST_RECEIVER_NOT_FOUND: 'User not found',
   CONTACT_REQUEST_SELF_NOT_ALLOWED: 'You cannot send a contact request to yourself',

@@ -15,6 +15,7 @@ import type {
   LoginResponse,
   LogoutResponse,
   RegisterResponse,
+  ResendVerificationResponse,
   SessionResponse,
   VerifyEmailResponse,
 } from '@email-chat-pro/types'
@@ -23,6 +24,7 @@ import { endpointThrottles } from '../../config/rate-limit.config'
 import { AuthService } from './auth.service'
 import { LoginDto } from './dto/login.dto'
 import { RegisterDto } from './dto/register.dto'
+import { ResendVerificationDto } from './dto/resend-verification.dto'
 import { VerifyEmailDto } from './dto/verify-email.dto'
 import { User } from './entities/user.entity'
 import { JwtAuthGuard } from './guards/jwt.guard'
@@ -49,9 +51,31 @@ export class AuthController {
   }
 
   @Post('verify-email')
+  @Throttle(endpointThrottles.VERIFY_EMAIL)
   @HttpCode(HttpStatus.OK)
   async verifyEmail(@Body() dto: VerifyEmailDto): Promise<ApiResponse<VerifyEmailResponse>> {
     const data = await this.authService.verifyEmail(dto)
+    return {
+      success: true,
+      data,
+      timestamp: new Date().toISOString(),
+    }
+  }
+
+  /**
+   * POST /auth/resend-verification — issues a fresh verification token and
+   * re-sends the verification email (features.md §Email Verification).
+   *
+   * The response is intentionally identical for every outcome, including an
+   * unknown address, so the endpoint cannot be used to discover which emails
+   * are registered.
+   */
+  @Post('resend-verification')
+  @HttpCode(HttpStatus.OK)
+  async resendVerification(
+    @Body() dto: ResendVerificationDto,
+  ): Promise<ApiResponse<ResendVerificationResponse>> {
+    const data = await this.authService.resendVerification(dto)
     return {
       success: true,
       data,

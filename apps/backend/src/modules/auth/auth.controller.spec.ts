@@ -1,5 +1,8 @@
 import type { Request, Response } from 'express'
 import { Test } from '@nestjs/testing'
+import { THROTTLER_LIMIT, THROTTLER_TTL } from '@nestjs/throttler/dist/throttler.constants'
+import { ERROR_MESSAGES } from '@email-chat-pro/constants'
+import { GLOBAL_THROTTLE, endpointThrottles } from '../../config/rate-limit.config'
 import { AuthController } from './auth.controller'
 import { AuthService } from './auth.service'
 import { RegisterDto } from './dto/register.dto'
@@ -23,6 +26,7 @@ describe('AuthController', () => {
   const authService = {
     register: jest.fn(),
     verifyEmail: jest.fn(),
+    resendVerification: jest.fn(),
     login: jest.fn(),
     logout: jest.fn(),
     toUserDto: jest.fn(),
@@ -88,6 +92,52 @@ describe('AuthController', () => {
       expect(authService.verifyEmail).toHaveBeenCalledWith({ token })
       expect(response.success).toBe(true)
       expect(response.data).toEqual({ message: 'Email verified successfully' })
+      expect(response.timestamp).toEqual(expect.any(String))
+      expect(response.error).toBeUndefined()
+    })
+  })
+
+  // P1-5: verify-email previously had no per-endpoint limit.
+  describe('rate limiting', () => {
+    const appliedThrottle = (method: 'verifyEmail' | 'resendVerification') => {
+      const handler = AuthController.prototype[method]
+      return {
+        limit: Reflect.getMetadata(`${THROTTLER_LIMIT}default`, handler),
+        ttl: Reflect.getMetadata(`${THROTTLER_TTL}default`, handler),
+      }
+    }
+
+    it('applies the configured verification limit to POST verify-email', () => {
+      expect(appliedThrottle('verifyEmail')).toEqual(endpointThrottles.VERIFY_EMAIL.default)
+    })
+
+    it('bounds verify-email with a real, non-empty limit', () => {
+      const { limit, ttl } = appliedThrottle('verifyEmail')
+
+      expect(limit).toBeGreaterThan(0)
+      expect(ttl).toBeGreaterThan(0)
+    })
+
+    it('leaves the resend route on the global limit unless one is configured', () => {
+      // A missing override is not a defect: resend is the recovery path for a
+      // failed send, so it inherits the global 100/15min default.
+      const { limit } = appliedThrottle('resendVerification')
+
+      expect(limit ?? GLOBAL_THROTTLE.limit).toBe(GLOBAL_THROTTLE.limit)
+    })
+  })
+
+  describe('resendVerification', () => {
+    it('wraps the generic result in the standardized ApiResponse envelope', async () => {
+      authService.resendVerification.mockResolvedValue({
+        message: ERROR_MESSAGES.RESEND_VERIFICATION_SENT,
+      })
+
+      const response = await controller.resendVerification({ email: 'user@example.com' })
+
+      expect(authService.resendVerification).toHaveBeenCalledWith({ email: 'user@example.com' })
+      expect(response.success).toBe(true)
+      expect(response.data).toEqual({ message: ERROR_MESSAGES.RESEND_VERIFICATION_SENT })
       expect(response.timestamp).toEqual(expect.any(String))
       expect(response.error).toBeUndefined()
     })

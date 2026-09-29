@@ -5,9 +5,15 @@ import {
   UnauthorizedException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
-import { IsNull, Raw, Repository } from 'typeorm'
+import { IsNull, Not, Raw, Repository } from 'typeorm'
 import * as bcrypt from 'bcryptjs'
-import { ERROR_CODES, ERROR_MESSAGES, SEARCH_LIMIT_MAX } from '@email-chat-pro/constants'
+import {
+  ERROR_CODES,
+  ERROR_MESSAGES,
+  SEARCH_LIMIT_MAX,
+  SEARCH_QUERY_MAX_LENGTH,
+  SEARCH_QUERY_MIN_LENGTH,
+} from '@email-chat-pro/constants'
 import { User } from '../auth/entities/user.entity'
 import { DeleteAccountDto } from './dto/delete-account.dto'
 import { UpdateProfileDto } from './dto/update-profile.dto'
@@ -125,20 +131,38 @@ export class UsersService {
    * - Only active, non-deleted users are returned; deleted users (Task 1.5
    *   anonymization) are excluded (features.md — "Deleted users are not
    *   returned").
+   * - The authenticated caller is excluded from their own results: searching is
+   *   for other people, and returning yourself is both useless and a small
+   *   information leak about your own account state.
+   * - `q` is bounded at SEARCH_QUERY_MAX_LENGTH so a long fragment cannot drive
+   *   an expensive unbounded-pattern scan.
    * - Results are capped at SEARCH_LIMIT_MAX (default SEARCH_LIMIT_DEFAULT) —
    *   features.md "Search results are limited to a defined result count".
    */
-  async searchUsers(q: string | undefined, limit: number): Promise<User[]> {
+  async searchUsers(
+    q: string | undefined,
+    limit: number,
+    currentUserId: string,
+  ): Promise<User[]> {
     const query = q?.trim() ?? ''
-    if (!query) {
+    if (query.length < SEARCH_QUERY_MIN_LENGTH) {
       throw new BadRequestException({
         code: ERROR_CODES.VALIDATION_ERROR,
         message: ERROR_MESSAGES.SEARCH_QUERY_REQUIRED,
       })
     }
+    if (query.length > SEARCH_QUERY_MAX_LENGTH) {
+      throw new BadRequestException({
+        code: ERROR_CODES.VALIDATION_ERROR,
+        message: ERROR_MESSAGES.SEARCH_QUERY_TOO_LONG,
+      })
+    }
 
     const safeLimit = Math.min(Math.max(limit, 1), SEARCH_LIMIT_MAX)
     const pattern = `%${this.escapeLikePattern(query)}%`
+    // `NOT (id = $n)` — TypeORM's `Not()` operator. Applied to BOTH branches
+    // below so the caller is excluded whether they match by username or email.
+    const excludeCaller = Not(currentUserId)
 
     // Two OR branches: partial username match, or exact email match. The
     // `LOWER()` comparison mirrors the case-insensitive username unique index
@@ -147,11 +171,13 @@ export class UsersService {
     return this.usersRepository.find({
       where: [
         {
+          id: excludeCaller,
           isActive: true,
           deletedAt: IsNull(),
           username: Raw((alias) => `LOWER(${alias}) LIKE LOWER(:pattern)`, { pattern }),
         },
         {
+          id: excludeCaller,
           isActive: true,
           deletedAt: IsNull(),
           email: Raw((alias) => `LOWER(${alias}) = LOWER(:email)`, { email: query }),

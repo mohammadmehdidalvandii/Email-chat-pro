@@ -37,6 +37,27 @@ export interface VerifyEmailResponse {
   message: string
 }
 
+/**
+ * Request body for POST /auth/resend-verification.
+ *
+ * features.md §Email Verification — "Users can request another verification
+ * email".
+ */
+export interface ResendVerificationInput {
+  email: string
+}
+
+/**
+ * Response payload for POST /auth/resend-verification.
+ *
+ * The message is intentionally non-committal: the identical payload is returned
+ * whether a mail was sent, the account is already verified, or no such account
+ * exists, so the response cannot be used to enumerate registered addresses.
+ */
+export interface ResendVerificationResponse {
+  message: string
+}
+
 /** Request body for POST /auth/login (Task 1.3 — Login and Logout). */
 export interface LoginInput {
   email: string

@@ -3,12 +3,20 @@ import { Test } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { FindOperator } from 'typeorm'
 import * as bcrypt from 'bcryptjs'
-import { ERROR_CODES, ERROR_MESSAGES, SEARCH_LIMIT_MAX } from '@email-chat-pro/constants'
+import {
+  ERROR_CODES,
+  ERROR_MESSAGES,
+  SEARCH_LIMIT_MAX,
+  SEARCH_QUERY_MAX_LENGTH,
+} from '@email-chat-pro/constants'
 import { User } from '../auth/entities/user.entity'
 import { UsersService } from './users.service'
 
 describe('UsersService', () => {
   let service: UsersService
+
+  /** The authenticated caller, who must never appear in their own results. */
+  const CALLER_ID = 'uuid-caller'
 
   const repository = {
     findOne: jest.fn(),
@@ -196,21 +204,21 @@ describe('UsersService', () => {
 
   describe('searchUsers', () => {
     it('rejects an empty, whitespace-only, or missing query with a validation error', async () => {
-      await expect(service.searchUsers('', 10)).rejects.toMatchObject({
+      await expect(service.searchUsers('', 10, CALLER_ID)).rejects.toMatchObject({
         status: 400,
         response: {
           code: ERROR_CODES.VALIDATION_ERROR,
           message: ERROR_MESSAGES.SEARCH_QUERY_REQUIRED,
         },
       })
-      await expect(service.searchUsers('   ', 10)).rejects.toMatchObject({
+      await expect(service.searchUsers('   ', 10, CALLER_ID)).rejects.toMatchObject({
         status: 400,
         response: {
           code: ERROR_CODES.VALIDATION_ERROR,
           message: ERROR_MESSAGES.SEARCH_QUERY_REQUIRED,
         },
       })
-      await expect(service.searchUsers(undefined, 10)).rejects.toMatchObject({
+      await expect(service.searchUsers(undefined, 10, CALLER_ID)).rejects.toMatchObject({
         status: 400,
         response: {
           code: ERROR_CODES.VALIDATION_ERROR,
@@ -223,7 +231,7 @@ describe('UsersService', () => {
     it('queries active non-deleted users with OR username/email predicates and the default limit', async () => {
       repository.find.mockResolvedValue([])
 
-      await service.searchUsers('ali', 10)
+      await service.searchUsers('ali', 10, CALLER_ID)
 
       expect(repository.find).toHaveBeenCalledTimes(1)
       const options = repository.find.mock.calls[0][0]
@@ -244,7 +252,7 @@ describe('UsersService', () => {
     it('escapes LIKE wildcards in the query so they match literally', async () => {
       repository.find.mockResolvedValue([])
 
-      await service.searchUsers('al%ice', 10)
+      await service.searchUsers('al%ice', 10, CALLER_ID)
 
       const options = repository.find.mock.calls[0][0]
       expect(options.where[0].username.objectLiteralParameters).toEqual({ pattern: '%al\\%ice%' })
@@ -253,7 +261,7 @@ describe('UsersService', () => {
     it('clamps the limit to the configured maximum when it exceeds the cap', async () => {
       repository.find.mockResolvedValue([])
 
-      await service.searchUsers('ali', 500)
+      await service.searchUsers('ali', 500, CALLER_ID)
 
       expect(repository.find.mock.calls[0][0].take).toBe(SEARCH_LIMIT_MAX)
     })
@@ -261,7 +269,7 @@ describe('UsersService', () => {
     it('clamps the limit to at least 1 when it is below the minimum', async () => {
       repository.find.mockResolvedValue([])
 
-      await service.searchUsers('ali', 0)
+      await service.searchUsers('ali', 0, CALLER_ID)
 
       expect(repository.find.mock.calls[0][0].take).toBe(1)
     })
@@ -271,9 +279,107 @@ describe('UsersService', () => {
       const bob = { ...baseUser, id: 'uuid-bob', username: 'bob', fullName: 'Bob' }
       repository.find.mockResolvedValue([alice, bob])
 
-      const result = await service.searchUsers('ali', 10)
+      const result = await service.searchUsers('ali', 10, CALLER_ID)
 
       expect(result).toEqual([alice, bob])
+    })
+
+    // P1-4: the caller was previously able to appear in their own results.
+    describe('caller exclusion', () => {
+      it('excludes the authenticated caller from both the username and email branches', async () => {
+        repository.find.mockResolvedValue([])
+
+        await service.searchUsers('ali', 10, CALLER_ID)
+
+        const { where } = repository.find.mock.calls[0][0]
+        expect(where).toHaveLength(2)
+        for (const branch of where) {
+          expect(branch.id).toBeInstanceOf(FindOperator)
+          // Not() is applied to the caller id on every branch.
+          expect(branch.id.type).toBe('not')
+        }
+      })
+
+      it('excludes the caller without disturbing the existing predicates', async () => {
+        repository.find.mockResolvedValue([])
+
+        await service.searchUsers('ali', 10, CALLER_ID)
+
+        const { where } = repository.find.mock.calls[0][0]
+        for (const branch of where) {
+          expect(branch.isActive).toBe(true)
+          expect(branch.deletedAt).toBeInstanceOf(FindOperator)
+          expect(branch.id).toBeInstanceOf(FindOperator)
+        }
+        expect(where[0].username.objectLiteralParameters).toEqual({ pattern: '%ali%' })
+      })
+
+      it('excludes a different id per caller, so one caller never filters another out', async () => {
+        repository.find.mockResolvedValue([])
+
+        await service.searchUsers('ali', 10, 'uuid-alice')
+        await service.searchUsers('ali', 10, 'uuid-bob')
+
+        const [aliceCall, bobCall] = repository.find.mock.calls
+        expect(aliceCall[0].where[0].id).not.toBe(bobCall[0].where[0].id)
+      })
+    })
+
+    // P1-4: the query length was previously unbounded.
+    describe('query length bounds', () => {
+      it('accepts a query of exactly the maximum length', async () => {
+        repository.find.mockResolvedValue([])
+        const q = 'a'.repeat(SEARCH_QUERY_MAX_LENGTH)
+
+        await service.searchUsers(q, 10, CALLER_ID)
+
+        expect(repository.find).toHaveBeenCalledTimes(1)
+        expect(repository.find.mock.calls[0][0].where[0].username.objectLiteralParameters).toEqual({
+          pattern: `%${q}%`,
+        })
+      })
+
+      it('rejects a query longer than the maximum with a validation error', async () => {
+        await expect(
+          service.searchUsers('a'.repeat(SEARCH_QUERY_MAX_LENGTH + 1), 10, CALLER_ID),
+        ).rejects.toMatchObject({
+          status: 400,
+          response: {
+            code: ERROR_CODES.VALIDATION_ERROR,
+            message: ERROR_MESSAGES.SEARCH_QUERY_TOO_LONG,
+          },
+        })
+        expect(repository.find).not.toHaveBeenCalled()
+      })
+
+      it('measures length after trimming, so padding cannot push a query over the cap', async () => {
+        repository.find.mockResolvedValue([])
+        const padded = `  ${'a'.repeat(SEARCH_QUERY_MAX_LENGTH)}  `
+
+        await service.searchUsers(padded, 10, CALLER_ID)
+
+        expect(repository.find).toHaveBeenCalledTimes(1)
+      })
+
+      it('still rejects an empty query after the length check', async () => {
+        await expect(service.searchUsers('', 10, CALLER_ID)).rejects.toMatchObject({
+          status: 400,
+          response: { message: ERROR_MESSAGES.SEARCH_QUERY_REQUIRED },
+        })
+      })
+    })
+
+    // Guard against a regression that would widen the response beyond the
+    // already-minimal projection (no password hash, no verification state).
+    it('does not select private columns in the search projection', async () => {
+      repository.find.mockResolvedValue([])
+
+      await service.searchUsers('ali', 10, CALLER_ID)
+
+      const options = repository.find.mock.calls[0][0]
+      const selected = (options.select ?? {}) as Record<string, boolean>
+      expect(selected.passwordHash).not.toBe(true)
+      expect(selected.verificationTokenHash).not.toBe(true)
     })
   })
 })

@@ -8,6 +8,7 @@ import {
   USERNAME_MIN_LENGTH,
   USERNAME_REGEX,
 } from '@email-chat-pro/constants'
+import { IsValidHttpUrl } from '../../../common/validators/is-valid-http-url.validator'
 
 /**
  * Request body for PATCH /users/me (Task 1.4 — Profile Setup).
@@ -37,5 +38,6 @@ export class UpdateProfileDto {
   @IsOptional()
   @IsString()
   @MaxLength(AVATAR_URL_MAX_LENGTH, { message: ERROR_MESSAGES.AVATAR_URL_TOO_LONG })
+  @IsValidHttpUrl({ message: ERROR_MESSAGES.AVATAR_URL_INVALID })
   avatarUrl?: string
 }

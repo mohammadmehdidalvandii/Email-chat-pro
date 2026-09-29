@@ -36,6 +36,42 @@ describe('rate-limit.config', () => {
     it('limits file uploads to 5 per hour (3600000 ms)', () => {
       expect(endpointThrottles.UPLOAD_FILE).toEqual({ default: { limit: 5, ttl: 3600000 } })
     })
+
+    // P1-5: these two endpoints previously had no per-endpoint limit and were
+    // only covered by the 100/15min global default. architecture.md lists no
+    // value for either, so these are the agreed project-convention values.
+    it('limits contact requests to 10 per hour (3600000 ms)', () => {
+      expect(endpointThrottles.CONTACT_REQUEST).toEqual({ default: { limit: 10, ttl: 3600000 } })
+    })
+
+    it('limits email verification to 10 attempts per 15 minutes (900000 ms)', () => {
+      expect(endpointThrottles.VERIFY_EMAIL).toEqual({ default: { limit: 10, ttl: 900000 } })
+    })
+  })
+
+  describe('coverage', () => {
+    // Every @Throttle(...) must reference a real key: a typo would silently
+    // fall back to the global default.
+    it('exposes only the documented endpoint keys', () => {
+      expect(Object.keys(endpointThrottles).sort()).toEqual([
+        'CONTACT_REQUEST',
+        'LOGIN',
+        'REGISTER',
+        'SEARCH_USERS',
+        'SEND_MESSAGE',
+        'UPLOAD_FILE',
+        'VERIFY_EMAIL',
+      ])
+    })
+
+    it('keeps every endpoint limit tighter than or equal to a day', () => {
+      for (const [key, value] of Object.entries(endpointThrottles)) {
+        expect(`${key}:${value.default.limit}`).toMatch(/^[A-Z_]+:\d+$/)
+        expect(value.default.limit).toBeGreaterThan(0)
+        expect(value.default.ttl).toBeGreaterThan(0)
+        expect(value.default.ttl).toBeLessThanOrEqual(24 * 60 * 60 * 1000)
+      }
+    })
   })
 
   describe('throttlerModuleOptions', () => {

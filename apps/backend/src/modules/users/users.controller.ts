@@ -96,18 +96,19 @@ export class UsersController {
    *   - q: the search query (username or email)
    *   - limit: default 10, max 50
    *
-   * Protected by JwtAuthGuard; the authenticated user is required but is not
-   * used to filter results (features.md specifies eligible active users only).
+   * Protected by JwtAuthGuard; the authenticated user is excluded from the
+   * results so a search never returns the caller.
    */
   @Get('search')
   @UseGuards(JwtAuthGuard)
   @Throttle(endpointThrottles.SEARCH_USERS)
   @HttpCode(HttpStatus.OK)
   async searchUsers(
+    @Req() req: AuthenticatedRequest,
     @Query('q') q: string | undefined,
     @Query('limit', new DefaultValuePipe(SEARCH_LIMIT_DEFAULT), ParseIntPipe) limit: number,
   ): Promise<ApiResponse<UserSearchResponse>> {
-    const users = await this.usersService.searchUsers(q, limit)
+    const users = await this.usersService.searchUsers(q, limit, req.user.id)
     return {
       success: true,
       data: users.map((user) => this.authService.toUserDto(user)),

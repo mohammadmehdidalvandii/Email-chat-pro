@@ -102,9 +102,10 @@ describe('UsersController', () => {
       usersService.searchUsers.mockResolvedValue([matched])
       authService.toUserDto.mockReturnValue(matched)
 
-      const response = await controller.searchUsers('ali', 10)
+      const response = await controller.searchUsers(makeRequest({ id: 'uuid-1' }), 'ali', 10)
 
-      expect(usersService.searchUsers).toHaveBeenCalledWith('ali', 10)
+      // The caller's id is threaded through so the service can exclude them.
+      expect(usersService.searchUsers).toHaveBeenCalledWith('ali', 10, 'uuid-1')
       expect(authService.toUserDto).toHaveBeenCalledWith(matched)
       expect(response.success).toBe(true)
       expect(response.data).toEqual([matched])

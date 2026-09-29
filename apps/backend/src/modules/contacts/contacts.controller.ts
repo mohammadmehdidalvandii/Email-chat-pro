@@ -11,12 +11,14 @@ import {
   Req,
   UseGuards,
 } from '@nestjs/common'
+import { Throttle } from '@nestjs/throttler'
 import type {
   ApiResponse,
   ContactRequest as ContactRequestContract,
   User as SharedUser,
 } from '@email-chat-pro/types'
 import type { Request } from 'express'
+import { endpointThrottles } from '../../config/rate-limit.config'
 import { User } from '../auth/entities/user.entity'
 import { JwtAuthGuard } from '../auth/guards/jwt.guard'
 import { ContactsService } from './contacts.service'
@@ -47,6 +49,7 @@ export class ContactsController {
    */
   @Post('requests')
   @UseGuards(JwtAuthGuard)
+  @Throttle(endpointThrottles.CONTACT_REQUEST)
   @HttpCode(HttpStatus.CREATED)
   async sendRequest(
     @Req() req: AuthenticatedRequest,
