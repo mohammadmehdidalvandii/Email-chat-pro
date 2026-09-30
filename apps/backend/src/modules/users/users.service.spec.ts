@@ -200,6 +200,39 @@ describe('UsersService', () => {
       expect(saved.avatarUrl).toBeNull()
       expect(saved.passwordHash).toBe('')
     })
+
+    // P2: the anonymized username must be one that re-registration can never
+    // produce, otherwise deleting an account would collide with the next user
+    // who picks the freed handle, and a unique-index violation would surface
+    // as a 500 instead of the intended 409.
+    it('renames the account to a username that lies outside the valid alphabet', async () => {
+      repository.save.mockImplementation((user: Partial<User>) => Promise.resolve(user))
+
+      await service.deleteAccount({ ...activeUser }, { password: 'SecurePass123!' })
+
+      const saved = repository.save.mock.calls[0][0] as User
+      // A '#' is accepted by the update-profile username pattern, so assert
+      // against the full composed value: the 'deleted#' prefix is the part
+      // that puts it out of reach of a future registration.
+      expect(saved.username).toBe(`deleted#${activeUser.id}`)
+      expect(saved.username).not.toBe(activeUser.username)
+      expect(saved.username?.startsWith('deleted#')).toBe(true)
+    })
+
+    it('clears every identifying column so the row cannot be re-identified', async () => {
+      repository.save.mockImplementation((user: Partial<User>) => Promise.resolve(user))
+
+      await service.deleteAccount({ ...activeUser }, { password: 'SecurePass123!' })
+
+      const saved = repository.save.mock.calls[0][0] as User
+      // The email is deliberately NOT cleared: it is the unique login key and
+      // the audit trail, and the account is already barred from authenticating
+      // by isActive=false plus the empty password hash.
+      expect(saved.email).toBe(activeUser.email)
+      expect(saved.passwordHash).toBe('')
+      expect(saved.isActive).toBe(false)
+      expect(saved.deletedAt).toBeInstanceOf(Date)
+    })
   })
 
   describe('searchUsers', () => {

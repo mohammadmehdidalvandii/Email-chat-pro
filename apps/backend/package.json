@@ -9,6 +9,7 @@
     "lint": "eslint \"src/**/*.ts\"",
     "type-check": "tsc --noEmit",
     "test": "jest",
+    "test:e2e": "jest --config jest-e2e.config.js",
     "migration:run": "npm run build && typeorm-ts-node-commonjs migration:run -d src/database/data-source.ts",
     "migration:revert": "typeorm-ts-node-commonjs migration:revert -d src/database/data-source.ts",
     "migration:show": "typeorm-ts-node-commonjs migration:show -d src/database/data-source.ts"
@@ -69,7 +70,12 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.{ts,js}"
+    ],
+    "coveragePathIgnorePatterns": [
+      "/node_modules/",
+      "/coverage/",
+      "\\.spec\\.ts$"
     ],
     "coverageDirectory": "../coverage",
     "testEnvironment": "node"

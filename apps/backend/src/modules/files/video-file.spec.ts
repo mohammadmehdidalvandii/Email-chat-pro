@@ -1,4 +1,10 @@
-import { detectVideoFormat, readVideoDuration, inspectVideoBuffer } from './video-file'
+import {
+  detectVideoFormat,
+  inspectVideoBuffer,
+  mimeTypeForVideoFormat,
+  readVideoDuration,
+  type VideoFormat,
+} from './video-file'
 
 // ---------------------------------------------------------------------------
 // MP4 (ISO BMFF) helpers
@@ -285,5 +291,309 @@ describe('video-file', () => {
       const buf = buildMp4('isom', 1000, 600001)
       expect(readVideoDuration(buf, 'mp4')).toBe(600.001)
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// P2 — header hardening.
+//
+// The ≤5-minute guarantee in architecture.md §File Upload Validation is only
+// as strong as this parser. Every case below is a header an attacker controls
+// byte-for-byte, and the required outcome for all of them is the SAME: return
+// null. A null makes FilesService answer VIDEO_DURATION_INVALID and reject the
+// upload; a wrong number, an infinite value, or a thrown RangeError would each
+// turn a client-controlled field into a way to slip a long video past the gate
+// or to 500 the endpoint. The guards are therefore asserted on the boundary
+// values, not just the happy paths.
+// ---------------------------------------------------------------------------
+
+/** MP4 with an mvhd v1 box: 64-bit creation/modification, 32-bit timescale, 64-bit duration. */
+function mvhdBoxV1(timescale: number, duration: bigint): Buffer {
+  const buf = Buffer.alloc(44)
+  buf.writeUInt32BE(44, 0)
+  buf.write('mvhd', 4, 'latin1')
+  buf.writeUInt8(1, 8) // version
+  buf.writeUInt32BE(timescale, 28)
+  buf.writeBigUInt64BE(duration, 32)
+  return buf
+}
+
+function buildMp4With(box: Buffer): Buffer {
+  const moov = Buffer.alloc(8)
+  moov.writeUInt32BE(8 + box.length, 0)
+  moov.write('moov', 4, 'latin1')
+  return Buffer.concat([ftypBox('isom'), moov, box])
+}
+
+/** ISO BMFF box with an explicit 64-bit (`size === 1`) extended size field. */
+function extendedSizeBox(type: string, payload: Buffer): Buffer {
+  const buf = Buffer.alloc(16 + payload.length)
+  buf.writeUInt32BE(1, 0)
+  buf.write(type, 4, 'latin1')
+  buf.writeBigUInt64BE(BigInt(16 + payload.length), 8)
+  payload.copy(buf, 16)
+  return buf
+}
+
+describe('video-file header hardening', () => {
+  describe('ISO BMFF box sizes', () => {
+    it('reads the duration from a box that declares size 0 (extends to EOF)', () => {
+      const mvhd = Buffer.alloc(28)
+      mvhd.write('mvhd', 0, 'latin1') // size field overwritten with 0 below
+      mvhd.writeUInt32BE(0, 0)
+      mvhd.write('mvhd', 4, 'latin1')
+      mvhd.writeUInt32BE(1000, 20)
+      mvhd.writeUInt32BE(300000, 24)
+      const moov = Buffer.alloc(8)
+      moov.writeUInt32BE(0, 0) // also size 0
+      moov.write('moov', 4, 'latin1')
+
+      const buf = Buffer.concat([ftypBox('isom'), moov, mvhd])
+
+      expect(readVideoDuration(buf, 'mp4')).toBe(300)
+    })
+
+    it('follows a 64-bit extended size on the moov box', () => {
+      const mvhd = mvhdBoxV0(1000, 300000)
+      const buf = Buffer.concat([ftypBox('isom'), extendedSizeBox('moov', mvhd)])
+
+      expect(readVideoDuration(buf, 'mp4')).toBe(300)
+    })
+
+    it('rejects a box whose extended size runs past the end of the buffer', () => {
+      const buf = Buffer.alloc(32)
+      buf.writeUInt32BE(1, 0)
+      buf.write('moov', 4, 'latin1')
+      buf.writeBigUInt64BE(9999n, 8) // claims far more than the file holds
+
+      expect(readVideoDuration(buf, 'mp4')).toBeNull()
+    })
+
+    it('rejects a box smaller than its own header', () => {
+      const buf = Buffer.alloc(16)
+      buf.writeUInt32BE(4, 0) // a 4-byte "box" cannot hold an 8-byte header
+      buf.write('ftyp', 4, 'latin1')
+      buf.write('isom', 8, 'latin1')
+
+      expect(readVideoDuration(buf, 'mp4')).toBeNull()
+    })
+
+    it('rejects a truncated ftyp header that never reaches 12 bytes', () => {
+      expect(detectVideoFormat(ftypBox('isom').subarray(0, 10))).toBeNull()
+    })
+
+    it('returns null rather than recursing forever on a self-referential box size', () => {
+      // size 0 on a box nested directly inside another size-0 box would loop
+      // forever without the guard; the bounded walk must terminate.
+      const nested = Buffer.alloc(16)
+      nested.writeUInt32BE(0, 0)
+      nested.write('moov', 4, 'latin1')
+      nested.writeUInt32BE(0, 8)
+      nested.write('mvhd', 12, 'latin1')
+
+      expect(readVideoDuration(Buffer.concat([ftypBox('isom'), nested]), 'mp4')).toBeNull()
+    })
+  })
+
+  describe('ISO BMFF duration sentinels', () => {
+    it.each([
+      ['a zero duration', 0],
+      ['the 0xFFFFFFFF "unknown" sentinel', 0xffffffff],
+    ])('rejects mvhd v0 with %s', (_label, duration) => {
+      expect(readVideoDuration(buildMp4('isom', 1000, duration), 'mp4')).toBeNull()
+    })
+
+    it('reads a v1 duration of 300s', () => {
+      const buf = buildMp4With(mvhdBoxV1(1000, 300_000n))
+
+      expect(readVideoDuration(buf, 'mp4')).toBe(300)
+    })
+
+    it('rejects a v1 duration of 0', () => {
+      expect(readVideoDuration(buildMp4With(mvhdBoxV1(1000, 0n)), 'mp4')).toBeNull()
+    })
+
+    it('rejects a v1 duration of the 0xFFFFFFFFFFFFFFFF sentinel', () => {
+      const buf = buildMp4With(mvhdBoxV1(1000, 0xffffffffffffffffn))
+
+      expect(readVideoDuration(buf, 'mp4')).toBeNull()
+    })
+
+    it('rejects a v1 timescale of 0 rather than dividing by zero', () => {
+      expect(readVideoDuration(buildMp4With(mvhdBoxV1(0, 300_000n)), 'mp4')).toBeNull()
+    })
+
+    it('rejects a v1 box truncated before the duration field', () => {
+      const full = mvhdBoxV1(1000, 300_000n)
+      const buf = Buffer.concat([ftypBox('isom'), extendedSizeBox('moov', full.subarray(0, 34))])
+
+      expect(readVideoDuration(buf, 'mp4')).toBeNull()
+    })
+  })
+
+  describe('RIFF / AVI', () => {
+    /** Wraps chunks in a RIFF header so detectVideoFormat still reports 'avi'. */
+    const riff = (...chunks: Buffer[]) =>
+      Buffer.concat([Buffer.from('RIFF', 'latin1'), uint32le(4 + chunks.length), Buffer.from('AVI ', 'latin1'), ...chunks])
+
+    /** A top-level 'avih' chunk placed directly in the stream, not inside hdrl. */
+    const bareAvih = (microPerFrame: number, totalFrames: number) => {
+      const body = Buffer.alloc(20)
+      body.writeUInt32LE(microPerFrame, 0)
+      body.writeUInt32LE(totalFrames, 16)
+      return Buffer.concat([Buffer.from('avih', 'latin1'), uint32le(20), body])
+    }
+
+    it('reads the duration from a top-level avih chunk', () => {
+      expect(readVideoDuration(riff(bareAvih(40000, 7500)), 'avi')).toBe(300)
+    })
+
+    it('rejects a top-level avih with a zero frame count', () => {
+      expect(readVideoDuration(riff(bareAvih(40000, 0)), 'avi')).toBeNull()
+    })
+
+    it('rejects a top-level avih with a zero microseconds-per-frame', () => {
+      expect(readVideoDuration(riff(bareAvih(0, 7500)), 'avi')).toBeNull()
+    })
+
+    it('rejects a top-level avih whose body is truncated', () => {
+      const short = Buffer.concat([Buffer.from('avih', 'latin1'), uint32le(20), Buffer.alloc(8)])
+
+      expect(readVideoDuration(riff(short), 'avi')).toBeNull()
+    })
+
+    it('rejects a zero-size chunk, which would otherwise stall the walk', () => {
+      const zeroSized = Buffer.concat([Buffer.from('JUNK', 'latin1'), uint32le(0)])
+
+      expect(readVideoDuration(riff(zeroSized), 'avi')).toBeNull()
+    })
+
+    it('keeps walking past 16-bit padding after an odd-sized chunk', () => {
+      // A chunk of odd size is followed by one pad byte; reading the avih at
+      // the un-padded offset would miss it and report a bogus duration.
+      const odd = Buffer.concat([Buffer.from('JUNK', 'latin1'), uint32le(3), Buffer.from([1, 2, 3, 0])])
+      const buf = riff(odd, bareAvih(40000, 7500))
+
+      expect(readVideoDuration(buf, 'avi')).toBe(300)
+    })
+
+    it('rejects a zero-size chunk inside hdrl', () => {
+      const hdrl = Buffer.concat([
+        Buffer.from('LIST', 'latin1'),
+        uint32le(4 + 8),
+        Buffer.from('hdrl', 'latin1'),
+        Buffer.from('JUNK', 'latin1'),
+        uint32le(0),
+      ])
+
+      expect(readVideoDuration(riff(hdrl), 'avi')).toBeNull()
+    })
+
+    it('rejects an avih inside hdrl with a zero frame count', () => {
+      const avih = Buffer.alloc(20)
+      avih.writeUInt32LE(40000, 0)
+      avih.writeUInt32LE(0, 16)
+      const chunk = Buffer.concat([Buffer.from('avih', 'latin1'), uint32le(20), avih])
+      const hdrl = Buffer.concat([
+        Buffer.from('LIST', 'latin1'),
+        uint32le(4 + chunk.length),
+        Buffer.from('hdrl', 'latin1'),
+        chunk,
+      ])
+
+      expect(readVideoDuration(riff(hdrl), 'avi')).toBeNull()
+    })
+
+    it('returns null when the stream ends before any avih', () => {
+      expect(readVideoDuration(riff(), 'avi')).toBeNull()
+    })
+  })
+
+  describe('Matroska / WebM sentinels', () => {
+    it('applies the 1ms default TimecodeScale when the element is absent', () => {
+      const docType = element(ELEM_DOC_TYPE, Buffer.from('webm', 'latin1'))
+      const header = Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), vintSize(docType.length), docType])
+      const infoBody = element(ELEM_DURATION, doubleBE(300_000))
+      const buf = Buffer.concat([header, element(ELEM_SEGMENT, element(ELEM_INFO, infoBody))])
+
+      // 300_000 timecode units × the 1ms default = 300s.
+      expect(readVideoDuration(buf, 'webm')).toBe(300)
+    })
+
+    it.each([
+      ['a negative duration', -5.0],
+      ['a zero duration', 0.0],
+    ])('rejects %s', (_label, seconds) => {
+      const docType = element(ELEM_DOC_TYPE, Buffer.from('webm', 'latin1'))
+      const header = Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), vintSize(docType.length), docType])
+      const infoBody = element(ELEM_DURATION, doubleBE(seconds))
+      const buf = Buffer.concat([header, element(ELEM_SEGMENT, element(ELEM_INFO, infoBody))])
+
+      expect(readVideoDuration(buf, 'webm')).toBeNull()
+    })
+
+    it('rejects a non-finite duration (NaN)', () => {
+      const docType = element(ELEM_DOC_TYPE, Buffer.from('webm', 'latin1'))
+      const header = Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), vintSize(docType.length), docType])
+      const infoBody = element(ELEM_DURATION, doubleBE(NaN))
+      const buf = Buffer.concat([header, element(ELEM_SEGMENT, element(ELEM_INFO, infoBody))])
+
+      expect(readVideoDuration(buf, 'webm')).toBeNull()
+    })
+
+    it('reads a 4-byte float Duration', () => {
+      const float = Buffer.alloc(4)
+      // Float32 precision: 300_000 is stored as 300000.015625.
+      float.writeFloatBE(300_000, 0)
+      const docType = element(ELEM_DOC_TYPE, Buffer.from('webm', 'latin1'))
+      const header = Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), vintSize(docType.length), docType])
+      const infoBody = Buffer.concat([
+        element(ELEM_TIMECODE_SCALE, uint32be(1_000_000)),
+        element(ELEM_DURATION, float),
+      ])
+      const buf = Buffer.concat([header, element(ELEM_SEGMENT, element(ELEM_INFO, infoBody))])
+
+      expect(readVideoDuration(buf, 'webm')).toBe(300)
+    })
+
+    it('reads an 8-byte TimecodeScale alongside a 4-byte Duration', () => {
+      const scale = Buffer.alloc(8)
+      scale.writeBigUInt64BE(2_000_000n, 0)
+      const float = Buffer.alloc(4)
+      float.writeFloatBE(150_000, 0)
+      const docType = element(ELEM_DOC_TYPE, Buffer.from('webm', 'latin1'))
+      const header = Buffer.concat([Buffer.from([0x1a, 0x45, 0xdf, 0xa3]), vintSize(docType.length), docType])
+      const infoBody = Buffer.concat([element(ELEM_TIMECODE_SCALE, scale), element(ELEM_DURATION, float)])
+      const buf = Buffer.concat([header, element(ELEM_SEGMENT, element(ELEM_INFO, infoBody))])
+
+      // 150 units × 2ms = 300s.
+      expect(readVideoDuration(buf, 'webm')).toBe(300)
+    })
+
+    it('rejects a header with no DocType element at all', () => {
+      // A WebM signature with an empty header is a Matroska file, not WebM.
+      const header = Buffer.concat([
+        Buffer.from([0x1a, 0x45, 0xdf, 0xa3]),
+        Buffer.from([0x80]),
+      ])
+
+      expect(detectVideoFormat(header)).toBeNull()
+      expect(readVideoDuration(header, 'webm')).toBeNull()
+    })
+
+    it('rejects a truncated EBML signature', () => {
+      expect(detectVideoFormat(Buffer.from([0x1a, 0x45]))).toBeNull()
+    })
+  })
+})
+
+describe('mimeTypeForVideoFormat', () => {
+  it.each([
+    ['mp4', 'video/mp4'],
+    ['mov', 'video/quicktime'],
+    ['webm', 'video/webm'],
+    ['avi', 'video/x-msvideo'],
+  ])('maps %s to %s', (format, mime) => {
+    expect(mimeTypeForVideoFormat(format as VideoFormat)).toBe(mime)
   })
 })
