@@ -17,6 +17,12 @@ export const CHAT_HISTORY_KEY = ['chatHistory'] as const
 /** Messages requested per history page (backend default is also 50). */
 export const CHAT_HISTORY_PAGE_SIZE = 50
 
+/**
+ * How often the conversation list refetches itself to pick up messages in chats
+ * the user is not currently viewing.
+ */
+export const CONVERSATIONS_POLL_INTERVAL_MS = 30_000
+
 /** Cache key for one chat's history page. */
 export function chatHistoryKey(chatId: string, page: number): readonly unknown[] {
   return [...CHAT_HISTORY_KEY, chatId, page]
@@ -77,6 +83,16 @@ export function useConversations() {
     queryFn: () => getUserConversationsApi(),
     enabled: Boolean(token),
     staleTime: 1000 * 60, // 1 minute
+    // The gateway broadcasts `message:received` only to the room the sender's
+    // chat is in (`server.to('chat:' + chatId)`), and the client joins just the
+    // chat it is currently viewing. A message in any other conversation
+    // therefore never reaches this browser, so `applyIncomingMessage` cannot
+    // patch it — the only way the list learns about it is a refetch. Poll on a
+    // slow interval so background conversations surface on their own instead of
+    // going stale until a manual refresh. TanStack Query pauses this in a
+    // backgrounded tab unless `refetchIntervalInBackground` is enabled, so an
+    // idle tab costs nothing.
+    refetchInterval: CONVERSATIONS_POLL_INTERVAL_MS,
   })
 }
 

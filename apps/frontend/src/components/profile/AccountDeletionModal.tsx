@@ -10,6 +10,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDeleteAccountMutation } from '../../hooks/use-profile-mutations'
 import { useProfileModalStore } from '../../stores/profile.store'
+import { toApiRequestError } from '../../lib/api/client'
+import { translateApiError } from '../../i18n/errors'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
@@ -37,9 +39,13 @@ export function AccountDeletionModal() {
     try {
       await mutation.mutateAsync({ password })
     } catch (error) {
-      // The typed error from the mutation is available via mutation.error.
+      // `apiRequest` rejects with a plain `ApiRequestError` object rather than an
+      // Error instance, so `instanceof Error` was always false and every failure
+      // collapsed to the generic `deleteError` string — including a wrong
+      // password. Normalize and translate through the same path ProfileForm
+      // uses, so the backend's own error code is what the user sees.
       setSubmitError(
-        error instanceof Error ? error.message : t('deleteError'),
+        translateApiError(toApiRequestError(error).code, t('deleteError')),
       )
     }
   }
@@ -79,7 +85,10 @@ export function AccountDeletionModal() {
 
           {mutation.isError && mutation.error && !submitError && (
             <p className="text-sm text-red-600" dir="auto" role="alert">
-              {mutation.error.message}
+              {translateApiError(
+                toApiRequestError(mutation.error).code,
+                t('deleteError'),
+              )}
             </p>
           )}
 
