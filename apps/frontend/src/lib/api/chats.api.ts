@@ -58,7 +58,7 @@ export async function sendMessageApi(
   chatId: string,
   dto: CreateMessageInput,
 ): Promise<Message> {
-  const { chatId: _ignoredChatId, content, messageType, mediaUrl } = dto
+  const { content, messageType, mediaUrl } = dto
 
   // `content` is dropped only when it is genuinely absent/blank: the DTO
   // requires 1–5000 characters, so sending an empty string would fail

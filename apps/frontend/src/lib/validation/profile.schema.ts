@@ -8,7 +8,7 @@
  * validation stay aligned. Backend validation remains authoritative.
  *
  * As in the auth schemas, messages are `validation:` keys translated at render
- * time by {@link validationMessage} rather than English literals.
+ * time by `validationMessage` (i18n/validation.ts) rather than English literals.
  */
 import {
   BIO_MAX_LENGTH,
@@ -18,7 +18,6 @@ import {
   USERNAME_REGEX,
 } from '@email-chat-pro/constants'
 import { z } from 'zod'
-import { validationMessage } from '../../i18n/validation'
 
 /** Builds a Zod message that is a `validation` namespace key. */
 const msg = (key: string) => ({ message: `validation:${key}` })
@@ -56,10 +55,13 @@ export const profileSchema = z.object({
 
 export type ProfileFormValues = z.infer<typeof profileSchema>
 
-// Phase 3 — contact request validation (shared constants, no new rules needed)
+// Phase 3 — contact request validation (shared constants, no new rules needed).
+// `receiverId` and `status` are supplied by the app itself rather than typed by
+// the user, but they are validated like any other field and must not surface
+// Zod's internal English text, so both carry `validation:` keys like the rest.
 export const contactSchema = z.object({
-  receiverId: z.string().uuid(),
+  receiverId: z.string().uuid(msg('invalidUuid').message),
 })
 export const respondSchema = z.object({
-  status: z.enum(['accepted', 'declined']),
+  status: z.enum(['accepted', 'declined'], msg('invalidRequestStatus')),
 })

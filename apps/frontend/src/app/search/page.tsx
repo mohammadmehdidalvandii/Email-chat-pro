@@ -5,9 +5,10 @@
  *
  * The backend's search does not exclude the authenticated user, so the
  * signed-in user is filtered out of the results here rather than sending a
- * request to oneself. The endpoint is throttled (50/hour), so the input is
- * debounced by `UserSearchBar` and a 429 is reported with the backend's own
- * `RATE_LIMIT_EXCEEDED` code rather than a generic failure.
+ * request to oneself. The endpoint is throttled (50/hour), so `UserSearchBar`
+ * debounces the query parameter before it reaches this page, and a 429 is
+ * reported with the backend's own `RATE_LIMIT_EXCEEDED` code rather than a
+ * generic failure.
  */
 import { Suspense, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
@@ -91,7 +92,12 @@ function SearchContent() {
             <li key={user.id}>
               <UserSearchResult
                 user={user}
-                isSending={send.isPending}
+                // TanStack Query tracks the variables of the in-flight mutation,
+                // so only the row actually being sent to is disabled — one
+                // pending request must not lock every other row's button.
+                isSending={
+                  send.isPending && send.variables?.receiverId === user.id
+                }
                 isRequested={requestedIds.includes(user.id)}
                 onSendRequest={() =>
                   send.mutate(

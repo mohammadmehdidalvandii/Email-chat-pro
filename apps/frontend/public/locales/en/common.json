@@ -1,8 +1,5 @@
 {
   "appName": "Email-Chat-Pro",
-  "appDescription": "Real-time 1-on-1 messaging platform.",
-  "foundationReady": "Project foundation is ready.",
-  "apiLabel": "API",
   "language": "Language",
   "loading": "Loading...",
   "retry": "Try again",
@@ -14,12 +11,13 @@
     "profile": "Profile",
     "logout": "Log out",
     "openMenu": "Open navigation menu",
-    "closeMenu": "Close navigation menu"
+    "closeMenu": "Close navigation menu",
+    "main": "Main navigation",
+    "menu": "Navigation menu"
   },
   "state": {
     "error": "Something went wrong. Please try again.",
     "empty": "Nothing here yet."
   },
-  "redirecting": "Taking you to your workspace...",
-  "sessionRestored": "Session restored — redirecting..."
+  "redirecting": "Taking you to your workspace..."
 }

@@ -13,5 +13,8 @@
   "usernameTooLong": "Username must be no more than 30 characters",
   "usernameInvalid": "Use only letters, numbers, underscores, and hyphens",
   "fullNameTooLong": "Full name must be no more than 100 characters",
-  "bioTooLong": "Bio must be no more than 500 characters"
+  "bioTooLong": "Bio must be no more than 500 characters",
+  "invalidValue": "This value is not valid",
+  "invalidUuid": "This value is not a valid identifier",
+  "invalidRequestStatus": "Please choose accept or decline"
 }

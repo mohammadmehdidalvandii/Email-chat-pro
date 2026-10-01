@@ -30,13 +30,19 @@ import { LanguageSwitcher } from './LanguageSwitcher'
 import { SidebarItem } from './SidebarItem'
 import { cn } from '../../lib/utils'
 
-/** The section links, in display order. Labels come from `common.nav.*`. */
+/**
+ * The section links, in display order.
+ *
+ * `labelKey` is the full static `common:` key rather than a template literal, so
+ * the bundler can extract it and a typo fails loudly instead of silently
+ * rendering the key itself.
+ */
 export const NAV_ITEMS = [
-  { href: '/dashboard', key: 'dashboard', icon: LayoutDashboard },
-  { href: '/chats', key: 'chats', icon: MessageCircle },
-  { href: '/contacts', key: 'contacts', icon: Users },
-  { href: '/search', key: 'search', icon: Search },
-  { href: '/settings/profile', key: 'profile', icon: Settings },
+  { href: '/dashboard', labelKey: 'common:nav.dashboard', icon: LayoutDashboard },
+  { href: '/chats', labelKey: 'common:nav.chats', icon: MessageCircle },
+  { href: '/contacts', labelKey: 'common:nav.contacts', icon: Users },
+  { href: '/search', labelKey: 'common:nav.search', icon: Search },
+  { href: '/settings/profile', labelKey: 'common:nav.profile', icon: Settings },
 ] as const
 
 /**
@@ -78,14 +84,14 @@ export function AppSidebar({ onNavigate, className }: AppSidebarProps) {
       </div>
 
       <nav
-        aria-label={t('common:nav.dashboard')}
+        aria-label={t('common:nav.main')}
         className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto p-3"
       >
         {NAV_ITEMS.map((item) => (
           <SidebarItem
             key={item.href}
             href={item.href}
-            label={t(`common:nav.${item.key}`)}
+            label={t(item.labelKey)}
             icon={<item.icon className="h-4 w-4" />}
             active={isNavItemActive(pathname, item.href)}
             onNavigate={onNavigate}

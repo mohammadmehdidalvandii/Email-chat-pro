@@ -56,8 +56,14 @@ export function prependMessageToHistory(
 /**
  * Reflects a newly received message in the conversation list so the preview,
  * the activity timestamp, and the ordering all follow backend data without a
- * refetch (§5). The message only surfaces a preview when it is the newest one
- * in its chat, which `lastActivityAt` ordering makes safe to check here.
+ * refetch (§5).
+ *
+ * Ordering guard: the socket event, the optimistic send write, and the polling
+ * refetch all reach this cache independently, so a message can arrive after a
+ * newer one has already been applied. `createdAt` is the backend's own ordering
+ * field (the same one `lastActivityAt` comes from), so a message older than the
+ * preview it would replace is dropped instead of regressing the preview and the
+ * list position.
  */
 export function patchConversationWithMessage(
   cache: ConversationListItem[] | undefined,
@@ -65,11 +71,15 @@ export function patchConversationWithMessage(
 ): ConversationListItem[] | undefined {
   if (!cache) return cache
 
-  const updated = cache.map((conversation) =>
-    conversation.id === message.chatId
-      ? { ...conversation, lastMessage: message, lastActivityAt: message.createdAt }
-      : conversation,
-  )
+  const updated = cache.map((conversation) => {
+    if (conversation.id !== message.chatId) return conversation
+    // Out-of-order arrival: never let an older message overwrite a newer
+    // preview or move the conversation backwards in the list.
+    if (conversation.lastMessage && conversation.lastMessage.createdAt > message.createdAt) {
+      return conversation
+    }
+    return { ...conversation, lastMessage: message, lastActivityAt: message.createdAt }
+  })
 
   // The backend sorts by lastActivityAt descending; mirror that exactly so the
   // list order never disagrees with a subsequent refetch.

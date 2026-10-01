@@ -8,10 +8,10 @@
  * authoritative; these schemas are for immediate client-side feedback only.
  *
  * Messages are `validation:` translation keys rather than literals, resolved
- * through the shared {@link validationMessage} helper (architecture.md §i18n —
- * no raw English in user-facing UI). The key travels as the Zod message and is
- * translated when the form renders it, so switching language re-labels the
- * existing errors without re-running validation.
+ * through the shared `validationMessage` helper (i18n/validation.ts —
+ * architecture.md §i18n: no raw English in user-facing UI). The key travels as
+ * the Zod message and is translated when the form renders it, so switching
+ * language re-labels the existing errors without re-running validation.
  */
 import {
   EMAIL_MAX_LENGTH,
@@ -21,7 +21,6 @@ import {
   VERIFICATION_TOKEN_LENGTH,
 } from '@email-chat-pro/constants'
 import { z } from 'zod'
-import { validationMessage } from '../../i18n/validation'
 
 /** Builds a Zod message that is a `validation` namespace key. */
 const msg = (key: string) => ({ message: `validation:${key}` })

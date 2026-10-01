@@ -132,7 +132,7 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
       {attachment && (
         <div className="mb-2 flex items-center justify-between gap-3 text-xs text-neutral-600">
           <span className="truncate" dir="auto">
-            {t(`chat:attachmentAttached`)}: {attachment.url}
+            {t('chat:attachmentAttachedWithUrl', { url: attachment.url })}
           </span>
           <button
             type="button"
@@ -187,7 +187,9 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
 
       {uploadMutation.isPending && (
         <p className="mt-2 text-xs text-neutral-500" role="status">
-          {progress === null ? t('chat:uploading') : `${t('chat:uploading')} ${progress}%`}
+          {progress === null
+            ? t('chat:uploading')
+            : t('chat:uploadingProgress', { percent: progress })}
         </p>
       )}
     </div>

@@ -1,16 +1,15 @@
 {
   "title": "تماس‌ها",
   "searchPlaceholder": "جستجو با نام کاربری یا ایمیل",
+  "searchInputLabel": "جستجوی کاربران با نام کاربری یا ایمیل",
   "search": "جستجو",
   "searching": "در حال جستجو...",
   "searchPrompt": "برای یافتن کاربران، نام کاربری یا ایمیل را وارد کنید.",
   "noResults": "کاربری با جستجوی شما مطابقت نداشت.",
   "searchFailed": "جستجو انجام نشد. لطفاً دوباره تلاش کنید.",
   "sendRequest": "ارسال درخواست",
-  "requestSent": "درخواست ارسال شد",
   "requestPending": "درخواست در انتظار",
   "openChat": "باز کردن گفتگو",
-  "alreadyContact": "تماس",
   "incomingRequests": "درخواست‌های دریافتی",
   "noIncoming": "درخواست دریافتی وجود ندارد",
   "accept": "پذیرش",
@@ -21,14 +20,8 @@
   "actionFailed": "این اقدام انجام نشد. لطفاً دوباره تلاش کنید.",
   "bio": "بیوگرافی",
   "status": {
-    "label": "وضعیت",
     "pending": "در انتظار",
     "accepted": "پذیرفته شده",
     "declined": "رد شده"
-  },
-  "presence": {
-    "online": "آنلاین",
-    "offline": "آفلاین",
-    "lastSeen": "آخرین بازدید {{time}}"
   }
 }

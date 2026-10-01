@@ -1,16 +1,15 @@
 {
   "title": "Contacts",
   "searchPlaceholder": "Search by username or email",
+  "searchInputLabel": "Search for people by username or email",
   "search": "Search",
   "searching": "Searching…",
   "searchPrompt": "Type a username or email to find people.",
   "noResults": "No users matched your search.",
   "searchFailed": "Search failed. Please try again.",
   "sendRequest": "Send request",
-  "requestSent": "Request sent",
   "requestPending": "Request pending",
   "openChat": "Open chat",
-  "alreadyContact": "Contact",
   "incomingRequests": "Incoming requests",
   "noIncoming": "No incoming requests",
   "accept": "Accept",
@@ -21,14 +20,8 @@
   "actionFailed": "That action couldn't be completed. Please try again.",
   "bio": "Bio",
   "status": {
-    "label": "Status",
     "pending": "Pending",
     "accepted": "Accepted",
     "declined": "Declined"
-  },
-  "presence": {
-    "online": "Online",
-    "offline": "Offline",
-    "lastSeen": "Last seen {{time}}"
   }
 }

@@ -130,7 +130,6 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     // The gateway answers chat:join / chat:leave with these; an authorization
     // or lookup failure arrives as `error:event` rather than a throw.
     const onErrorEvent = (event: ErrorEvent) => {
-      // eslint-disable-next-line no-console
       console.error(`WebSocket error [${event.code}]:`, event.message)
     }
 

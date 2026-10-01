@@ -2,24 +2,34 @@
 
 import { useTranslation } from 'react-i18next'
 import { ChevronDown } from 'lucide-react'
-import { LOCALE_META, SUPPORTED_LOCALES, type Locale } from '../../config/i18n.config'
+import { LOCALE_META, SUPPORTED_LOCALES, DEFAULT_LOCALE, type Locale } from '../../config/i18n.config'
 
 /**
  * Language switcher (architecture.md: Layout/LanguageSwitcher.tsx). Changing
  * the selection updates the i18next language; I18nProvider reacts by flipping
  * the document `dir`/`lang` and persisting the choice.
  */
+/** id linking the visible label to the select. */
+const SELECT_ID = 'language-switcher'
+
 export function LanguageSwitcher() {
   const { i18n, t } = useTranslation('common', { useSuspense: false })
-  const current = (i18n.resolvedLanguage ?? i18n.language ?? 'en') as string as Locale
+  // Narrow through the same SUPPORTED_LOCALES guard as `getActiveLocale`
+  // instead of asserting, so an unsupported i18next language cannot leave the
+  // select showing no matching option.
+  const active = i18n.resolvedLanguage ?? i18n.language ?? DEFAULT_LOCALE
+  const current: Locale = SUPPORTED_LOCALES.includes(active as Locale)
+    ? (active as Locale)
+    : DEFAULT_LOCALE
 
   return (
     // Mirrors the SidebarItem control language: rounded-md, the same offset
     // focus ring, and muted neutral text. The switch logic below is untouched.
-    <label className="block space-y-1.5">
+    <label htmlFor={SELECT_ID} className="block space-y-1.5">
       <span className="block text-xs font-medium text-neutral-500">{t('language')}</span>
       <span className="relative block">
         <select
+          id={SELECT_ID}
           value={current}
           onChange={(event) => {
             void i18n.changeLanguage(event.target.value)

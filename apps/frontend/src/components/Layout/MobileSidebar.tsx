@@ -53,7 +53,7 @@ export function MobileSidebar({ open, onClose }: MobileSidebarProps) {
       <div
         role="dialog"
         aria-modal="true"
-        aria-label={t('nav.dashboard')}
+        aria-label={t('nav.menu')}
         className="absolute inset-y-0 start-0 flex w-72 max-w-[85vw] flex-col border-e border-neutral-200 shadow-xl"
       >
         <div className="flex justify-end border-b border-neutral-200 bg-white px-2 py-2">

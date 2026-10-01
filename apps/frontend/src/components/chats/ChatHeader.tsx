@@ -27,7 +27,10 @@ export function ChatHeader({ chatId }: ChatHeaderProps) {
   const { data: conversations } = useConversations()
   const contact = conversations?.find((conversation) => conversation.id === chatId)?.contact
 
-  const name = contact ? (contact.username ?? contact.email) : t('chat:conversations')
+  // Until the conversation list resolves there is no contact to name; "Chat"
+  // identifies the screen without pretending the other person is called
+  // "Conversations".
+  const name = contact ? (contact.username ?? contact.email) : t('chat:unknownContact')
   const status = hasError
     ? t('chat:connection.failed')
     : isConnected

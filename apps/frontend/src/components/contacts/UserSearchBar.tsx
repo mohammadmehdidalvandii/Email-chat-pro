@@ -7,7 +7,7 @@
  * refresh. Because the endpoint is throttled server-side, the text is debounced
  * before the query runs rather than firing a request per keystroke.
  */
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslation } from 'react-i18next'
 import { Button } from '../ui/button'
@@ -24,7 +24,16 @@ export function UserSearchBar() {
   const [text, setText] = useState(urlQuery)
 
   // Keep the input in step when the URL changes from outside (back/forward).
+  // While the user is mid-edit the input is the source of truth: syncing it
+  // back from the URL on every change would overwrite in-flight typing with the
+  // still-debounced previous value and drop characters. The last committed URL
+  // value is tracked in a ref so an external navigation (back/forward, or a
+  // reset link) is still adopted, but only when the input has not diverged from
+  // what the user last typed-and-committed.
+  const committedQuery = useRef(urlQuery)
   useEffect(() => {
+    if (urlQuery === committedQuery.current) return
+    committedQuery.current = urlQuery
     setText(urlQuery)
   }, [urlQuery])
 
@@ -34,6 +43,7 @@ export function UserSearchBar() {
     const trimmed = text.trim()
     if (trimmed === urlQuery) return
     const timer = setTimeout(() => {
+      committedQuery.current = trimmed
       const query = trimmed ? `?q=${encodeURIComponent(trimmed)}` : ''
       router.replace(query ? `/search${query}` : '/search')
     }, SEARCH_DEBOUNCE_MS)
@@ -44,6 +54,7 @@ export function UserSearchBar() {
     event.preventDefault()
     const trimmed = text.trim()
     // Submitting bypasses the debounce so Enter feels immediate.
+    committedQuery.current = trimmed
     router.replace(trimmed ? `/search?q=${encodeURIComponent(trimmed)}` : '/search')
   }
 
@@ -54,7 +65,7 @@ export function UserSearchBar() {
         value={text}
         onChange={(event) => setText(event.target.value)}
         placeholder={t('searchPlaceholder')}
-        aria-label={t('searchPlaceholder')}
+        aria-label={t('searchInputLabel')}
       />
       <Button type="submit">{t('search')}</Button>
     </form>

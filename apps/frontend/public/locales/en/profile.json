@@ -16,9 +16,6 @@
   "cancel": "Cancel",
   "delete": "Delete",
   "deleteError": "Failed to delete account. Please try again.",
-  "deleted": "Account deleted. Redirecting...",
   "saved": "Profile saved.",
-  "updateFailed": "Could not save your profile. Please try again.",
-  "avatarAlt": "Profile photo",
-  "noAvatar": "No photo"
+  "updateFailed": "Could not save your profile. Please try again."
 }
