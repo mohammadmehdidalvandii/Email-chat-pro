@@ -15,7 +15,7 @@ import { FilesModule } from './modules/files/files.module'
 import { MessagesModule } from './modules/messages/messages.module'
 import { UsersModule } from './modules/users/users.module'
 import { WebSocketModule } from './modules/websocket/websocket.module'
-
+import { ConfigModule } from '@nestjs/config'
 @Module({
   imports: [
     TypeOrmModule.forRootAsync({
@@ -23,6 +23,9 @@ import { WebSocketModule } from './modules/websocket/websocket.module'
     }),
     ThrottlerModule.forRootAsync({
       useFactory: throttlerModuleOptions,
+    }),
+        ConfigModule.forRoot({
+      isGlobal: true,
     }),
     AuthModule,
     UsersModule,
