@@ -4,7 +4,7 @@
  * - useUpdateProfileMutation: PATCH /users/me — on success invalidates
  *   the profile query so the cache stays fresh.
  * - useDeleteAccountMutation: DELETE /users/me — on success clears the
- *   auth session, invalidates the profile query, and lets the
+ *   auth session and empties the query cache, then lets the
  *   calling page redirect via the session flow.
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -17,6 +17,7 @@ import type {
 import { deleteAccountApi, updateProfileApi } from '../lib/api/users.api'
 import { PROFILE_QUERY_KEY } from './use-profile-query'
 import { useAuthStore } from '../stores/auth.store'
+import { usePresenceStore } from '../stores/presence.store'
 import type { ApiRequestError } from '../lib/api/client'
 
 export type UpdateProfileError = ApiRequestError
@@ -40,10 +41,13 @@ export function useDeleteAccountMutation() {
   return useMutation<DeleteAccountResponse, ApiRequestError, DeleteAccountInput>({
     mutationFn: deleteAccountApi,
     onSuccess: () => {
-      // Invalidate profile cache, then clear auth state so the session
-      // flow redirects the user to /login.
-      void queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY })
+      // Clear auth state first so the session flow redirects to /login, then
+      // empty the cache: the deleted account's conversations, contacts and
+      // search results must not survive for whoever registers or logs in on
+      // this tab next.
       clearSession()
+      queryClient.clear()
+      usePresenceStore.getState().resetPresence()
     },
   })
 }

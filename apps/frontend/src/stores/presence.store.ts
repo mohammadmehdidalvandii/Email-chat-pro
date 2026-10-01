@@ -9,6 +9,8 @@ export interface PresenceEntry {
 interface PresenceState {
   presenceByUserId: Record<string, PresenceEntry>
   setPresence: (userId: string, entry: PresenceEntry) => void
+  /** Drop every entry — used when a session ends so the next user starts clean. */
+  resetPresence: () => void
 }
 
 export const usePresenceStore = create<PresenceState>((set) => ({
@@ -17,4 +19,5 @@ export const usePresenceStore = create<PresenceState>((set) => ({
     set((state) => ({
       presenceByUserId: { ...state.presenceByUserId, [userId]: entry },
     })),
+  resetPresence: () => set({ presenceByUserId: {} }),
 }))

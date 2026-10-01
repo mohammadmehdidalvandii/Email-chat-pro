@@ -24,9 +24,15 @@ export function useChatSocket(activeChatId: string | null): void {
 
     if (socket.connected) {
       join()
-    } else {
-      socket.once('connect', join)
     }
+
+    // The server drops room membership on disconnect, so every reconnect needs a
+    // fresh join. This must be a persistent `.on` listener, not `.once`: a
+    // reconnect flips `socket.connected` back to true without changing any
+    // dependency of this effect, so nothing else would re-run it and the
+    // socket would sit connected while in no room — no incoming messages for
+    // the rest of the session, with the header still showing "Connected".
+    socket.on('connect', join)
 
     return () => {
       socket.off('connect', join)
