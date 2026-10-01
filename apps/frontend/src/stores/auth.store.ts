@@ -69,7 +69,10 @@ export const useAuthStore = create<AuthState>((set) => ({
   markSessionResolved: () => set({ hasSessionResolved: true }),
   clearSession: () => {
     persistToken(null)
-    set({ token: null, user: null })
+    // `hasSessionResolved` must go back to false: RequireAuth gates its
+    // loading state on it, so leaving it true after a logout lets the next
+    // login render protected content before the session check has run.
+    set({ token: null, user: null, hasSessionResolved: false })
   },
 }))
 

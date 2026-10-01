@@ -25,16 +25,18 @@ interface MessageListProps {
 
 export function MessageList({ chatId }: MessageListProps) {
   const { t } = useTranslation(['chat', 'common'], { useSuspense: false })
-  const [page, setPage] = useState(1)
+  // Page state is scoped to the chat it was chosen in. Deriving it this way
+  // means a chat switch renders the new conversation's page 1 immediately:
+  // there is no render in which the previous chat's page is still applied to
+  // the new chatId, so no `GET /chats/{newId}/messages?page=3` is ever issued
+  // and no wrong empty/error state flashes.
+  const [pageState, setPageState] = useState({ chatId, page: 1 })
+  const page = pageState.chatId === chatId ? pageState.page : 1
+
   const { data, isLoading, isError, error, refetch } = useChatHistory(chatId, page)
   useChatSocket(chatId)
   const userId = useAuthStore((s) => s.user?.id)
   const scrollRef = useRef<HTMLDivElement>(null)
-
-  // A different conversation always starts at its newest page.
-  useEffect(() => {
-    setPage(1)
-  }, [chatId])
 
   // The server returns newest-first, so the newest message is at the start of
   // the array; scrolling to the visual top (index 0 in column-reverse) shows it.
@@ -88,7 +90,7 @@ export function MessageList({ chatId }: MessageListProps) {
         >
           <button
             type="button"
-            onClick={() => setPage((current) => Math.min(current + 1, pagination.pages))}
+            onClick={() => setPageState((current) => ({ chatId, page: Math.min(current.page + 1, pagination.pages) }))}
             disabled={page >= pagination.pages}
             className="text-sm text-neutral-700 underline underline-offset-4 disabled:opacity-40"
           >
@@ -99,7 +101,7 @@ export function MessageList({ chatId }: MessageListProps) {
           </span>
           <button
             type="button"
-            onClick={() => setPage((current) => Math.max(current - 1, 1))}
+            onClick={() => setPageState((current) => ({ chatId, page: Math.max(current.page - 1, 1) }))}
             disabled={page <= 1}
             className="text-sm text-neutral-700 underline underline-offset-4 disabled:opacity-40"
           >

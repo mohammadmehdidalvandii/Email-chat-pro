@@ -38,6 +38,16 @@ const SOCKET_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'http://localhost:4000'
 /** The gateway is mounted on the `/chats` namespace, not the default one. */
 const CHATS_NAMESPACE = '/chats'
 
+/**
+ * Ceiling on automatic reconnection attempts for one socket.
+ *
+ * The gateway rejects a handshake outright (and force-disconnects) when the
+ * token is missing, invalid, or belongs to a deactivated user. That outcome
+ * never changes on its own, so the retry loop must terminate rather than
+ * re-checking a dead token indefinitely.
+ */
+const RECONNECTION_ATTEMPTS = 10
+
 const SocketContext = createContext<SocketState>({ socket: null, isConnected: false, hasError: false })
 
 /**
@@ -73,6 +83,16 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       // Presence is re-broadcast on every (re)connect, so let the manager retry
       // transient drops instead of leaving the user silently offline.
       reconnection: true,
+      // Bound the retries. The gateway force-disconnects any handshake whose
+      // token is missing, expired, or belongs to an inactive user
+      // (websocket.gateway.ts), and that rejection is permanent — without a
+      // cap the manager would retry forever, re-validating the same bad token
+      // against the database on every attempt. A transient outage recovers
+      // well within this budget.
+      reconnectionAttempts: RECONNECTION_ATTEMPTS,
+      // Back off between attempts instead of hammering immediately.
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 30_000,
     })
     socket.connect()
     socketRef.current = socket

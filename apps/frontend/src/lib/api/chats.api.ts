@@ -49,7 +49,10 @@ export async function getChatHistoryApi(
  *
  * `content` is omitted entirely when empty (media-only message): the DTO
  * requires 1–5000 characters when present, and the service stores `''` itself
- * for image/video messages.
+ * for image/video messages. When a caption IS supplied alongside media it is
+ * sent — `CreateMessageDto.content` is optional for image/video and the
+ * service persists it (`content = dto.content ?? ''`), so a caption is valid
+ * server-side and must reach it rather than being dropped here.
  */
 export async function sendMessageApi(
   chatId: string,
@@ -57,8 +60,14 @@ export async function sendMessageApi(
 ): Promise<Message> {
   const { chatId: _ignoredChatId, content, messageType, mediaUrl } = dto
 
-  const body: { content?: string; messageType: MessageType; mediaUrl?: string } =
-    mediaUrl ? { messageType, mediaUrl } : { messageType, content }
+  // `content` is dropped only when it is genuinely absent/blank: the DTO
+  // requires 1–5000 characters, so sending an empty string would fail
+  // validation. A real caption always travels with the media.
+  const caption = content?.trim() ? content : undefined
+
+  const body: { content?: string; messageType: MessageType; mediaUrl?: string } = mediaUrl
+    ? { messageType, mediaUrl, ...(caption ? { content: caption } : {}) }
+    : { messageType, content }
 
   return apiRequest<Message>({
     method: 'POST',

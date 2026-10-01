@@ -22,17 +22,25 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
   const send = useSendMessage(chatId)
   const [sendError, setSendError] = useState<string | null>(null)
 
-  const handleSend = (content: string, messageType: 'text' | 'image' | 'video', mediaUrl?: string | null) => {
+  /**
+   * Resolves `true` only once the backend has persisted the message. The
+   * composer uses that to decide whether to clear itself, so a failed send
+   * leaves the caption and any attachment in place to retry.
+   */
+  const handleSend = async (
+    content: string,
+    messageType: 'text' | 'image' | 'video',
+    mediaUrl?: string | null,
+  ): Promise<boolean> => {
     setSendError(null)
-    send.mutate(
-      { chatId, content, messageType, mediaUrl },
-      {
-        onError: (error) => {
-          const apiError = toApiRequestError(error)
-          setSendError(translateApiError(apiError.code, apiError.message))
-        },
-      },
-    )
+    try {
+      await send.mutateAsync({ chatId, content, messageType, mediaUrl })
+      return true
+    } catch (error) {
+      const apiError = toApiRequestError(error)
+      setSendError(translateApiError(apiError.code, apiError.message))
+      return false
+    }
   }
 
   return (

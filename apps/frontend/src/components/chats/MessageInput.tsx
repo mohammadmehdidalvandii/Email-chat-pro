@@ -27,7 +27,12 @@ import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 
 interface MessageInputProps {
-  onSend: (content: string, messageType: MessageType, mediaUrl?: string | null) => void
+  /**
+   * Returns `true` once the message has been persisted by the backend. The
+   * composer clears itself only on `true`, so a failed send keeps the caption
+   * and the picked attachment for a retry.
+   */
+  onSend: (content: string, messageType: MessageType, mediaUrl?: string | null) => Promise<boolean>
   disabled?: boolean
 }
 
@@ -90,18 +95,35 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
     }
   }
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const trimmed = text.trim()
     if (busy || (trimmed.length === 0 && !attachment)) return
-    onSend(trimmed, attachment ? attachment.type : 'text', attachment?.url)
-    setText('')
-    setAttachment(null)
+
+    // Capture what is being sent so a retry after a failure cannot pick up
+    // newer edits — the send is resolved against exactly these values.
+    const pendingText = trimmed
+    const pendingAttachment = attachment
+
+    const sent = await onSend(
+      pendingText,
+      pendingAttachment ? pendingAttachment.type : 'text',
+      pendingAttachment?.url,
+    )
+
+    // Only clear once the backend confirmed the write. On failure the caption
+    // and attachment stay put, and the error is shown above by ChatWindow.
+    if (!sent) return
+
+    // Guard against the user having typed or picked something else while the
+    // request was in flight; that input must not be wiped by this send.
+    setText((current) => (current.trim() === pendingText ? '' : current))
+    setAttachment((current) => (current?.url === pendingAttachment?.url ? null : current))
   }
 
   const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
     if (event.key === 'Enter') {
       event.preventDefault()
-      handleSend()
+      void handleSend()
     }
   }
 
@@ -155,7 +177,8 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
           disabled={busy}
         />
         <Button
-          onClick={handleSend}
+          type="button"
+          onClick={() => void handleSend()}
           disabled={busy || (!text.trim() && !attachment)}
         >
           {t('chat:send')}
