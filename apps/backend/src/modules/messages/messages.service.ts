@@ -76,14 +76,14 @@ export class MessagesService {
     const chat = await this.chatsService.findById(chatId)
     if (!chat) {
       throw new NotFoundException({
-        code: ERROR_CODES.NOT_FOUND,
+        code: ERROR_CODES.CHAT_NOT_FOUND,
         message: ERROR_MESSAGES.CHAT_NOT_FOUND,
       })
     }
 
     if (chat.userAId !== sender.id && chat.userBId !== sender.id) {
       throw new ForbiddenException({
-        code: ERROR_CODES.FORBIDDEN,
+        code: ERROR_CODES.NOT_CHAT_PARTICIPANT,
         message: ERROR_MESSAGES.NOT_CHAT_PARTICIPANT,
       })
     }
@@ -94,7 +94,7 @@ export class MessagesService {
     // any chat that exists between non-contacts.
     if (!(await this.contactsService.areContacts(chat.userAId, chat.userBId))) {
       throw new ForbiddenException({
-        code: ERROR_CODES.FORBIDDEN,
+        code: ERROR_CODES.CONTACT_RELATIONSHIP_REQUIRED,
         message: ERROR_MESSAGES.CONTACT_RELATIONSHIP_REQUIRED,
       })
     }
@@ -113,13 +113,13 @@ export class MessagesService {
     if (dto.messageType === 'text') {
       if (!dto.content || dto.content.trim() === '') {
         throw new BadRequestException({
-          code: ERROR_CODES.VALIDATION_ERROR,
+          code: ERROR_CODES.MESSAGE_CONTENT_REQUIRED,
           message: ERROR_MESSAGES.MESSAGE_CONTENT_REQUIRED,
         })
       }
       if (dto.mediaUrl) {
         throw new BadRequestException({
-          code: ERROR_CODES.VALIDATION_ERROR,
+          code: ERROR_CODES.MESSAGE_MEDIA_NOT_ALLOWED,
           message: ERROR_MESSAGES.MESSAGE_MEDIA_NOT_ALLOWED,
         })
       }
@@ -128,13 +128,13 @@ export class MessagesService {
     } else if (dto.messageType === 'image') {
       if (!dto.mediaUrl) {
         throw new BadRequestException({
-          code: ERROR_CODES.VALIDATION_ERROR,
+          code: ERROR_CODES.IMAGE_MEDIA_URL_REQUIRED,
           message: ERROR_MESSAGES.IMAGE_MEDIA_URL_REQUIRED,
         })
       }
       if (!isValidHttpUrl(dto.mediaUrl)) {
         throw new BadRequestException({
-          code: ERROR_CODES.VALIDATION_ERROR,
+          code: ERROR_CODES.IMAGE_MEDIA_URL_INVALID,
           message: ERROR_MESSAGES.IMAGE_MEDIA_URL_INVALID,
         })
       }
@@ -143,13 +143,13 @@ export class MessagesService {
     } else {
       if (!dto.mediaUrl) {
         throw new BadRequestException({
-          code: ERROR_CODES.VALIDATION_ERROR,
+          code: ERROR_CODES.VIDEO_MEDIA_URL_REQUIRED,
           message: ERROR_MESSAGES.VIDEO_MEDIA_URL_REQUIRED,
         })
       }
       if (!isValidHttpUrl(dto.mediaUrl)) {
         throw new BadRequestException({
-          code: ERROR_CODES.VALIDATION_ERROR,
+          code: ERROR_CODES.VIDEO_MEDIA_URL_INVALID,
           message: ERROR_MESSAGES.VIDEO_MEDIA_URL_INVALID,
         })
       }
@@ -193,14 +193,14 @@ export class MessagesService {
     const chat = await this.chatsService.findById(chatId)
     if (!chat) {
       throw new NotFoundException({
-        code: ERROR_CODES.NOT_FOUND,
+        code: ERROR_CODES.CHAT_NOT_FOUND,
         message: ERROR_MESSAGES.CHAT_NOT_FOUND,
       })
     }
 
     if (chat.userAId !== userId && chat.userBId !== userId) {
       throw new ForbiddenException({
-        code: ERROR_CODES.FORBIDDEN,
+        code: ERROR_CODES.NOT_CHAT_PARTICIPANT,
         message: ERROR_MESSAGES.NOT_CHAT_PARTICIPANT,
       })
     }

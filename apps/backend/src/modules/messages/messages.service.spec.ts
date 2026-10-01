@@ -108,7 +108,7 @@ describe('MessagesService', () => {
       await expect(service.sendMessage(baseUser, 'chat-1', dto)).rejects.toMatchObject({
         status: 404,
         response: {
-          code: ERROR_CODES.NOT_FOUND,
+          code: ERROR_CODES.CHAT_NOT_FOUND,
           message: ERROR_MESSAGES.CHAT_NOT_FOUND,
         },
       })
@@ -123,7 +123,7 @@ describe('MessagesService', () => {
       ).rejects.toMatchObject({
         status: 403,
         response: {
-          code: ERROR_CODES.FORBIDDEN,
+          code: ERROR_CODES.NOT_CHAT_PARTICIPANT,
           message: ERROR_MESSAGES.NOT_CHAT_PARTICIPANT,
         },
       })
@@ -137,7 +137,7 @@ describe('MessagesService', () => {
       await expect(service.sendMessage(baseUser, 'chat-1', dto)).rejects.toMatchObject({
         status: 403,
         response: {
-          code: ERROR_CODES.FORBIDDEN,
+          code: ERROR_CODES.CONTACT_RELATIONSHIP_REQUIRED,
           message: ERROR_MESSAGES.CONTACT_RELATIONSHIP_REQUIRED,
         },
       })
@@ -210,7 +210,7 @@ describe('MessagesService', () => {
       ).rejects.toMatchObject({
         status: 400,
         response: {
-          code: ERROR_CODES.VALIDATION_ERROR,
+          code: ERROR_CODES.MESSAGE_MEDIA_NOT_ALLOWED,
           message: ERROR_MESSAGES.MESSAGE_MEDIA_NOT_ALLOWED,
         },
       })
@@ -286,7 +286,7 @@ describe('MessagesService', () => {
       ).rejects.toMatchObject({
         status: 400,
         response: {
-          code: ERROR_CODES.VALIDATION_ERROR,
+          code: ERROR_CODES.IMAGE_MEDIA_URL_REQUIRED,
           message: ERROR_MESSAGES.IMAGE_MEDIA_URL_REQUIRED,
         },
       })
@@ -304,7 +304,7 @@ describe('MessagesService', () => {
       ).rejects.toMatchObject({
         status: 400,
         response: {
-          code: ERROR_CODES.VALIDATION_ERROR,
+          code: ERROR_CODES.IMAGE_MEDIA_URL_INVALID,
           message: ERROR_MESSAGES.IMAGE_MEDIA_URL_INVALID,
         },
       })
@@ -380,7 +380,7 @@ describe('MessagesService', () => {
       ).rejects.toMatchObject({
         status: 400,
         response: {
-          code: ERROR_CODES.VALIDATION_ERROR,
+          code: ERROR_CODES.VIDEO_MEDIA_URL_REQUIRED,
           message: ERROR_MESSAGES.VIDEO_MEDIA_URL_REQUIRED,
         },
       })
@@ -398,7 +398,7 @@ describe('MessagesService', () => {
       ).rejects.toMatchObject({
         status: 400,
         response: {
-          code: ERROR_CODES.VALIDATION_ERROR,
+          code: ERROR_CODES.VIDEO_MEDIA_URL_INVALID,
           message: ERROR_MESSAGES.VIDEO_MEDIA_URL_INVALID,
         },
       })
@@ -413,7 +413,7 @@ describe('MessagesService', () => {
       ).rejects.toMatchObject({
         status: 400,
         response: {
-          code: ERROR_CODES.VALIDATION_ERROR,
+          code: ERROR_CODES.MESSAGE_CONTENT_REQUIRED,
           message: ERROR_MESSAGES.MESSAGE_CONTENT_REQUIRED,
         },
       })
@@ -515,7 +515,7 @@ describe('MessagesService', () => {
       await expect(service.getHistory(baseUser.id, chatId, 1, 50)).rejects.toMatchObject({
         status: 404,
         response: {
-          code: ERROR_CODES.NOT_FOUND,
+          code: ERROR_CODES.CHAT_NOT_FOUND,
           message: ERROR_MESSAGES.CHAT_NOT_FOUND,
         },
       })
@@ -527,7 +527,7 @@ describe('MessagesService', () => {
       await expect(service.getHistory('not-a-participant', chatId, 1, 50)).rejects.toMatchObject({
         status: 403,
         response: {
-          code: ERROR_CODES.FORBIDDEN,
+          code: ERROR_CODES.NOT_CHAT_PARTICIPANT,
           message: ERROR_MESSAGES.NOT_CHAT_PARTICIPANT,
         },
       })

@@ -150,6 +150,67 @@ describe('WebSocketService', () => {
     })
   })
 
+  describe('sendCurrentPresence', () => {
+    it('replays online state for contacts already online, targeting only the new socket', async () => {
+      service['onlineSockets'].set(CONTACT_A, new Set(['socket-a']))
+      contactsService.getContacts.mockResolvedValue([
+        { id: CONTACT_A, lastSeenAt: '2026-01-02T00:00:00.000Z' },
+        { id: CONTACT_B },
+      ] as SharedUser[])
+
+      await service.sendCurrentPresence(baseUser.id, 'socket-new')
+
+      // Only the online contact produces an event, and only to the connecting socket.
+      expect(server.to).toHaveBeenCalledTimes(1)
+      expect(server.to).toHaveBeenCalledWith('socket-new')
+      expect(server.emit).toHaveBeenCalledWith(WS_SERVER_EVENTS.PRESENCE_CHANGED, {
+        userId: CONTACT_A,
+        status: 'online',
+        lastSeenAt: '2026-01-02T00:00:00.000Z',
+      })
+    })
+
+    it('does not write last_seen_at — the contact is already online, nothing transitioned', async () => {
+      service['onlineSockets'].set(CONTACT_A, new Set(['socket-a']))
+      contactsService.getContacts.mockResolvedValue([{ id: CONTACT_A }] as SharedUser[])
+
+      await service.sendCurrentPresence(baseUser.id, 'socket-new')
+
+      expect(usersRepository.update).not.toHaveBeenCalled()
+    })
+
+    it('falls back to an ISO timestamp when an online contact has no lastSeenAt', async () => {
+      service['onlineSockets'].set(CONTACT_A, new Set(['socket-a']))
+      contactsService.getContacts.mockResolvedValue([{ id: CONTACT_A }] as SharedUser[])
+
+      await service.sendCurrentPresence(baseUser.id, 'socket-new')
+
+      expect(server.emit).toHaveBeenCalledWith(
+        WS_SERVER_EVENTS.PRESENCE_CHANGED,
+        expect.objectContaining({ lastSeenAt: expect.any(String) }),
+      )
+    })
+
+    it('emits nothing when no contact is online', async () => {
+      contactsService.getContacts.mockResolvedValue([
+        { id: CONTACT_A },
+        { id: CONTACT_B },
+      ] as SharedUser[])
+
+      await service.sendCurrentPresence(baseUser.id, 'socket-new')
+
+      expect(server.emit).not.toHaveBeenCalled()
+    })
+
+    it('is a no-op when no server is attached', async () => {
+      service['server'] = null
+
+      await service.sendCurrentPresence(baseUser.id, 'socket-new')
+
+      expect(server.emit).not.toHaveBeenCalled()
+    })
+  })
+
   describe('broadcast safety', () => {
     it('swallows the broadcast when no server is attached but still records last_seen_at', async () => {
       service['server'] = null

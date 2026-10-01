@@ -75,7 +75,7 @@ export class ContactsService {
   async sendRequest(sender: User, receiverId: string): Promise<ContactRequestContract> {
     if (receiverId === sender.id) {
       throw new BadRequestException({
-        code: ERROR_CODES.VALIDATION_ERROR,
+        code: ERROR_CODES.CONTACT_REQUEST_SELF_NOT_ALLOWED,
         message: ERROR_MESSAGES.CONTACT_REQUEST_SELF_NOT_ALLOWED,
       })
     }
@@ -85,7 +85,7 @@ export class ContactsService {
     })
     if (!receiver) {
       throw new NotFoundException({
-        code: ERROR_CODES.NOT_FOUND,
+        code: ERROR_CODES.CONTACT_REQUEST_RECEIVER_NOT_FOUND,
         message: ERROR_MESSAGES.CONTACT_REQUEST_RECEIVER_NOT_FOUND,
       })
     }
@@ -97,7 +97,7 @@ export class ContactsService {
     if (existing) {
       if (existing.status !== 'declined') {
         throw new ConflictException({
-          code: ERROR_CODES.CONFLICT,
+          code: ERROR_CODES.CONTACT_REQUEST_DUPLICATE,
           message: ERROR_MESSAGES.CONTACT_REQUEST_DUPLICATE,
         })
       }
@@ -117,7 +117,7 @@ export class ContactsService {
     } catch (error) {
       if (this.isUniqueViolation(error)) {
         throw new ConflictException({
-          code: ERROR_CODES.CONFLICT,
+          code: ERROR_CODES.CONTACT_REQUEST_DUPLICATE,
           message: ERROR_MESSAGES.CONTACT_REQUEST_DUPLICATE,
         })
       }
@@ -168,19 +168,19 @@ export class ContactsService {
     })
     if (!request) {
       throw new NotFoundException({
-        code: ERROR_CODES.NOT_FOUND,
+        code: ERROR_CODES.CONTACT_REQUEST_NOT_FOUND,
         message: ERROR_MESSAGES.CONTACT_REQUEST_NOT_FOUND,
       })
     }
     if (request.receiver.id !== userId) {
       throw new ForbiddenException({
-        code: ERROR_CODES.FORBIDDEN,
+        code: ERROR_CODES.CONTACT_REQUEST_NOT_RECEIVER,
         message: ERROR_MESSAGES.CONTACT_REQUEST_NOT_RECEIVER,
       })
     }
     if (request.status !== 'pending') {
       throw new ConflictException({
-        code: ERROR_CODES.CONFLICT,
+        code: ERROR_CODES.CONTACT_REQUEST_ALREADY_RESPONDED,
         message: ERROR_MESSAGES.CONTACT_REQUEST_ALREADY_RESPONDED,
       })
     }

@@ -10,12 +10,27 @@ import {
   VIDEO_MAX_DURATION_SECONDS,
 } from './validation.constants'
 
-/** Standard error codes used in API error responses (architecture.md §Error Handling). */
+/**
+ * Standard error codes used in API error responses (architecture.md §Error Handling).
+ *
+ * These are the codes a client may receive in `error.code`. They fall into two
+ * groups:
+ *
+ *  - Generic HTTP-level codes, used as the fallback whenever a throw does not
+ *    identify a more specific cause (see `HttpExceptionFilter.codeForStatus`).
+ *  - Specific codes, emitted when the backend knows exactly what went wrong.
+ *    They are the contract the UI keys off: a specific code lets the frontend
+ *    render the right translation without ever matching on the English
+ *    `message` text. Every specific code has a matching `errors` namespace key
+ *    in the frontend locales.
+ *
+ * Specific codes reuse the names already defined in {@link ERROR_MESSAGES} —
+ * the code identifies the cause, the message remains the English fallback.
+ */
 export const ERROR_CODES = {
+  // --- Generic HTTP-level codes (fallback when no specific cause applies) ---
   /** Request validation failed (HTTP 400). */
   VALIDATION_ERROR: 'VALIDATION_ERROR',
-  /** The verification token is unknown, expired, or already used (HTTP 400). */
-  VERIFICATION_TOKEN_INVALID: 'VERIFICATION_TOKEN_INVALID',
   /** Authentication failed (HTTP 401). */
   UNAUTHORIZED: 'UNAUTHORIZED',
   /** The authenticated user cannot access the resource (HTTP 403). */
@@ -28,6 +43,107 @@ export const ERROR_CODES = {
   RATE_LIMIT_EXCEEDED: 'RATE_LIMIT_EXCEEDED',
   /** Unexpected server failure (HTTP 500). */
   INTERNAL_ERROR: 'INTERNAL_ERROR',
+
+  // --- Authentication ---
+  /** The verification token is unknown, expired, or already used (HTTP 400). */
+  VERIFICATION_TOKEN_INVALID: 'VERIFICATION_TOKEN_INVALID',
+  /**
+   * The email is not registered (HTTP 409).
+   *
+   * Distinct from {@link ERROR_CODES.CONFLICT} so the UI can say "this email is
+   * taken" instead of a generic conflict message.
+   */
+  EMAIL_ALREADY_REGISTERED: 'EMAIL_ALREADY_REGISTERED',
+  /**
+   * The account exists and the password matched, but the email is unverified
+   * (HTTP 401). Only ever returned AFTER the password check passes, so the code
+   * discloses nothing an incorrect password would not.
+   */
+  EMAIL_NOT_VERIFIED: 'EMAIL_NOT_VERIFIED',
+  /**
+   * Unknown email, inactive/deleted account, or wrong password (HTTP 401).
+   * Deliberately one code for all three so the endpoint cannot be used to
+   * discover which email addresses are registered.
+   */
+  INVALID_CREDENTIALS: 'INVALID_CREDENTIALS',
+
+  // --- Profile & account ---
+  /** The requested username belongs to another user (HTTP 409). */
+  USERNAME_TAKEN: 'USERNAME_TAKEN',
+  /** The password supplied for account deletion did not match (HTTP 401). */
+  PASSWORD_INCORRECT: 'PASSWORD_INCORRECT',
+
+  // --- Search ---
+  /** The search query is missing or blank (HTTP 400). */
+  SEARCH_QUERY_REQUIRED: 'SEARCH_QUERY_REQUIRED',
+  /** The search query exceeded the maximum length (HTTP 400). */
+  SEARCH_QUERY_TOO_LONG: 'SEARCH_QUERY_TOO_LONG',
+
+  // --- Chats & messages ---
+  /** The chat does not exist (HTTP 404). */
+  CHAT_NOT_FOUND: 'CHAT_NOT_FOUND',
+  /** The user is not a participant of the chat (HTTP 403). */
+  NOT_CHAT_PARTICIPANT: 'NOT_CHAT_PARTICIPANT',
+  /** A message was sent with neither text nor media (HTTP 400). */
+  MESSAGE_CONTENT_REQUIRED: 'MESSAGE_CONTENT_REQUIRED',
+  /** The message text exceeded the maximum length (HTTP 400). */
+  MESSAGE_CONTENT_TOO_LONG: 'MESSAGE_CONTENT_TOO_LONG',
+  /** `messageType` is not one of text/image/video (HTTP 400). */
+  MESSAGE_TYPE_INVALID: 'MESSAGE_TYPE_INVALID',
+  /** A text message carried a media URL (HTTP 400). */
+  MESSAGE_MEDIA_NOT_ALLOWED: 'MESSAGE_MEDIA_NOT_ALLOWED',
+
+  // --- Contacts ---
+  /** A contact request already exists between these two users (HTTP 409). */
+  CONTACT_REQUEST_DUPLICATE: 'CONTACT_REQUEST_DUPLICATE',
+  /** The user tried to send a contact request to themselves (HTTP 400). */
+  CONTACT_REQUEST_SELF_NOT_ALLOWED: 'CONTACT_REQUEST_SELF_NOT_ALLOWED',
+  /** The target user does not exist or is not active (HTTP 404). */
+  CONTACT_REQUEST_RECEIVER_NOT_FOUND: 'CONTACT_REQUEST_RECEIVER_NOT_FOUND',
+  /** The contact request does not exist (HTTP 404). */
+  CONTACT_REQUEST_NOT_FOUND: 'CONTACT_REQUEST_NOT_FOUND',
+  /** The user is not the recipient of the contact request (HTTP 403). */
+  CONTACT_REQUEST_NOT_RECEIVER: 'CONTACT_REQUEST_NOT_RECEIVER',
+  /** The contact request was already accepted or declined (HTTP 409). */
+  CONTACT_REQUEST_ALREADY_RESPONDED: 'CONTACT_REQUEST_ALREADY_RESPONDED',
+  /** Messaging requires an accepted contact relationship (HTTP 403). */
+  CONTACT_RELATIONSHIP_REQUIRED: 'CONTACT_RELATIONSHIP_REQUIRED',
+
+  // --- File upload ---
+  /** No file was supplied (HTTP 400). */
+  FILE_REQUIRED: 'FILE_REQUIRED',
+  /** The file's MIME type is not supported (HTTP 400). */
+  FILE_TYPE_INVALID: 'FILE_TYPE_INVALID',
+  /** The file exceeds the size limit for its type (HTTP 413). */
+  FILE_SIZE_EXCEEDED: 'FILE_SIZE_EXCEEDED',
+  /** Image dimensions are outside the allowed range (HTTP 400). */
+  FILE_DIMENSIONS_INVALID: 'FILE_DIMENSIONS_INVALID',
+  /** The video's duration could not be determined (HTTP 400). */
+  VIDEO_DURATION_INVALID: 'VIDEO_DURATION_INVALID',
+  /** The video is longer than the allowed duration (HTTP 400). */
+  VIDEO_DURATION_EXCEEDED: 'VIDEO_DURATION_EXCEEDED',
+  /** The upload to the storage provider failed (HTTP 500). */
+  FILE_UPLOAD_FAILED: 'FILE_UPLOAD_FAILED',
+  /** An image message carried no `mediaUrl` (HTTP 400). */
+  IMAGE_MEDIA_URL_REQUIRED: 'IMAGE_MEDIA_URL_REQUIRED',
+  /** The image `mediaUrl` is not a valid http(s) URL (HTTP 400). */
+  IMAGE_MEDIA_URL_INVALID: 'IMAGE_MEDIA_URL_INVALID',
+  /** A video message carried no `mediaUrl` (HTTP 400). */
+  VIDEO_MEDIA_URL_REQUIRED: 'VIDEO_MEDIA_URL_REQUIRED',
+  /** The video `mediaUrl` is not a valid http(s) URL (HTTP 400). */
+  VIDEO_MEDIA_URL_INVALID: 'VIDEO_MEDIA_URL_INVALID',
+
+  // --- Rate limiting ---
+  /** A route-specific rate limit was exceeded (HTTP 429). */
+  TOO_MANY_REQUESTS: 'TOO_MANY_REQUESTS',
+
+  // --- WebSocket ---
+  /** The socket connection failed or was rejected (handshake). */
+  WS_CONNECTION_FAILED: 'WS_CONNECTION_FAILED',
+  /** The socket handshake carried no valid token. */
+  WS_UNAUTHORIZED: 'WS_UNAUTHORIZED',
+  /** The socket user is not a participant of the requested room. */
+  WS_CHAT_UNAUTHORIZED: 'WS_CHAT_UNAUTHORIZED',
 } as const
 
 /** Human-readable messages for registration-, verification-, and profile-related errors. */

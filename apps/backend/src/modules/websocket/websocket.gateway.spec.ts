@@ -37,6 +37,7 @@ describe('ChatGateway', () => {
     attachServer: jest.fn(),
     registerOnline: jest.fn().mockResolvedValue(undefined),
     unregisterOnline: jest.fn().mockResolvedValue(undefined),
+    sendCurrentPresence: jest.fn().mockResolvedValue(undefined),
   }
 
   const server = {
@@ -114,7 +115,7 @@ describe('ChatGateway', () => {
       await gateway.handleConnection(client)
 
       expect(client.emit).toHaveBeenCalledWith(WS_SERVER_EVENTS.ERROR, {
-        code: ERROR_CODES.UNAUTHORIZED,
+        code: ERROR_CODES.WS_UNAUTHORIZED,
         message: ERROR_MESSAGES.WS_UNAUTHORIZED,
       })
       expect(client.disconnect).toHaveBeenCalledWith(true)
@@ -130,7 +131,7 @@ describe('ChatGateway', () => {
       await gateway.handleConnection(client)
 
       expect(client.emit).toHaveBeenCalledWith(WS_SERVER_EVENTS.ERROR, {
-        code: ERROR_CODES.UNAUTHORIZED,
+        code: ERROR_CODES.WS_UNAUTHORIZED,
         message: ERROR_MESSAGES.WS_UNAUTHORIZED,
       })
       expect(client.disconnect).toHaveBeenCalledWith(true)
@@ -144,7 +145,7 @@ describe('ChatGateway', () => {
       await gateway.handleConnection(client)
 
       expect(client.emit).toHaveBeenCalledWith(WS_SERVER_EVENTS.ERROR, {
-        code: ERROR_CODES.UNAUTHORIZED,
+        code: ERROR_CODES.WS_UNAUTHORIZED,
         message: ERROR_MESSAGES.WS_UNAUTHORIZED,
       })
       expect(client.disconnect).toHaveBeenCalledWith(true)
@@ -158,7 +159,7 @@ describe('ChatGateway', () => {
       await gateway.handleConnection(client)
 
       expect(client.emit).toHaveBeenCalledWith(WS_SERVER_EVENTS.ERROR, {
-        code: ERROR_CODES.UNAUTHORIZED,
+        code: ERROR_CODES.WS_UNAUTHORIZED,
         message: ERROR_MESSAGES.WS_UNAUTHORIZED,
       })
       expect(client.disconnect).toHaveBeenCalledWith(true)
@@ -184,6 +185,30 @@ describe('ChatGateway', () => {
       await gateway.handleConnection(client)
 
       expect(webSocketService.registerOnline).toHaveBeenCalledWith(baseUser, 'socket-1')
+    })
+
+    it('replays the current presence of already-online contacts to the new socket', async () => {
+      const client = makeClient({ handshake: { auth: { token: 'valid-token' } } })
+      jwtService.verify.mockReturnValue({ sub: baseUser.id, email: baseUser.email })
+      usersRepository.findOne.mockResolvedValue(baseUser)
+
+      await gateway.handleConnection(client)
+
+      expect(webSocketService.sendCurrentPresence).toHaveBeenCalledWith(baseUser.id, 'socket-1')
+    })
+
+    it('still accepts the connection when the presence replay fails', async () => {
+      const client = makeClient({ handshake: { auth: { token: 'valid-token' } } })
+      jwtService.verify.mockReturnValue({ sub: baseUser.id, email: baseUser.email })
+      usersRepository.findOne.mockResolvedValue(baseUser)
+      webSocketService.sendCurrentPresence.mockRejectedValueOnce(new Error('db down'))
+
+      await expect(gateway.handleConnection(client)).resolves.toBeUndefined()
+
+      // The socket stays connected: an auxiliary presence failure must not
+      // reject an otherwise-valid connection.
+      expect(client.disconnect).not.toHaveBeenCalled()
+      expect(gateway['connectedUsers'].get('socket-1')).toEqual(baseUser)
     })
 
     it.each([
@@ -252,7 +277,7 @@ describe('ChatGateway', () => {
 
       expect(result).toEqual({
         event: WS_SERVER_EVENTS.ERROR,
-        data: { code: ERROR_CODES.UNAUTHORIZED, message: ERROR_MESSAGES.WS_UNAUTHORIZED },
+        data: { code: ERROR_CODES.WS_UNAUTHORIZED, message: ERROR_MESSAGES.WS_UNAUTHORIZED },
       })
       expect(client.join).not.toHaveBeenCalled()
     })
@@ -288,7 +313,7 @@ describe('ChatGateway', () => {
 
       expect(result).toEqual({
         event: WS_SERVER_EVENTS.ERROR,
-        data: { code: ERROR_CODES.NOT_FOUND, message: ERROR_MESSAGES.CHAT_NOT_FOUND },
+        data: { code: ERROR_CODES.CHAT_NOT_FOUND, message: ERROR_MESSAGES.CHAT_NOT_FOUND },
       })
       expect(client.join).not.toHaveBeenCalled()
     })
@@ -304,7 +329,7 @@ describe('ChatGateway', () => {
 
       expect(result).toEqual({
         event: WS_SERVER_EVENTS.ERROR,
-        data: { code: ERROR_CODES.FORBIDDEN, message: ERROR_MESSAGES.WS_CHAT_UNAUTHORIZED },
+        data: { code: ERROR_CODES.WS_CHAT_UNAUTHORIZED, message: ERROR_MESSAGES.WS_CHAT_UNAUTHORIZED },
       })
       expect(client.join).not.toHaveBeenCalled()
     })

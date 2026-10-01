@@ -107,7 +107,7 @@ describe('UsersService', () => {
       ).rejects.toMatchObject({
         status: 409,
         response: {
-          code: ERROR_CODES.CONFLICT,
+          code: ERROR_CODES.USERNAME_TAKEN,
           message: ERROR_MESSAGES.USERNAME_TAKEN,
         },
       })
@@ -123,7 +123,7 @@ describe('UsersService', () => {
       ).rejects.toMatchObject({
         status: 409,
         response: {
-          code: ERROR_CODES.CONFLICT,
+          code: ERROR_CODES.USERNAME_TAKEN,
           message: ERROR_MESSAGES.USERNAME_TAKEN,
         },
       })
@@ -178,7 +178,7 @@ describe('UsersService', () => {
       ).rejects.toMatchObject({
         status: 401,
         response: {
-          code: ERROR_CODES.UNAUTHORIZED,
+          code: ERROR_CODES.PASSWORD_INCORRECT,
           message: ERROR_MESSAGES.PASSWORD_INCORRECT,
         },
       })
@@ -240,21 +240,21 @@ describe('UsersService', () => {
       await expect(service.searchUsers('', 10, CALLER_ID)).rejects.toMatchObject({
         status: 400,
         response: {
-          code: ERROR_CODES.VALIDATION_ERROR,
+          code: ERROR_CODES.SEARCH_QUERY_REQUIRED,
           message: ERROR_MESSAGES.SEARCH_QUERY_REQUIRED,
         },
       })
       await expect(service.searchUsers('   ', 10, CALLER_ID)).rejects.toMatchObject({
         status: 400,
         response: {
-          code: ERROR_CODES.VALIDATION_ERROR,
+          code: ERROR_CODES.SEARCH_QUERY_REQUIRED,
           message: ERROR_MESSAGES.SEARCH_QUERY_REQUIRED,
         },
       })
       await expect(service.searchUsers(undefined, 10, CALLER_ID)).rejects.toMatchObject({
         status: 400,
         response: {
-          code: ERROR_CODES.VALIDATION_ERROR,
+          code: ERROR_CODES.SEARCH_QUERY_REQUIRED,
           message: ERROR_MESSAGES.SEARCH_QUERY_REQUIRED,
         },
       })
@@ -378,7 +378,7 @@ describe('UsersService', () => {
         ).rejects.toMatchObject({
           status: 400,
           response: {
-            code: ERROR_CODES.VALIDATION_ERROR,
+            code: ERROR_CODES.SEARCH_QUERY_TOO_LONG,
             message: ERROR_MESSAGES.SEARCH_QUERY_TOO_LONG,
           },
         })

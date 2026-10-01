@@ -93,7 +93,7 @@ describe('FilesService', () => {
   it('throws FILE_REQUIRED when no file is sent', async () => {
     await expect(service.uploadImage(undefined)).rejects.toMatchObject({
       status: 400,
-      response: { code: ERROR_CODES.VALIDATION_ERROR, message: ERROR_MESSAGES.FILE_REQUIRED },
+      response: { code: ERROR_CODES.FILE_REQUIRED, message: ERROR_MESSAGES.FILE_REQUIRED },
     })
   })
 
@@ -102,7 +102,7 @@ describe('FilesService', () => {
       service.uploadImage({ buffer: Buffer.alloc(0) } as Express.Multer.File),
     ).rejects.toMatchObject({
       status: 400,
-      response: { code: ERROR_CODES.VALIDATION_ERROR, message: ERROR_MESSAGES.FILE_REQUIRED },
+      response: { code: ERROR_CODES.FILE_REQUIRED, message: ERROR_MESSAGES.FILE_REQUIRED },
     })
   })
 
@@ -111,7 +111,7 @@ describe('FilesService', () => {
       service.uploadImage({ buffer: Buffer.from('not an image at all') } as Express.Multer.File),
     ).rejects.toMatchObject({
       status: 400,
-      response: { code: ERROR_CODES.VALIDATION_ERROR, message: ERROR_MESSAGES.FILE_TYPE_INVALID },
+      response: { code: ERROR_CODES.FILE_TYPE_INVALID, message: ERROR_MESSAGES.FILE_TYPE_INVALID },
     })
   })
 
@@ -121,7 +121,7 @@ describe('FilesService', () => {
     ).rejects.toMatchObject({
       status: 400,
       response: {
-        code: ERROR_CODES.VALIDATION_ERROR,
+        code: ERROR_CODES.FILE_DIMENSIONS_INVALID,
         message: ERROR_MESSAGES.FILE_DIMENSIONS_INVALID,
       },
     })
@@ -133,7 +133,7 @@ describe('FilesService', () => {
     ).rejects.toMatchObject({
       status: 400,
       response: {
-        code: ERROR_CODES.VALIDATION_ERROR,
+        code: ERROR_CODES.FILE_DIMENSIONS_INVALID,
         message: ERROR_MESSAGES.FILE_DIMENSIONS_INVALID,
       },
     })
@@ -171,7 +171,7 @@ describe('FilesService', () => {
 
     await expect(service.uploadImage(validFile())).rejects.toMatchObject({
       status: 500,
-      response: { code: ERROR_CODES.INTERNAL_ERROR, message: ERROR_MESSAGES.FILE_UPLOAD_FAILED },
+      response: { code: ERROR_CODES.FILE_UPLOAD_FAILED, message: ERROR_MESSAGES.FILE_UPLOAD_FAILED },
     })
   })
 
@@ -180,7 +180,7 @@ describe('FilesService', () => {
 
     await expect(service.uploadImage(validFile())).rejects.toMatchObject({
       status: 500,
-      response: { code: ERROR_CODES.INTERNAL_ERROR, message: ERROR_MESSAGES.FILE_UPLOAD_FAILED },
+      response: { code: ERROR_CODES.FILE_UPLOAD_FAILED, message: ERROR_MESSAGES.FILE_UPLOAD_FAILED },
     })
   })
 
@@ -189,7 +189,7 @@ describe('FilesService', () => {
 
     await expect(service.uploadImage(validFile())).rejects.toMatchObject({
       status: 500,
-      response: { code: ERROR_CODES.INTERNAL_ERROR, message: ERROR_MESSAGES.FILE_UPLOAD_FAILED },
+      response: { code: ERROR_CODES.FILE_UPLOAD_FAILED, message: ERROR_MESSAGES.FILE_UPLOAD_FAILED },
     })
   })
 
@@ -197,7 +197,7 @@ describe('FilesService', () => {
     await expect(service.uploadImage(largeImageFile())).rejects.toMatchObject({
       status: 400,
       response: {
-        code: ERROR_CODES.VALIDATION_ERROR,
+        code: ERROR_CODES.FILE_SIZE_EXCEEDED,
         message: ERROR_MESSAGES.FILE_SIZE_EXCEEDED,
       },
     })
@@ -208,7 +208,7 @@ describe('FilesService', () => {
   it('throws FILE_REQUIRED when no video file is sent', async () => {
     await expect(service.uploadVideo(undefined)).rejects.toMatchObject({
       status: 400,
-      response: { code: ERROR_CODES.VALIDATION_ERROR, message: ERROR_MESSAGES.FILE_REQUIRED },
+      response: { code: ERROR_CODES.FILE_REQUIRED, message: ERROR_MESSAGES.FILE_REQUIRED },
     })
   })
 
@@ -217,7 +217,7 @@ describe('FilesService', () => {
       service.uploadVideo({ buffer: Buffer.from('not a video') } as Express.Multer.File),
     ).rejects.toMatchObject({
       status: 400,
-      response: { code: ERROR_CODES.VALIDATION_ERROR, message: ERROR_MESSAGES.FILE_TYPE_INVALID },
+      response: { code: ERROR_CODES.FILE_TYPE_INVALID, message: ERROR_MESSAGES.FILE_TYPE_INVALID },
     })
   })
 
@@ -233,7 +233,7 @@ describe('FilesService', () => {
     ).rejects.toMatchObject({
       status: 400,
       response: {
-        code: ERROR_CODES.VALIDATION_ERROR,
+        code: ERROR_CODES.VIDEO_DURATION_INVALID,
         message: ERROR_MESSAGES.VIDEO_DURATION_INVALID,
       },
     })
@@ -245,7 +245,7 @@ describe('FilesService', () => {
     ).rejects.toMatchObject({
       status: 400,
       response: {
-        code: ERROR_CODES.VALIDATION_ERROR,
+        code: ERROR_CODES.VIDEO_DURATION_EXCEEDED,
         message: ERROR_MESSAGES.VIDEO_DURATION_EXCEEDED,
       },
     })
@@ -283,7 +283,7 @@ describe('FilesService', () => {
 
     await expect(service.uploadVideo(file)).rejects.toMatchObject({
       status: 500,
-      response: { code: ERROR_CODES.INTERNAL_ERROR, message: ERROR_MESSAGES.FILE_UPLOAD_FAILED },
+      response: { code: ERROR_CODES.FILE_UPLOAD_FAILED, message: ERROR_MESSAGES.FILE_UPLOAD_FAILED },
     })
   })
 

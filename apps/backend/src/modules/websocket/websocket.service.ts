@@ -113,6 +113,48 @@ export class WebSocketService {
   }
 
   /**
+   * Sends the connecting socket the CURRENT presence state of every accepted
+   * contact that is online right now.
+   *
+   * Without this, presence is only ever pushed on a transition, so a user who
+   * connects after their contacts are already online would never learn their
+   * state: `presence:changed` fires when someone goes online or offline, not
+   * when a listener arrives. The two clients would sit in the same room with
+   * both presence indicators blank until the next transition happened to occur.
+   *
+   * Only online contacts are reported. An offline contact produces no event,
+   * which is the same signal the transition path produces for them, and the
+   * `lastSeenAt` fallback for offline users already comes from the REST
+   * payload — so this makes the socket path match the existing presence model
+   * rather than extending it.
+   *
+   * Best-effort: a failure here must not reject an otherwise-valid connection,
+   * so the caller logs and swallows it (same as registration).
+   */
+  async sendCurrentPresence(userId: string, socketId: string): Promise<void> {
+    const server = this.server
+    if (server === null) {
+      return
+    }
+    const contacts = await this.contactsService.getContacts(userId)
+    for (const contact of contacts) {
+      const sockets = this.onlineSockets.get(contact.id)
+      if (sockets === undefined || sockets.size === 0) {
+        continue
+      }
+      server.to(socketId).emit(WS_SERVER_EVENTS.PRESENCE_CHANGED, {
+        userId: contact.id,
+        status: 'online',
+        // Replay the contact's own last-seen instant rather than inventing one:
+        // for an online user this is when they came online, which is exactly
+        // what the transition event would have carried. `SharedUser.lastSeenAt`
+        // is already an ISO string (or absent).
+        lastSeenAt: contact.lastSeenAt ?? new Date().toISOString(),
+      } satisfies PresenceChangedEvent)
+    }
+  }
+
+  /**
    * Sends a presence event to every online socket of the user's accepted
    * contacts (contacts with no active socket receive nothing). The changed
    * user does not receive their own presence event.

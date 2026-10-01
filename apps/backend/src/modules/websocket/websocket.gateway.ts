@@ -84,7 +84,7 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       if (!token) {
         this.logger.warn(`Connection rejected — no token provided [${client.id}]`)
         client.emit(WS_SERVER_EVENTS.ERROR, {
-          code: ERROR_CODES.UNAUTHORIZED,
+          code: ERROR_CODES.WS_UNAUTHORIZED,
           message: ERROR_MESSAGES.WS_UNAUTHORIZED,
         })
         client.disconnect(true)
@@ -97,7 +97,7 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       if (!user || !user.isActive) {
         this.logger.warn(`Connection rejected — invalid user [${client.id}]`)
         client.emit(WS_SERVER_EVENTS.ERROR, {
-          code: ERROR_CODES.UNAUTHORIZED,
+          code: ERROR_CODES.WS_UNAUTHORIZED,
           message: ERROR_MESSAGES.WS_UNAUTHORIZED,
         })
         client.disconnect(true)
@@ -114,11 +114,20 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
       } catch (error) {
         this.logger.warn(`Presence registration failed for ${user.id}: ${(error as Error).message}`)
       }
+
+      // Replay the current presence of contacts that are already online. This
+      // must run AFTER registration so contacts who connected between this
+      // user's lookup and now are included, and it targets only this socket.
+      try {
+        await this.webSocketService.sendCurrentPresence(user.id, client.id)
+      } catch (error) {
+        this.logger.warn(`Initial presence failed for ${user.id}: ${(error as Error).message}`)
+      }
       this.logger.log(`Client connected — ${user.id} [${client.id}]`)
     } catch {
       this.logger.warn(`Connection rejected — invalid token [${client.id}]`)
       client.emit(WS_SERVER_EVENTS.ERROR, {
-        code: ERROR_CODES.UNAUTHORIZED,
+        code: ERROR_CODES.WS_UNAUTHORIZED,
         message: ERROR_MESSAGES.WS_UNAUTHORIZED,
       })
       client.disconnect(true)
@@ -197,7 +206,7 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     if (!user) {
       return {
         event: WS_SERVER_EVENTS.ERROR,
-        data: { code: ERROR_CODES.UNAUTHORIZED, message: ERROR_MESSAGES.WS_UNAUTHORIZED },
+        data: { code: ERROR_CODES.WS_UNAUTHORIZED, message: ERROR_MESSAGES.WS_UNAUTHORIZED },
       }
     }
 
@@ -205,14 +214,14 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     if (!chat) {
       return {
         event: WS_SERVER_EVENTS.ERROR,
-        data: { code: ERROR_CODES.NOT_FOUND, message: ERROR_MESSAGES.CHAT_NOT_FOUND },
+        data: { code: ERROR_CODES.CHAT_NOT_FOUND, message: ERROR_MESSAGES.CHAT_NOT_FOUND },
       }
     }
 
     if (chat.userAId !== user.id && chat.userBId !== user.id) {
       return {
         event: WS_SERVER_EVENTS.ERROR,
-        data: { code: ERROR_CODES.FORBIDDEN, message: ERROR_MESSAGES.WS_CHAT_UNAUTHORIZED },
+        data: { code: ERROR_CODES.WS_CHAT_UNAUTHORIZED, message: ERROR_MESSAGES.WS_CHAT_UNAUTHORIZED },
       }
     }
 

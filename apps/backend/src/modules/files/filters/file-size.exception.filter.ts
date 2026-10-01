@@ -26,7 +26,7 @@ export class FileSizeExceptionFilter implements ExceptionFilter {
     const response = ctx.getResponse<Response>()
     response.status(HttpStatus.BAD_REQUEST).json({
       success: false,
-      error: { code: ERROR_CODES.VALIDATION_ERROR, message: ERROR_MESSAGES.FILE_SIZE_EXCEEDED },
+      error: { code: ERROR_CODES.FILE_SIZE_EXCEEDED, message: ERROR_MESSAGES.FILE_SIZE_EXCEEDED },
       timestamp: new Date().toISOString(),
     })
   }

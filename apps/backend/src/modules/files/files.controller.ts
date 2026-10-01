@@ -51,7 +51,7 @@ function uploadFileFilter(
   } else {
     callback(
       new BadRequestException({
-        code: ERROR_CODES.VALIDATION_ERROR,
+        code: ERROR_CODES.FILE_TYPE_INVALID,
         message: ERROR_MESSAGES.FILE_TYPE_INVALID,
       }),
       false,

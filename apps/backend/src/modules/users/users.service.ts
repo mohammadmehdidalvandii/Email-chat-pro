@@ -73,7 +73,7 @@ export class UsersService {
     } catch (error) {
       if (this.isUniqueViolation(error)) {
         throw new ConflictException({
-          code: ERROR_CODES.CONFLICT,
+          code: ERROR_CODES.USERNAME_TAKEN,
           message: ERROR_MESSAGES.USERNAME_TAKEN,
         })
       }
@@ -100,7 +100,7 @@ export class UsersService {
     const passwordMatches = await bcrypt.compare(dto.password, user.passwordHash)
     if (!passwordMatches) {
       throw new UnauthorizedException({
-        code: ERROR_CODES.UNAUTHORIZED,
+        code: ERROR_CODES.PASSWORD_INCORRECT,
         message: ERROR_MESSAGES.PASSWORD_INCORRECT,
       })
     }
@@ -147,13 +147,13 @@ export class UsersService {
     const query = q?.trim() ?? ''
     if (query.length < SEARCH_QUERY_MIN_LENGTH) {
       throw new BadRequestException({
-        code: ERROR_CODES.VALIDATION_ERROR,
+        code: ERROR_CODES.SEARCH_QUERY_REQUIRED,
         message: ERROR_MESSAGES.SEARCH_QUERY_REQUIRED,
       })
     }
     if (query.length > SEARCH_QUERY_MAX_LENGTH) {
       throw new BadRequestException({
-        code: ERROR_CODES.VALIDATION_ERROR,
+        code: ERROR_CODES.SEARCH_QUERY_TOO_LONG,
         message: ERROR_MESSAGES.SEARCH_QUERY_TOO_LONG,
       })
     }
@@ -212,7 +212,7 @@ export class UsersService {
     })
     if (existing) {
       throw new ConflictException({
-        code: ERROR_CODES.CONFLICT,
+        code: ERROR_CODES.USERNAME_TAKEN,
         message: ERROR_MESSAGES.USERNAME_TAKEN,
       })
     }

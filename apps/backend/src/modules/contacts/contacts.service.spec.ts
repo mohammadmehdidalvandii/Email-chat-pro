@@ -110,7 +110,7 @@ describe('ContactsService', () => {
       await expect(service.sendRequest(baseUser, baseUser.id)).rejects.toThrow(BadRequestException)
       await expect(service.sendRequest(baseUser, baseUser.id)).rejects.toMatchObject({
         response: {
-          code: ERROR_CODES.VALIDATION_ERROR,
+          code: ERROR_CODES.CONTACT_REQUEST_SELF_NOT_ALLOWED,
           message: ERROR_MESSAGES.CONTACT_REQUEST_SELF_NOT_ALLOWED,
         },
       })
@@ -124,7 +124,7 @@ describe('ContactsService', () => {
       await expect(service.sendRequest(baseUser, userB.id)).rejects.toThrow(NotFoundException)
       await expect(service.sendRequest(baseUser, userB.id)).rejects.toMatchObject({
         response: {
-          code: ERROR_CODES.NOT_FOUND,
+          code: ERROR_CODES.CONTACT_REQUEST_RECEIVER_NOT_FOUND,
           message: ERROR_MESSAGES.CONTACT_REQUEST_RECEIVER_NOT_FOUND,
         },
       })
@@ -159,7 +159,7 @@ describe('ContactsService', () => {
       await expect(service.sendRequest(baseUser, userB.id)).rejects.toThrow(ConflictException)
       await expect(service.sendRequest(baseUser, userB.id)).rejects.toMatchObject({
         response: {
-          code: ERROR_CODES.CONFLICT,
+          code: ERROR_CODES.CONTACT_REQUEST_DUPLICATE,
           message: ERROR_MESSAGES.CONTACT_REQUEST_DUPLICATE,
         },
       })
@@ -230,7 +230,7 @@ describe('ContactsService', () => {
       await expect(service.sendRequest(baseUser, userB.id)).rejects.toThrow(ConflictException)
       await expect(service.sendRequest(baseUser, userB.id)).rejects.toMatchObject({
         response: {
-          code: ERROR_CODES.CONFLICT,
+          code: ERROR_CODES.CONTACT_REQUEST_DUPLICATE,
           message: ERROR_MESSAGES.CONTACT_REQUEST_DUPLICATE,
         },
       })
@@ -284,7 +284,7 @@ describe('ContactsService', () => {
         service.respondToRequest(userB.id, 'request-1', 'accepted'),
       ).rejects.toMatchObject({
         response: {
-          code: ERROR_CODES.NOT_FOUND,
+          code: ERROR_CODES.CONTACT_REQUEST_NOT_FOUND,
           message: ERROR_MESSAGES.CONTACT_REQUEST_NOT_FOUND,
         },
       })
@@ -301,7 +301,7 @@ describe('ContactsService', () => {
         service.respondToRequest(baseUser.id, 'request-1', 'accepted'),
       ).rejects.toMatchObject({
         response: {
-          code: ERROR_CODES.FORBIDDEN,
+          code: ERROR_CODES.CONTACT_REQUEST_NOT_RECEIVER,
           message: ERROR_MESSAGES.CONTACT_REQUEST_NOT_RECEIVER,
         },
       })
@@ -318,7 +318,7 @@ describe('ContactsService', () => {
         service.respondToRequest(userB.id, 'request-1', 'accepted'),
       ).rejects.toMatchObject({
         response: {
-          code: ERROR_CODES.CONFLICT,
+          code: ERROR_CODES.CONTACT_REQUEST_ALREADY_RESPONDED,
           message: ERROR_MESSAGES.CONTACT_REQUEST_ALREADY_RESPONDED,
         },
       })

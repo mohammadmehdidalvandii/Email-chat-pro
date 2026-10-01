@@ -77,7 +77,7 @@ export class AuthService {
     const existing = await this.usersRepository.findOne({ where: { email } })
     if (existing) {
       throw new ConflictException({
-        code: ERROR_CODES.CONFLICT,
+        code: ERROR_CODES.EMAIL_ALREADY_REGISTERED,
         message: ERROR_MESSAGES.EMAIL_ALREADY_REGISTERED,
       })
     }
@@ -98,7 +98,7 @@ export class AuthService {
     } catch (error) {
       if (this.isUniqueViolation(error)) {
         throw new ConflictException({
-          code: ERROR_CODES.CONFLICT,
+          code: ERROR_CODES.EMAIL_ALREADY_REGISTERED,
           message: ERROR_MESSAGES.EMAIL_ALREADY_REGISTERED,
         })
       }
@@ -252,16 +252,18 @@ export class AuthService {
     const user = await this.usersRepository.findOne({ where: { email } })
 
     if (!user || user.deletedAt !== null || !user.isActive) {
-      throw this.unauthorized(ERROR_MESSAGES.INVALID_CREDENTIALS)
+      throw this.unauthorized(ERROR_CODES.INVALID_CREDENTIALS, ERROR_MESSAGES.INVALID_CREDENTIALS)
     }
 
     const passwordMatches = await bcrypt.compare(dto.password, user.passwordHash)
     if (!passwordMatches) {
-      throw this.unauthorized(ERROR_MESSAGES.INVALID_CREDENTIALS)
+      throw this.unauthorized(ERROR_CODES.INVALID_CREDENTIALS, ERROR_MESSAGES.INVALID_CREDENTIALS)
     }
 
+    // Reached only after the password matched, so this code confirms knowledge
+    // of a real credential and discloses nothing a wrong password would not.
     if (!user.isVerified) {
-      throw this.unauthorized(ERROR_MESSAGES.EMAIL_NOT_VERIFIED)
+      throw this.unauthorized(ERROR_CODES.EMAIL_NOT_VERIFIED, ERROR_MESSAGES.EMAIL_NOT_VERIFIED)
     }
 
     const payload: JwtPayload = { sub: user.id, email: user.email }
@@ -295,9 +297,17 @@ export class AuthService {
     }
   }
 
-  private unauthorized(message: string): UnauthorizedException {
+  /**
+   * Builds the 401 used by every failed login attempt.
+   *
+   * `code` is the structured discriminator the frontend keys off to render
+   * "verify your email" vs "invalid credentials" (packages/constants
+   * ERROR_CODES); `message` stays the English fallback for clients that do not
+   * model the code.
+   */
+  private unauthorized(code: string, message: string): UnauthorizedException {
     return new UnauthorizedException({
-      code: ERROR_CODES.UNAUTHORIZED,
+      code,
       message,
     })
   }

@@ -62,14 +62,14 @@ export class FilesService {
   async uploadImage(file: Express.Multer.File | undefined): Promise<FileUploadResponse> {
     if (!file || !file.buffer || file.buffer.length === 0) {
       throw new BadRequestException({
-        code: ERROR_CODES.VALIDATION_ERROR,
+        code: ERROR_CODES.FILE_REQUIRED,
         message: ERROR_MESSAGES.FILE_REQUIRED,
       })
     }
 
     if (file.buffer.length > IMAGE_MAX_SIZE_BYTES) {
       throw new BadRequestException({
-        code: ERROR_CODES.VALIDATION_ERROR,
+        code: ERROR_CODES.FILE_SIZE_EXCEEDED,
         message: ERROR_MESSAGES.FILE_SIZE_EXCEEDED,
       })
     }
@@ -77,7 +77,7 @@ export class FilesService {
     const info = inspectImageBuffer(file.buffer)
     if (!info) {
       throw new BadRequestException({
-        code: ERROR_CODES.VALIDATION_ERROR,
+        code: ERROR_CODES.FILE_TYPE_INVALID,
         message: ERROR_MESSAGES.FILE_TYPE_INVALID,
       })
     }
@@ -89,7 +89,7 @@ export class FilesService {
       info.height > IMAGE_MAX_DIMENSION_PX
     ) {
       throw new BadRequestException({
-        code: ERROR_CODES.VALIDATION_ERROR,
+        code: ERROR_CODES.FILE_DIMENSIONS_INVALID,
         message: ERROR_MESSAGES.FILE_DIMENSIONS_INVALID,
       })
     }
@@ -105,7 +105,7 @@ export class FilesService {
     } catch (error) {
       this.logger.error(`Image upload to Cloudinary failed: ${this.errorMessage(error)}`)
       throw new InternalServerErrorException({
-        code: ERROR_CODES.INTERNAL_ERROR,
+        code: ERROR_CODES.FILE_UPLOAD_FAILED,
         message: ERROR_MESSAGES.FILE_UPLOAD_FAILED,
       })
     }
@@ -123,14 +123,14 @@ export class FilesService {
   async uploadVideo(file: Express.Multer.File | undefined): Promise<FileUploadResponse> {
     if (!file || !file.buffer || file.buffer.length === 0) {
       throw new BadRequestException({
-        code: ERROR_CODES.VALIDATION_ERROR,
+        code: ERROR_CODES.FILE_REQUIRED,
         message: ERROR_MESSAGES.FILE_REQUIRED,
       })
     }
 
     if (file.buffer.length > VIDEO_MAX_SIZE_BYTES) {
       throw new BadRequestException({
-        code: ERROR_CODES.VALIDATION_ERROR,
+        code: ERROR_CODES.FILE_SIZE_EXCEEDED,
         message: ERROR_MESSAGES.FILE_SIZE_EXCEEDED,
       })
     }
@@ -138,7 +138,7 @@ export class FilesService {
     const format = detectVideoFormat(file.buffer)
     if (!format) {
       throw new BadRequestException({
-        code: ERROR_CODES.VALIDATION_ERROR,
+        code: ERROR_CODES.FILE_TYPE_INVALID,
         message: ERROR_MESSAGES.FILE_TYPE_INVALID,
       })
     }
@@ -146,13 +146,13 @@ export class FilesService {
     const durationSeconds = readVideoDuration(file.buffer, format)
     if (durationSeconds === null) {
       throw new BadRequestException({
-        code: ERROR_CODES.VALIDATION_ERROR,
+        code: ERROR_CODES.VIDEO_DURATION_INVALID,
         message: ERROR_MESSAGES.VIDEO_DURATION_INVALID,
       })
     }
     if (durationSeconds > VIDEO_MAX_DURATION_SECONDS) {
       throw new BadRequestException({
-        code: ERROR_CODES.VALIDATION_ERROR,
+        code: ERROR_CODES.VIDEO_DURATION_EXCEEDED,
         message: ERROR_MESSAGES.VIDEO_DURATION_EXCEEDED,
       })
     }
@@ -168,7 +168,7 @@ export class FilesService {
     } catch (error) {
       this.logger.error(`Video upload to Cloudinary failed: ${this.errorMessage(error)}`)
       throw new InternalServerErrorException({
-        code: ERROR_CODES.INTERNAL_ERROR,
+        code: ERROR_CODES.FILE_UPLOAD_FAILED,
         message: ERROR_MESSAGES.FILE_UPLOAD_FAILED,
       })
     }

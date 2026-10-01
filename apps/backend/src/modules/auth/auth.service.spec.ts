@@ -181,7 +181,7 @@ describe('AuthService', () => {
       await expect(service.register(dto)).rejects.toMatchObject({
         status: 409,
         response: {
-          code: ERROR_CODES.CONFLICT,
+          code: ERROR_CODES.EMAIL_ALREADY_REGISTERED,
           message: ERROR_MESSAGES.EMAIL_ALREADY_REGISTERED,
         },
       })
@@ -348,7 +348,7 @@ describe('AuthService', () => {
       await expect(service.login(dto)).rejects.toMatchObject({
         status: 401,
         response: {
-          code: ERROR_CODES.UNAUTHORIZED,
+          code: ERROR_CODES.INVALID_CREDENTIALS,
           message: ERROR_MESSAGES.INVALID_CREDENTIALS,
         },
       })
@@ -376,7 +376,7 @@ describe('AuthService', () => {
       await expect(service.login(wrongPassword)).rejects.toMatchObject({
         status: 401,
         response: {
-          code: ERROR_CODES.UNAUTHORIZED,
+          code: ERROR_CODES.INVALID_CREDENTIALS,
           message: ERROR_MESSAGES.INVALID_CREDENTIALS,
         },
       })
@@ -388,7 +388,7 @@ describe('AuthService', () => {
       await expect(service.login(dto)).rejects.toMatchObject({
         status: 401,
         response: {
-          code: ERROR_CODES.UNAUTHORIZED,
+          code: ERROR_CODES.EMAIL_NOT_VERIFIED,
           message: ERROR_MESSAGES.EMAIL_NOT_VERIFIED,
         },
       })

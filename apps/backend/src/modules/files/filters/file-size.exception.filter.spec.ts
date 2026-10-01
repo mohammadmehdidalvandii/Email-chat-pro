@@ -17,7 +17,7 @@ describe('FileSizeExceptionFilter', () => {
     expect(status).toHaveBeenCalledWith(400)
     expect(json).toHaveBeenCalledWith({
       success: false,
-      error: { code: ERROR_CODES.VALIDATION_ERROR, message: ERROR_MESSAGES.FILE_SIZE_EXCEEDED },
+      error: { code: ERROR_CODES.FILE_SIZE_EXCEEDED, message: ERROR_MESSAGES.FILE_SIZE_EXCEEDED },
       timestamp: expect.any(String),
     })
   })
