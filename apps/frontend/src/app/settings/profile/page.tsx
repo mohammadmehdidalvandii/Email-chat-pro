@@ -9,29 +9,23 @@
  * authenticated user's profile (ProfileForm) and provides an account deletion
  * action (AccountDeletionModal). Renders inside the shared AppShell so it is
  * reachable from the navigation without typing a URL.
+ *
+ * The post-deletion redirect to /login lives inside AccountDeletionModal —
+ * the component that owns the mutation performing the deletion — so this page
+ * deliberately holds no delete-account mutation of its own (a second
+ * `useDeleteAccountMutation()` instance here would never observe the modal's
+ * success and its redirect effect would never fire).
  */
-import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { AppShell } from '../../../components/Layout/AppShell'
 import { RequireAuth } from '../../../components/auth/RequireAuth'
 import { AccountDeletionModal } from '../../../components/profile/AccountDeletionModal'
 import { ProfileForm } from '../../../components/profile/ProfileForm'
-import { useDeleteAccountMutation } from '../../../hooks/use-profile-mutations'
 import { useProfileModalStore } from '../../../stores/profile.store'
 
 function ProfileContent() {
   const { t } = useTranslation('profile', { useSuspense: false })
-  const router = useRouter()
   const { openDeleteModal } = useProfileModalStore()
-  const deleteAccount = useDeleteAccountMutation()
-
-  // Redirect to /login when the account is successfully deleted.
-  useEffect(() => {
-    if (deleteAccount.isSuccess) {
-      void router.replace('/login')
-    }
-  }, [deleteAccount.isSuccess, router])
 
   return (
     <AppShell>

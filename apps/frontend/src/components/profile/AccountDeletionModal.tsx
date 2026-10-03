@@ -3,9 +3,14 @@
  * (current-task.md §Phase 2 — Components Required).
  *
  * Requires the user's password for confirmation (DELETE /users/me
- * body: DeleteAccountInput). On success, the parent clears auth
- * state and redirects via the existing session flow.
+ * body: DeleteAccountInput). On success the mutation hook clears the
+ * auth session and this component redirects to /login. This is the
+ * component that owns the mutation that performs the deletion, so it
+ * is also the one that navigates — a redirect wired to a separate
+ * `useDeleteAccountMutation()` instance would never fire, because
+ * `mutateAsync` only transitions the instance it was called on.
  */
+import { useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useDeleteAccountMutation } from '../../hooks/use-profile-mutations'
@@ -18,6 +23,7 @@ import { Label } from '../ui/label'
 
 export function AccountDeletionModal() {
   const { t } = useTranslation('profile', { useSuspense: false })
+  const router = useRouter()
   const { isDeleteModalOpen, closeDeleteModal } = useProfileModalStore()
   const mutation = useDeleteAccountMutation()
   const [password, setPassword] = useState('')
@@ -38,6 +44,12 @@ export function AccountDeletionModal() {
     setSubmitError(null)
     try {
       await mutation.mutateAsync({ password })
+      // The deletion succeeded, so the auth session has already been
+      // cleared by the mutation's onSuccess handler (token removed from
+      // localStorage, user state nulled, query cache emptied). Redirect
+      // to /login now — never before this point, so a failed request
+      // leaves the user exactly where they were.
+      void router.replace('/login')
     } catch (error) {
       // `apiRequest` rejects with a plain `ApiRequestError` object rather than an
       // Error instance, so `instanceof Error` was always false and every failure
