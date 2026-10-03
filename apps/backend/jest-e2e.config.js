@@ -27,12 +27,16 @@ module.exports = {
   transform: {
     '^.+\\.(t|j)s$': ['ts-jest', { tsconfig: '<rootDir>/tsconfig.json' }],
   },
+  transformIgnorePatterns: [
+    'node_modules/(?!(@nestjs/config)/)'
+  ],
   // `@nestjs/jwt` v12 is ESM-only, which the CommonJS Jest runtime cannot
   // require. The shim reimplements its surface over the `jsonwebtoken` CJS
   // package it already depends on, so auth E2E tests sign and verify real
   // tokens. See test/jwt-cjs-shim.js for why stubbing would not be equivalent.
   moduleNameMapper: {
     '^@nestjs/jwt$': '<rootDir>/test/jwt-cjs-shim.js',
+    '^@nestjs/config$': '<rootDir>/../../node_modules/@nestjs/config/dist/index.js'
   },
   // Booting the real application, then resolving an offline mail host, is
   // slower than a unit module compile. The default 5s is not enough headroom
