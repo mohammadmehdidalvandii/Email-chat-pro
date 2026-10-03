@@ -67,6 +67,7 @@ export function LoginForm() {
         dir="ltr"
         registration={register('password')}
         error={errors.password}
+        showPasswordToggle
       />
 
       {submitError && (

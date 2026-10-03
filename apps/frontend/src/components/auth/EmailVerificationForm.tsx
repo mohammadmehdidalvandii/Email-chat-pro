@@ -85,6 +85,13 @@ export function EmailVerificationForm() {
       <Button type="submit" isLoading={loading} className="mt-2 w-full">
         {loading ? t('verifying') : t('submit')}
       </Button>
+
+      {/* The token is delivered by email, so the Spam/Junk hint
+          belongs on this page — where the user waits for the email
+          and enters the token — not only on the registration
+          success screen, which auto-redirects here within
+          seconds. */}
+      <p className="text-sm text-neutral-600">{t('checkSpamFolder')}</p>
     </form>
   )
 }

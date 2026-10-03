@@ -66,6 +66,7 @@ export function RegisterForm() {
       <div className="flex flex-col gap-3" role="status" aria-live="polite">
         <p className="text-sm text-green-700">{t('registerSuccess')}</p>
         <p className="text-sm text-neutral-600">{t('registerSuccessNext')}</p>
+        <p className="text-sm text-neutral-600">{t('checkSpamFolder')}</p>
         <Button
           type="button"
           className="mt-2 w-full"
@@ -96,6 +97,7 @@ export function RegisterForm() {
         dir="ltr"
         registration={register('password')}
         error={errors.password}
+        showPasswordToggle
       />
       <FormField
         id="confirmPassword"
@@ -105,6 +107,7 @@ export function RegisterForm() {
         dir="ltr"
         registration={register('confirmPassword')}
         error={errors.confirmPassword}
+        showPasswordToggle
       />
 
       {submitError && (

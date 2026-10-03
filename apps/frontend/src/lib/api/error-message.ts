@@ -8,10 +8,16 @@
  * `message` text. Matching on message text broke the moment a message was
  * reworded or a locale was introduced.
  *
+ * One documented exception: a failed verification-email delivery is a
+ * 500 whose code is the generic INTERNAL_ERROR, disambiguated by the
+ * contract's fixed EMAIL_SEND_FAILED sentinel text (see
+ * `sendVerificationEmail` in the backend). That text is fixed by design
+ * and never leaks provider details.
+ *
  * Errors outside the auth flow fall back to the i18n `errors` namespace via
  * `translateApiError`.
  */
-import { ERROR_CODES } from '@email-chat-pro/constants'
+import { ERROR_CODES, ERROR_MESSAGES } from '@email-chat-pro/constants'
 import { translateApiError } from '../../i18n/errors'
 import { getI18n } from 'react-i18next'
 import type { ApiRequestError } from './client'
@@ -42,6 +48,20 @@ export function authErrorMessage(error: ApiRequestError | null | undefined): str
   }
   if (error.code === ERROR_CODES.VERIFICATION_TOKEN_INVALID) {
     return authT('verificationTokenInvalid')
+  }
+  // Registration succeeded but the verification email could not be
+  // delivered. The backend reports this as a 500 whose structured
+  // code is the generic INTERNAL_ERROR, so the code alone cannot
+  // tell it apart from any other server failure (e.g. a failed
+  // login). It does carry the fixed EMAIL_SEND_FAILED message from
+  // the shared contract — deliberately fixed text that never leaks
+  // provider details — so that sentinel is the reliable discriminator.
+  // Every other INTERNAL_ERROR keeps the generic message.
+  if (
+    error.code === ERROR_CODES.INTERNAL_ERROR &&
+    error.message === ERROR_MESSAGES.EMAIL_SEND_FAILED
+  ) {
+    return authT('emailSendFailed')
   }
 
   // Fall back to the standardized error-code translation (errors namespace).

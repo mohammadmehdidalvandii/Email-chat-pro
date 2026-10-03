@@ -1,6 +1,6 @@
 {
   "VALIDATION_ERROR": "Please check the information you entered and try again.",
-  "VERIFICATION_TOKEN_INVALID": "This verification link is invalid or has expired.",
+  "VERIFICATION_TOKEN_INVALID": "This verification token is invalid or has expired. Request a new one and try again.",
   "UNAUTHORIZED": "Please log in to continue.",
   "FORBIDDEN": "You don't have permission to do that.",
   "NOT_FOUND": "The requested item could not be found.",
@@ -42,5 +42,6 @@
   "IMAGE_MEDIA_URL_INVALID": "That image link isn't valid.",
   "VIDEO_MEDIA_URL_REQUIRED": "The video is missing.",
   "VIDEO_MEDIA_URL_INVALID": "That video link isn't valid.",
+  "emailSendFailed": "We could not send the verification email. Please try again later.",
   "fallback": "Something went wrong."
 }
