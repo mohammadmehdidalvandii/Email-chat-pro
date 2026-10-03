@@ -115,6 +115,46 @@ describe('EmailService', () => {
       expect(payload.html).toContain('secret-token-xyz')
     })
 
+    it('presents the code without a verification button or link', async () => {
+      send.mockResolvedValue(sendResult('email-1'))
+      const service = await createService()
+
+      await service.sendVerificationEmail('user@example.com', 'secret-token-xyz')
+
+      const payload = send.mock.calls[0][0]
+      const html = payload.html as string
+      // Token exists
+      expect(html).toContain('secret-token-xyz')
+      expect(html).toContain('Your verification code')
+      // No verification button or link
+      expect(html.toLowerCase()).not.toContain('<a href')
+      expect(html).not.toContain('Verify my email')
+    })
+
+    it('renders a complete transactional email structure', async () => {
+      send.mockResolvedValue(sendResult('email-1'))
+      const service = await createService()
+
+      await service.sendVerificationEmail('user@example.com', 'secret-token-xyz')
+
+      const payload = send.mock.calls[0][0]
+      const html = payload.html as string
+      // Greeting, explanation, prominent token section, expiration
+      // notice, and footer.
+      expect(html).toContain('Verify your email address')
+      expect(html).toContain('Your verification code')
+      expect(html).toContain('expires in 24 hours')
+      expect(html).toContain('Email-Chat-Pro')
+      // Responsive: a max-width wrapper plus a mobile viewport meta.
+      expect(html).toContain('max-width:600px')
+      expect(html).toContain('name="viewport"')
+      // Email-safe: no JavaScript and no external stylesheet.
+      expect(html.toLowerCase()).not.toContain('<script')
+      expect(html.toLowerCase()).not.toContain('javascript:')
+      expect(html).not.toContain('<link')
+      expect(html).not.toContain('src="http')
+    })
+
     it('never sends the API key or the configured sender secret as message content', async () => {
       send.mockResolvedValue(sendResult('email-1'))
       const service = await createService()
