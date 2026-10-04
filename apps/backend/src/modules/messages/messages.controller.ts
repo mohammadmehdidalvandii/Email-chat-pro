@@ -66,6 +66,21 @@ export class MessagesController {
     }
   }
 
+  @Post(':chatId/mark-read')
+  @UseGuards(JwtAuthGuard)
+  @HttpCode(HttpStatus.OK)
+  async markRead(
+    @Req() req: AuthenticatedRequest,
+    @Param('chatId', ParseUUIDPipe) chatId: string,
+  ): Promise<ApiResponse<string[]>> {
+    const messageIds = await this.messagesService.markRead(req.user.id, chatId)
+    return {
+      success: true,
+      data: messageIds,
+      timestamp: new Date().toISOString(),
+    }
+  }
+
   /**
    * GET /chats/:chatId/messages — returns paginated message history for the
    * specified chat (newest-first).

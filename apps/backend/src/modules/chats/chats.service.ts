@@ -90,6 +90,7 @@ export class ChatsService {
 
     const userById = new Map(otherUsers.map((u) => [u.id, u]))
     const messageByChat = new Map(lastMessages.map((m) => [m.chatId, m]))
+    const unreadByChat = await this.loadUnreadCounts(userId, chatIds)
 
     return chats
       .map((chat) => {
@@ -108,6 +109,7 @@ export class ChatsService {
           lastActivityAt: lastMessage
             ? lastMessage.createdAt.toISOString()
             : chat.createdAt.toISOString(),
+          unreadCount: unreadByChat.get(chat.id) ?? 0,
         }
       })
       .filter((item): item is ConversationListItem => item !== null)
@@ -133,6 +135,36 @@ export class ChatsService {
       .getMany()
   }
 
+  /**
+   * Loads the unread message count per chat for the user in one query
+   * (Task 5 — unread counts).
+   *
+   * An unread message is a row in one of the user's chats that was
+   * sent by the *other* participant and has not been read
+   * (`read_at IS NULL`). The count is computed with a single
+   * `GROUP BY chat_id` aggregate — one query for the whole list, no
+   * per-chat round trip. Chats with no unread messages produce no
+   * row, so callers default to 0.
+   */
+  private loadUnreadCounts(
+    userId: string,
+    chatIds: string[],
+  ): Promise<Map<string, number>> {
+    return this.messagesRepository
+      .createQueryBuilder('m')
+      .select('m.chat_id', 'chatId')
+      .addSelect('COUNT(*) FILTER (WHERE m.read_at IS NULL)', 'unreadCount')
+      .where('m.chat_id IN (:...chatIds)', { chatIds })
+      .andWhere('m.sender_id != :userId', { userId })
+      .groupBy('m.chat_id')
+      .getRawMany()
+      .then((rows) =>
+        new Map(
+          rows.map((r) => [r.chatId as string, Number(r.unreadCount)] as const),
+        ),
+      )
+  }
+
   /** Maps a persisted Message entity to the shared Message contract. */
   private toMessageDto(message: Message): MessageContract {
     return {
@@ -144,6 +176,7 @@ export class ChatsService {
       messageType: message.messageType as MessageContract['messageType'],
       mediaUrl: message.mediaUrl,
       createdAt: message.createdAt.toISOString(),
+      readAt: message.readAt ? message.readAt.toISOString() : null,
     }
   }
 }
