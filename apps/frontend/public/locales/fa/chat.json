@@ -38,5 +38,9 @@
   },
   "invalidFileType": "این نوع فایل پشتیبانی نمی‌شود. یک تصویر یا ویدیو پیوست کنید.",
   "fileTooLarge": "حجم این فایل برای پیوست بیش از حد است.",
-  "attachmentPreview": "یک پیوست فرستاد"
+  "attachmentPreview": "یک پیوست فرستاد",
+  "newMessageNotification": "پیام جدید",
+  "newMessageFrom": "از {{sender}}",
+  "notificationPreview": "{{preview}}",
+  "notificationDismiss": "بستن اعلان"
 }

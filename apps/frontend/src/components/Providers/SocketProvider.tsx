@@ -32,6 +32,7 @@ import {
 } from '@email-chat-pro/types'
 import { useAuthStore } from '../../stores/auth.store'
 import { useChatStore } from '../../stores/chat.store'
+import { useNotificationStore } from '../../stores/notification.store'
 import { usePresenceStore } from '../../stores/presence.store'
 import { applyIncomingMessage, CHAT_HISTORY_KEY, CONVERSATIONS_KEY } from '../../hooks/use-chat-query'
 
@@ -68,6 +69,9 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
   const token = useAuthStore((s) => s.token)
   const setIsSocketConnected = useChatStore((s) => s.setIsSocketConnected)
+  const activeChatId = useChatStore((s) => s.activeChatId)
+  const userId = useAuthStore((s) => s.user?.id)
+  const addNotification = useNotificationStore((s) => s.add)
   const socketRef = useRef<Socket | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [hasError, setHasError] = useState(false)
@@ -148,6 +152,30 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         transport: socket.io.engine.transport.name,
       })
       applyIncomingMessage(queryClient, payload.message)
+
+      // Incoming-message notification (recipient only). A notification
+      // is shown only when the current user is NOT the sender and is
+      // not already viewing the conversation where the message landed
+      // — in that case the message appears normally and no redundant
+      // alert is needed. `message.id` is the dedupe identity: the
+      // same event must never produce two notifications, so reconnect
+      // re-delivery or a repeated emit is a no-op. The preview keeps
+      // only the sender's name and the message content (already
+      // authorized for this user); no other data is exposed.
+      if (
+        payload.message.senderId !== userId &&
+        payload.chatId !== activeChatId
+      ) {
+        addNotification({
+          id: payload.message.id,
+          chatId: payload.chatId,
+          senderName:
+            payload.message.sender?.username ??
+            payload.message.sender?.email ??
+            '',
+          preview: payload.message.content,
+        })
+      }
     }
 
     const onMessageRead = (event: MessageReadEvent) => {

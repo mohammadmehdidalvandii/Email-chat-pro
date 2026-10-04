@@ -38,5 +38,9 @@
   },
   "invalidFileType": "Unsupported file type. Attach an image or a video.",
   "fileTooLarge": "That file is too large to attach.",
+  "newMessageNotification": "New message",
+  "newMessageFrom": "from {{sender}}",
+  "notificationPreview": "{{preview}}",
+  "notificationDismiss": "Dismiss notification",
   "attachmentPreview": "Sent an attachment"
 }

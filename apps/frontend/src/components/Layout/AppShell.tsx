@@ -23,6 +23,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Menu } from 'lucide-react'
 import { AppSidebar } from './AppSidebar'
+import { NotificationBanner } from '../chats/NotificationBanner'
 import { MobileSidebar } from './MobileSidebar'
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -66,6 +67,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         {/* Pages keep their own max-width containers, so the column is unconstrained. */}
         <main className="flex-1 px-4 py-6 md:py-8">{children}</main>
       </div>
+      <NotificationBanner />
     </div>
   )
 }
