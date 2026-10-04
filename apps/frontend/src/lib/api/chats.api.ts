@@ -21,6 +21,14 @@ export async function getUserConversationsApi(): Promise<ConversationListItem[]>
   })
 }
 
+/** POST /chats/:chatId/mark-read — recipient marks messages read. */
+export async function markReadApi(chatId: string): Promise<string[]> {
+  return apiRequest<string[]>({
+    method: 'POST',
+    url: `/chats/${chatId}/mark-read`,
+  })
+}
+
 /**
  * GET /chats/:chatId/messages — paginated history, newest-first.
  *

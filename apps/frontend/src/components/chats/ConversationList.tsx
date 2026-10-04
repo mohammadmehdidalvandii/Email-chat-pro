@@ -83,7 +83,10 @@ export function ConversationList({ limit }: ConversationListProps = {}) {
                   router.push(`/chats/${conversation.id}`)
                 }
               }}
-              className="flex cursor-pointer items-center justify-between gap-3 p-4 transition-colors hover:bg-neutral-100"
+              className={
+                'flex cursor-pointer items-center justify-between gap-3 p-4 transition-colors hover:bg-neutral-100 ' +
+                (conversation.unreadCount > 0 ? 'ring-2 ring-green-500/40 rounded-lg' : '')
+              }
             >
               <div className="flex min-w-0 items-center gap-3">
                 <div className="relative">
@@ -102,6 +105,11 @@ export function ConversationList({ limit }: ConversationListProps = {}) {
               {activity && (
                 <span className="shrink-0 text-xs text-neutral-400" dir="auto">
                   {activity}
+                </span>
+              )}
+              {conversation.unreadCount > 0 && (
+                <span className="ml-2 shrink-0 rounded-full bg-green-600 px-1.5 py-0.5 text-xs font-bold text-white shadow-sm">
+                  {conversation.unreadCount}
                 </span>
               )}
             </Card>

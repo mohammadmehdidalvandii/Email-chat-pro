@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MessageItem } from './MessageItem'
 import { useChatSocket } from '../../hooks/useChatSocket'
+import { useMarkRead } from '../../hooks/use-chat-mutations'
 import { useAuthStore } from '../../stores/auth.store'
 import { useChatHistory } from '../../hooks/use-chat-query'
 import { toApiRequestError } from '../../lib/api/client'
@@ -35,6 +36,7 @@ export function MessageList({ chatId }: MessageListProps) {
 
   const { data, isLoading, isError, error, refetch } = useChatHistory(chatId, page)
   useChatSocket(chatId)
+  const markRead = useMarkRead(chatId)
   const userId = useAuthStore((s) => s.user?.id)
   const scrollRef = useRef<HTMLDivElement>(null)
 
@@ -43,6 +45,15 @@ export function MessageList({ chatId }: MessageListProps) {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' })
   }, [chatId, page, data?.data.length])
+
+  // Recipient opens conversation → mark unread messages from other participant
+  // as read. Only the recipient can trigger this; backend validates membership
+  // and only updates messages from the other user.
+  useEffect(() => {
+    if (chatId && !isLoading && !isError) {
+      void markRead.mutateAsync()
+    }
+  }, [chatId, isLoading, isError])
 
   if (isLoading) return <p className="p-4 text-sm text-neutral-500">{t('chat:loading')}</p>
 

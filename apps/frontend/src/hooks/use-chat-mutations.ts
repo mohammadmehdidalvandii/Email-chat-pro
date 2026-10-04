@@ -8,7 +8,7 @@
  * participants currently in the room.
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { sendMessageApi } from '../lib/api/chats.api'
+import { sendMessageApi, markReadApi } from '../lib/api/chats.api'
 import type { CreateMessageInput, Message } from '@email-chat-pro/types'
 import type { ApiRequestError } from '../lib/api/client'
 import {
@@ -19,6 +19,20 @@ import {
 
 export type SendMessageError = ApiRequestError
 
+export function useMarkRead(chatId: string | null) {
+  const queryClient = useQueryClient()
+  return useMutation<string[], Error, void>({
+    mutationFn: () => {
+      if (!chatId) throw new Error('chatId required')
+      return markReadApi(chatId)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: CONVERSATIONS_KEY })
+      void queryClient.invalidateQueries({ queryKey: CHAT_HISTORY_KEY, exact: false })
+    },
+  })
+}
+
 export function useSendMessage(chatId: string | null) {
   const queryClient = useQueryClient()
 
@@ -28,6 +42,7 @@ export function useSendMessage(chatId: string | null) {
       return sendMessageApi(chatId, dto)
     },
     onSuccess: (message) => {
+      console.debug('[RT-DELAY][SEND]', { messageId: message.id, chatId: chatId, at: new Date().toISOString() })
       // Update the open chat and the conversation list from the response, then
       // let the server confirm history (covers messages sent while this tab was
       // not subscribed to the room).

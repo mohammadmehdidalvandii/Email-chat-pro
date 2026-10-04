@@ -12,6 +12,7 @@
 import { memo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Message } from '@email-chat-pro/types'
+import { Check, CheckCheck } from 'lucide-react'
 import { formatDate } from '../../i18n/formatting'
 
 interface MessageItemProps {
@@ -24,6 +25,22 @@ const MEDIA_TYPE_LABEL_KEY = {
   image: 'mediaType.image',
   video: 'mediaType.video',
 } as const
+
+/** WhatsApp-style read receipt: single grey check while sent, double green when read. */
+function ReadReceipt({ readAt }: { readAt: string | null }) {
+  if (readAt) {
+    return (
+      <span aria-label="Read" title="Read" className="text-green-400">
+        <CheckCheck size={14} />
+      </span>
+    )
+  }
+  return (
+    <span aria-label="Sent" title="Sent" className="text-neutral-400">
+      <Check size={14} />
+    </span>
+  )
+}
 
 /** Message media (image/video) as rendered inside a bubble. */
 function MessageMedia({ url, type, alt }: { url: string; type: 'image' | 'video'; alt: string }) {
@@ -108,8 +125,9 @@ export const MessageItem = memo(function MessageItem({ message, isOwn }: Message
           </p>
         )}
         {time && (
-          <p className="mt-1 text-xs opacity-70" dir="ltr">
+          <p className="mt-1 flex items-center gap-1 text-xs opacity-70" dir="ltr">
             {time}
+            {isOwn && <ReadReceipt readAt={message.readAt} />}
           </p>
         )}
       </div>
