@@ -3524,6 +3524,43 @@ Never record unauthorized work as completed.
 - Locale files added (, ).
 - All build, lint, and type-check steps passed.
 
+## Phase 5 — Media Upload Experience (Completed 2026-10-04)
+
+**Status:** Completed with verification.
+**Authorized By:** `docs/6-current-task.md` — Phase 5 (media upload, frontend only, no backend changes).
+
+### Implemented Features
+
+- `MessageInput` — file picker (`accept="image/*,video/*"`), upload mutation with progress (`uploadFileApi`), client-side format/size pre-checks mirroring backend (`IMAGE_MIME_TYPES`/`VIDEO_MIME_TYPES`, `IMAGE_MAX_SIZE_BYTES`/`VIDEO_MAX_SIZE_BYTES`), inline error (`translateApiError`), attachment preview with remove button.
+- `MessageItem` — `MessageMedia` renders `<img>` for `image` / `<video>` for `video` with `loading="lazy"`/`preload="metadata"`, `onError` → unavailable state, `mediaAlt` (localized) for screen readers.
+- `ChatWindow` — `handleSend` passes `messageType` + `mediaUrl` to `useSendMessage` mutation.
+- `files.api.ts` — `uploadFileApi` (`POST /files/upload`) with `FormData` (no manual `Content-Type` for boundary), extended timeout derived from `VIDEO_MAX_SIZE_BYTES`, optional progress callback.
+- `public/locales/en/chat.json` + `fa/chat.json` — `uploading`/`uploadingProgress`, `invalidFileType`, `fileTooLarge`, `attach`, `mediaType`/`mediaAlt`/`mediaUnavailable`, `attachmentAttachedWithUrl`.
+- WebSocket (`message:received`) unchanged — delivers media messages; `applyIncomingMessage` updates `chatHistoryKey` cache; `useChatSocket` + read-receipt (`message:read`) preserved.
+
+### Files Changed
+
+- Modified: `MessageInput.tsx`, `MessageItem.tsx`, `ChatWindow.tsx`, `MessageList.tsx`, `chat.json` (en/fa).
+- Existing (confirmed present, not recreated): `files.api.ts`, `use-chat-mutations.ts`.
+
+### Verification
+
+- `npm run type-check`: PASS (exit 0).
+- `npm run lint`: PASS (exit 0).
+- `npm run build`: PASS (exit 0).
+- Scope: frontend only; no backend, `.env`, DB, auth, or secret changes; no new dependencies; unread/read receipt architecture preserved; [RT-DELAY] diagnostics intentionally kept for user's 2-user real-time verification.
+
+### Known Issues
+
+- [RT-DELAY] temporary diagnostic logging remains in `SocketProvider.tsx`, `useChatSocket.ts`, `websocket.gateway.ts`, `messages.service.ts` — kept per user's earlier instruction not to finalize until verification complete; to be removed after user confirms 2-user test.
+
+### Scope Confirmation
+
+- No backend service/controller/gateway/entity changes.
+- No unauthorized features (notifications, presence, typing indicators, group chat, etc.).
+- Shared contracts (`@email-chat-pro/types`, `@email-chat-pro/constants`) used, not duplicated.
+- No second WebSocket connection; no polling; transport `['polling','websocket']` preserved.
+
 ## Phase 3 - Contacts and Search
 **Status:** Completed and Verified
 **Verified:** 2026-09-20
