@@ -166,6 +166,8 @@ export class MessagesService {
     })
     const saved = await this.messagesRepository.save(message)
     const messageDto = this.toMessageDto(saved)
+    // [RT-DELAY] temporary diagnostic
+    this.logger?.debug?.(`[RT-DELAY][DB] messageId=${messageDto.id} at=${new Date().toISOString()}`)
 
     // Task 2.3 — Real-time delivery. REST persists (source of truth); the
     // gateway broadcasts `message:received` to the chat room. The gateway is

@@ -8,7 +8,7 @@
  * between conversations.
  */
 import { useEffect } from 'react'
-import { WS_CLIENT_EVENTS } from '@email-chat-pro/types'
+import { WS_CLIENT_EVENTS, WS_SERVER_EVENTS } from '@email-chat-pro/types'
 import { useSessionSocket } from '../components/Providers/SocketProvider'
 
 export function useChatSocket(activeChatId: string | null): void {
@@ -23,19 +23,26 @@ export function useChatSocket(activeChatId: string | null): void {
     const join = () => socket.emit(WS_CLIENT_EVENTS.JOIN_CHAT, { chatId: activeChatId })
 
     if (socket.connected) {
+      // [RT-DELAY] temporary diagnostic
+      console.debug('[RT-DELAY] ROOM_JOIN_ATTEMPT', { chatId: activeChatId, socketId: socket.id, at: new Date().toISOString() })
       join()
     }
 
-    // The server drops room membership on disconnect, so every reconnect needs a
-    // fresh join. This must be a persistent `.on` listener, not `.once`: a
-    // reconnect flips `socket.connected` back to true without changing any
-    // dependency of this effect, so nothing else would re-run it and the
-    // socket would sit connected while in no room — no incoming messages for
-    // the rest of the session, with the header still showing "Connected".
-    socket.on('connect', join)
+    // Rejoin after reconnect, and retry if socket connects after effect runs (race fix: Case 2).
+    const onConnectRetry = () => {
+      if (activeChatId && socket && socket.connected) {
+        console.debug('[RT-DELAY] ROOM_JOIN_ATTEMPT (post-connect/reconnect)', { chatId: activeChatId, socketId: socket.id, at: new Date().toISOString() })
+        join()
+      }
+    }
+    socket.on(WS_SERVER_EVENTS.CHAT_JOINED, (data: { chatId: string }) => {
+      console.debug('[RT-DELAY] ROOM_JOINED (backend ack)', { chatId: data.chatId, socketId: socket.id, at: new Date().toISOString() })
+    })
+    socket.on('connect', onConnectRetry)
 
     return () => {
-      socket.off('connect', join)
+      socket.off('connect', onConnectRetry)
+      socket.off(WS_SERVER_EVENTS.CHAT_JOINED)
       // Leaving a room only makes sense while still connected; the server
       // drops the membership on disconnect anyway.
       if (socket.connected) {

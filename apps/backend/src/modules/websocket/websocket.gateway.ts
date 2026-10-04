@@ -124,6 +124,10 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
         this.logger.warn(`Initial presence failed for ${user.id}: ${(error as Error).message}`)
       }
       this.logger.log(`Client connected — ${user.id} [${client.id}]`)
+      // [RT-DELAY] temporary diagnostic — connection established
+      this.logger.debug(
+        `[RT-DELAY] SOCKET_CONNECTED socketId=${client.id} userId=${user.id} transport=${(client as unknown as { conn?: { transport?: { name?: string } } }).conn?.transport?.name ?? 'unknown'} at=${new Date().toISOString()}`,
+      )
     } catch {
       this.logger.warn(`Connection rejected — invalid token [${client.id}]`)
       client.emit(WS_SERVER_EVENTS.ERROR, {
@@ -143,6 +147,10 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
   async handleDisconnect(client: Socket): Promise<void> {
     const user = this.connectedUsers.get(client.id)
     this.connectedUsers.delete(client.id)
+    // [RT-DELAY] temporary diagnostic
+    this.logger.debug(
+      `[RT-DELAY] SOCKET_DISCONNECTED socketId=${client.id} userId=${user?.id ?? 'unknown'} at=${new Date().toISOString()}`,
+    )
     if (user) {
       // Presence recording is auxiliary — a failure here must not surface as a
       // socket-level error, so it is logged and swallowed.
@@ -227,6 +235,13 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
 
     const room = `chat:${payload.chatId}`
     await client.join(room)
+    // [RT-DELAY] temporary diagnostic — verify actual room membership
+    const roomSockets = this.server.sockets.adapter.rooms.get(room)
+    this.logger.debug(
+      `[RT-DELAY] ROOM_JOINED chatId=${payload.chatId} socketId=${client.id} ` +
+        `userId=${user.id} roomMemberCount=${roomSockets?.size ?? 0} ` +
+        `isInRoom=${roomSockets?.has(client.id) ?? false} at=${new Date().toISOString()}`,
+    )
     this.logger.log(`User ${user.id} joined room ${room} [${client.id}]`)
 
     return { event: WS_SERVER_EVENTS.CHAT_JOINED, data: { chatId: payload.chatId } }
@@ -258,7 +273,15 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
    */
   broadcastToChat(chatId: string, event: MessageSentEvent): void {
     const room = `chat:${chatId}`
+    // [RT-DELAY] temporary diagnostic — who is actually in the room at broadcast time
+    const roomSockets = this.server.sockets.adapter.rooms.get(room)
+    const socketIds = roomSockets ? [...roomSockets] : []
     this.server.to(room).emit(WS_SERVER_EVENTS.MESSAGE_RECEIVED, event)
+    this.logger.debug(
+      `[RT-DELAY] MESSAGE_BROADCAST chatId=${chatId} messageId=${event.message.id} ` +
+        `senderId=${event.message.senderId} roomMemberCount=${roomSockets?.size ?? 0} ` +
+        `socketIds=${JSON.stringify(socketIds)} at=${new Date().toISOString()}`,
+    )
     this.logger.log(`Broadcast ${WS_SERVER_EVENTS.MESSAGE_RECEIVED} to room ${room}`)
   }
 

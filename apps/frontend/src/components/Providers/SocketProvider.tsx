@@ -24,13 +24,16 @@ import { useQueryClient } from '@tanstack/react-query'
 import {
   WS_SERVER_EVENTS,
   type ErrorEvent,
+  type Message,
+  type MessageReadEvent,
   type MessageSentEvent,
+  type PaginatedResponse,
   type PresenceChangedEvent,
 } from '@email-chat-pro/types'
 import { useAuthStore } from '../../stores/auth.store'
 import { useChatStore } from '../../stores/chat.store'
 import { usePresenceStore } from '../../stores/presence.store'
-import { applyIncomingMessage } from '../../hooks/use-chat-query'
+import { applyIncomingMessage, CHAT_HISTORY_KEY, CONVERSATIONS_KEY } from '../../hooks/use-chat-query'
 
 /** Backend origin; the gateway namespace is appended by the `io()` call. */
 const SOCKET_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'http://localhost:4000'
@@ -79,7 +82,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
 
     const socket = io(`${SOCKET_URL}${CHATS_NAMESPACE}`, {
       auth: { token },
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'],
       // Presence is re-broadcast on every (re)connect, so let the manager retry
       // transient drops instead of leaving the user silently offline.
       reconnection: true,
@@ -101,10 +104,21 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       setIsConnected(true)
       setHasError(false)
       setIsSocketConnected(true)
+      // [RT-DELAY] temporary diagnostic
+      console.debug('[RT-DELAY] SOCKET_CONNECTED', {
+        socketId: socket.id,
+        transport: socket.io.engine.transport.name,
+        at: new Date().toISOString(),
+      })
     }
     const onDisconnect = () => {
       setIsConnected(false)
       setIsSocketConnected(false)
+      // [RT-DELAY] temporary diagnostic
+      console.debug('[RT-DELAY] SOCKET_DISCONNECTED', {
+        socketId: socket.id,
+        at: new Date().toISOString(),
+      })
     }
     // The gateway rejects an unauthenticated handshake before the connection is
     // established, so the reason arrives here rather than as a server event.
@@ -112,12 +126,58 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       setIsConnected(false)
       setHasError(true)
       setIsSocketConnected(false)
+      // [RT-DELAY] temporary diagnostic — connection failure
+      console.debug('[RT-DELAY] SOCKET_CONNECTION_ERROR', { at: new Date().toISOString() })
     }
+
+    // [RT-DELAY] temporary diagnostic — transport upgrade (polling → websocket)
+    socket.io.engine.on('upgrade', () => {
+      console.debug('[RT-DELAY][SOCKET] event=upgrade', {
+        transport: socket.io.engine.transport.name,
+      })
+    })
 
     // A message is written into the query cache, never into Zustand: TanStack
     // Query already owns this server state (rules.md §State Management).
     const onMessageReceived = (payload: MessageSentEvent) => {
+      // [RT-DELAY] temporary diagnostic
+      console.debug('[RT-DELAY][RECEIVE]', {
+        chatId: payload.chatId,
+        messageId: payload.message.id,
+        at: new Date().toISOString(),
+        transport: socket.io.engine.transport.name,
+      })
       applyIncomingMessage(queryClient, payload.message)
+    }
+
+    const onMessageRead = (event: MessageReadEvent) => {
+      // Patch `readAt` into every cached history page of the affected chat.
+      // The key shape is `['chatHistory', chatId, page]`, so the chat id is
+      // index 1 — the page (index 2) must NOT be compared against the chatId.
+      queryClient.getQueriesData<Message[] | PaginatedResponse<Message>>({
+        queryKey: CHAT_HISTORY_KEY,
+      }).forEach(([key, cached]) => {
+        const [prefix, cachedChatId] = key as readonly unknown[]
+        if (
+          prefix === CHAT_HISTORY_KEY[0] &&
+          typeof cachedChatId === 'string' &&
+          cachedChatId === event.chatId &&
+          cached &&
+          typeof cached === 'object' &&
+          'data' in cached &&
+          Array.isArray((cached as unknown as Record<string, unknown>).data)
+        ) {
+          const updated = cached.data.map((message) =>
+            event.messageIds.includes(message.id)
+              ? { ...message, readAt: event.readAt }
+              : message,
+          )
+          queryClient.setQueryData(key, { ...cached, data: updated })
+        }
+      })
+      // Invalidate the conversation list so unread counts and the green
+      // unread ring refresh from the backend's `unreadCount`.
+      queryClient.invalidateQueries({ queryKey: CONVERSATIONS_KEY })
     }
 
     const onPresenceChanged = (event: PresenceChangedEvent) => {
@@ -126,6 +186,15 @@ export function SocketProvider({ children }: { children: ReactNode }) {
         lastSeenAt: event.lastSeenAt,
       })
     }
+
+    // [RT-DELAY] temporary diagnostic — reconnect
+    socket.on('connect', () => {
+      console.debug('[RT-DELAY] SOCKET_RECONNECTED', {
+        socketId: socket.id,
+        transport: socket.io.engine.transport.name,
+        at: new Date().toISOString(),
+      })
+    })
 
     // The gateway answers chat:join / chat:leave with these; an authorization
     // or lookup failure arrives as `error:event` rather than a throw.
@@ -137,6 +206,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     socket.on('disconnect', onDisconnect)
     socket.on('connect_error', onConnectError)
     socket.on(WS_SERVER_EVENTS.MESSAGE_RECEIVED, onMessageReceived)
+    socket.on(WS_SERVER_EVENTS.MESSAGE_READ, onMessageRead)
     socket.on(WS_SERVER_EVENTS.PRESENCE_CHANGED, onPresenceChanged)
     socket.on(WS_SERVER_EVENTS.ERROR, onErrorEvent)
     socket.on(WS_SERVER_EVENTS.CHAT_JOINED, () => undefined)
@@ -147,6 +217,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       socket.off('disconnect', onDisconnect)
       socket.off('connect_error', onConnectError)
       socket.off(WS_SERVER_EVENTS.MESSAGE_RECEIVED, onMessageReceived)
+      socket.off(WS_SERVER_EVENTS.MESSAGE_READ, onMessageRead)
       socket.off(WS_SERVER_EVENTS.PRESENCE_CHANGED, onPresenceChanged)
       socket.off(WS_SERVER_EVENTS.ERROR, onErrorEvent)
       socket.off(WS_SERVER_EVENTS.CHAT_JOINED)
