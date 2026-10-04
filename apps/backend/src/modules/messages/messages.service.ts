@@ -17,7 +17,7 @@ import {
 } from '@email-chat-pro/constants'
 import type { Message as MessageContract } from '@email-chat-pro/types'
 import { isValidHttpUrl } from '@email-chat-pro/utils'
-import { Repository } from 'typeorm'
+import { IsNull, Repository } from 'typeorm'
 import { AuthService } from '../auth/auth.service'
 import { User } from '../auth/entities/user.entity'
 import { ChatsService } from '../chats/chats.service'
@@ -222,6 +222,86 @@ export class MessagesService {
     }
   }
 
+  /**
+   * Marks every unread message in a chat as read for the requesting user.
+   *
+   * Task 5 — Read receipts / unread counts. REST persists (source of truth);
+   * the gateway broadcasts `message:read` so the *other* participant (the
+   * sender of the now-read messages) sees the read status update in real time.
+   *
+   * Authorization: chat must exist (404) and the user must be a participant
+   * (403). The update is scoped to the recipient: only messages sent by the
+   * *other* participant (the user is not their own counterpart in a 1:1 chat)
+   * that are still unread are marked read, and only for the requesting user's
+   * side. A message row is shared, but read state belongs to the recipient —
+   * the sender's own messages are never marked read by this endpoint, so user
+   * A can only mark user B's messages as read, never user C's or their own.
+   *
+   * Returns the list of message ids that were actually transitioned from
+   * unread to read, so the caller (and the broadcast) can skip a no-op when
+   * the user opens a fully-read conversation — which keeps the
+   * "duplicate events do not create duplicate records" invariant: a second
+   * mark-read of the same messages is a no-op.
+   */
+  async markRead(userId: string, chatId: string): Promise<string[]> {
+    const chat = await this.chatsService.findById(chatId)
+    if (!chat) {
+      throw new NotFoundException({
+        code: ERROR_CODES.CHAT_NOT_FOUND,
+        message: ERROR_MESSAGES.CHAT_NOT_FOUND,
+      })
+    }
+
+    if (chat.userAId !== userId && chat.userBId !== userId) {
+      throw new ForbiddenException({
+        code: ERROR_CODES.NOT_CHAT_PARTICIPANT,
+        message: ERROR_MESSAGES.NOT_CHAT_PARTICIPANT,
+      })
+    }
+
+    // The other participant is the only valid reader/sender of the messages in
+    // this chat that this user can mark as read.
+    const otherParticipantId = chat.userAId === userId ? chat.userBId : chat.userAId
+
+    // Find the chat's unread messages sent by the other participant (the ones
+    // this user has not yet read) before updating, so we know what changed.
+    const unreadMessages = await this.messagesRepository.find({
+      where: {
+        chatId,
+        sender: { id: otherParticipantId },
+        readAt: IsNull(),
+      },
+      select: ['id'],
+    })
+
+    if (unreadMessages.length === 0) {
+      // Nothing to mark — the user already read everything. No DB write and no
+      // broadcast, so a repeated "open conversation" cannot stack duplicate
+      // read events or records.
+      return []
+    }
+
+    const messageIds = unreadMessages.map((m) => m.id)
+    const now = new Date()
+
+    await this.messagesRepository
+      .createQueryBuilder()
+      .update(Message)
+      .set({ readAt: now })
+      .where('chat_id = :chatId', { chatId })
+      .andWhere('sender_id = :otherParticipantId', { otherParticipantId })
+      .andWhere('read_at IS NULL')
+      .execute()
+
+    // Task 5 — Real-time read receipt. REST persisted the read state; the
+    // gateway notifies the chat room (both participants) so the sender's open
+    // chat flips the read indicator without a refresh. The gateway is optional
+    // so the service remains usable in isolation (e.g. tests).
+    this.chatGateway?.broadcastReadToChat(chatId, userId, messageIds, now.toISOString())
+
+    return messageIds
+  }
+
   /** Maps a persisted Message entity to the shared Message contract. */
   private toMessageDto(message: Message): MessageContract {
     return {
@@ -233,6 +313,7 @@ export class MessagesService {
       messageType: message.messageType as MessageContract['messageType'],
       mediaUrl: message.mediaUrl,
       createdAt: message.createdAt.toISOString(),
+      readAt: message.readAt ? message.readAt.toISOString() : null,
     }
   }
 }

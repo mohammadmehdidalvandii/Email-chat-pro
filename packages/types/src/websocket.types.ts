@@ -87,6 +87,24 @@ export interface ErrorEvent {
  * online/offline timestamp; for `offline` it is the moment the last socket
  * disconnected.
  */
+/**
+ * Broadcast to all participants in a chat room after messages are
+ * marked as read (Task 5 — read receipts). `messageIds` is the list
+ * of messages transitioned from unread to read; `readAt` is the
+ * UTC timestamp of the read operation. The sender of those messages
+ * (the other participant) uses this to flip the read indicator
+ * without a refresh.
+ */
+export interface MessageReadEvent {
+  chatId: string
+  /** Id of the user whose read action this is (the recipient). */
+  readerId: string
+  /** All message ids that were marked read in this operation. */
+  messageIds: string[]
+  /** UTC ISO-8601 timestamp of the read operation. */
+  readAt: string
+}
+
 export interface PresenceChangedEvent {
   userId: string
   status: PresenceStatus
@@ -114,4 +132,5 @@ export const WS_SERVER_EVENTS = {
   CHAT_JOINED: 'chat:joined',
   CHAT_LEFT: 'chat:left',
   PRESENCE_CHANGED: 'presence:changed',
+  MESSAGE_READ: 'message:read',
 } as const

@@ -14,7 +14,7 @@ import { Logger } from '@nestjs/common'
 import { Repository } from 'typeorm'
 import type { Server, Socket } from 'socket.io'
 import { ERROR_CODES, ERROR_MESSAGES } from '@email-chat-pro/constants'
-import type { JoinChatPayload, LeaveChatPayload, MessageSentEvent } from '@email-chat-pro/types'
+import type { JoinChatPayload, LeaveChatPayload, MessageReadEvent, MessageSentEvent } from '@email-chat-pro/types'
 import { WS_CLIENT_EVENTS, WS_SERVER_EVENTS } from '@email-chat-pro/types'
 import { User } from '../auth/entities/user.entity'
 import { ChatsService } from '../chats/chats.service'
@@ -260,5 +260,34 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     const room = `chat:${chatId}`
     this.server.to(room).emit(WS_SERVER_EVENTS.MESSAGE_RECEIVED, event)
     this.logger.log(`Broadcast ${WS_SERVER_EVENTS.MESSAGE_RECEIVED} to room ${room}`)
+  }
+
+  /**
+   * Broadcasts read status updates to all participants in a chat room.
+   *
+   * Called by MessagesService.markRead() after updating read_at timestamps.
+   * The event identifies which messages were marked read and under what timestamp,
+   * so the frontend can update the UI (toggle check marks) and the sender can
+   * see their message read without a page refresh.
+   *
+   * If no clients are in the room the broadcast is silently a no-op.
+   */
+  broadcastReadToChat(
+    chatId: string,
+    readerId: string,
+    messageIds: string[],
+    readAt: string,
+  ): void {
+    const room = `chat:${chatId}`
+    const event: MessageReadEvent = {
+      chatId,
+      readerId,
+      messageIds,
+      readAt,
+    }
+    this.server.to(room).emit(WS_SERVER_EVENTS.MESSAGE_READ, event)
+    this.logger.log(
+      `Broadcast ${WS_SERVER_EVENTS.MESSAGE_READ} to room ${room} (reader: ${readerId}, count: ${messageIds.length})`,
+    )
   }
 }

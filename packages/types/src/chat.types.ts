@@ -37,6 +37,14 @@ export type MessageType = 'text' | 'image' | 'video'
  * Each message is stored in a single row owned by the chat (never duplicated
  * per participant). `sender` is the full User object; `createdAt` is the
  * server-side timestamp that is the source of truth for ordering.
+ *
+ * `readAt` is the timestamp when the *recipient* (the other participant) last
+ * read the message. NULL = not yet read by the recipient. It is the backend's
+ * source of truth for read receipts: a sender sees `readAt !== NULL` on their
+ * own outgoing messages once the recipient has opened the conversation.
+ * The sender's own message is the "other" message for the recipient, so read
+ * status correctly belongs to the recipient's read, never the sender's own
+ * (a user cannot mark their own message as read to themselves).
  */
 export interface Message {
   id: string
@@ -47,6 +55,8 @@ export interface Message {
   messageType: MessageType
   mediaUrl: string | null
   createdAt: string
+  /** ISO-8601 timestamp when the recipient read this message, or null if unread. */
+  readAt: string | null
 }
 
 /**
@@ -79,4 +89,10 @@ export interface ConversationListItem {
   lastMessage: Message | null
   /** Sort key for "recent activity" — last message time, else chat creation time. */
   lastActivityAt: string
+  /**
+   * Count of messages in this chat sent by the other participant that
+   * the authenticated user has not yet read. Computed server-side per
+   * user/conversation; zero when everything is read or the chat is empty.
+   */
+  unreadCount: number
 }

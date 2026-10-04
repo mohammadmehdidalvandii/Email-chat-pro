@@ -43,16 +43,29 @@ export class Message {
   mediaUrl!: string | null
 
   @CreateDateColumn({
-    type: 'timestamp',
+    type: 'timestamptz',
     name: 'created_at',
     default: () => 'CURRENT_TIMESTAMP',
   })
   createdAt!: Date
 
   @UpdateDateColumn({
-    type: 'timestamp',
+    type: 'timestamptz',
     name: 'updated_at',
     default: () => 'CURRENT_TIMESTAMP',
   })
   updatedAt!: Date
+
+  /**
+   * Read-by-recipient timestamp (Task 5 — read receipts / unread counts).
+   * NULL means the message has not yet been read by the recipient.
+   * The recipient is always the other participant (1:1 chat). This belongs
+   * to the recipient, not the sender, because it tracks when the message was
+   * consumed — not when it was sent.
+   *
+   * Stored in UTC (TIMESTAMPTZ); rendered to the user's local timezone
+   * via the existing formatDate / Intl mechanism on the frontend.
+   */
+  @Column({ type: 'timestamptz', name: 'read_at', nullable: true })
+  readAt!: Date | null
 }

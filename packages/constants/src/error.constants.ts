@@ -132,6 +132,8 @@ export const ERROR_CODES = {
   VIDEO_MEDIA_URL_REQUIRED: 'VIDEO_MEDIA_URL_REQUIRED',
   /** The video `mediaUrl` is not a valid http(s) URL (HTTP 400). */
   VIDEO_MEDIA_URL_INVALID: 'VIDEO_MEDIA_URL_INVALID',
+  /** The user is not authorized to mark this chat's messages as read (HTTP 403). */
+  MARK_READ_NOT_PARTICIPANT: 'MARK_READ_NOT_PARTICIPANT',
 
   // --- Rate limiting ---
   /** A route-specific rate limit was exceeded (HTTP 429). */
@@ -226,6 +228,8 @@ export const ERROR_MESSAGES = {
   VIDEO_DURATION_INVALID: 'Video duration could not be validated',
   VIDEO_MEDIA_URL_REQUIRED: 'mediaUrl is required for video messages',
   VIDEO_MEDIA_URL_INVALID: 'mediaUrl must be a valid http(s) URL',
+  // Task 5 — Read Receipts / Unread Counts
+  MARK_READ_NOT_PARTICIPANT: 'You are not a participant of this chat',
   // Task 4.5 — Rate Limiting
   TOO_MANY_REQUESTS: 'Too many requests. Try again later.',
 } as const
