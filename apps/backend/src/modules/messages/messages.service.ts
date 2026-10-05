@@ -4,6 +4,7 @@ import {
   forwardRef,
   Inject,
   Injectable,
+  Logger,
   NotFoundException,
   Optional,
 } from '@nestjs/common'
@@ -46,6 +47,8 @@ import { Message } from './entities/message.entity'
  */
 @Injectable()
 export class MessagesService {
+  private readonly logger = new Logger(MessagesService.name)
+
   constructor(
     @InjectRepository(Message)
     private readonly messagesRepository: Repository<Message>,
