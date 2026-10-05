@@ -236,7 +236,7 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
     const room = `chat:${payload.chatId}`
     await client.join(room)
     // [RT-DELAY] temporary diagnostic — verify actual room membership
-    const roomSockets = this.server.sockets.adapter.rooms.get(room)
+    const roomSockets = this.server.sockets.adapter?.rooms?.get(room)
     this.logger.debug(
       `[RT-DELAY] ROOM_JOINED chatId=${payload.chatId} socketId=${client.id} ` +
         `userId=${user.id} roomMemberCount=${roomSockets?.size ?? 0} ` +
@@ -272,9 +272,10 @@ export class ChatGateway implements OnGatewayInit, OnGatewayConnection, OnGatewa
    * If no clients are in the room the broadcast is silently a no-op.
    */
   broadcastToChat(chatId: string, event: MessageSentEvent): void {
+    if (!this.server) return
     const room = `chat:${chatId}`
     // [RT-DELAY] temporary diagnostic — who is actually in the room at broadcast time
-    const roomSockets = this.server.sockets.adapter.rooms.get(room)
+    const roomSockets = this.server.sockets.adapter?.rooms?.get(room)
     const socketIds = roomSockets ? [...roomSockets] : []
     this.server.to(room).emit(WS_SERVER_EVENTS.MESSAGE_RECEIVED, event)
     this.logger.debug(

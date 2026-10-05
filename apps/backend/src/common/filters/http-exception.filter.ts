@@ -43,6 +43,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
     logger[loggerMethod](exceptionName, {
       code: status,
       isClientError,
+      message: exception instanceof Error ? exception.message : String(exception),
+      stack: exception instanceof Error ? exception.stack : undefined,
     })
   }
 

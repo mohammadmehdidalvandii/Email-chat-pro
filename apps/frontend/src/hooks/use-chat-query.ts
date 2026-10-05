@@ -44,8 +44,8 @@ export function prependMessageToHistory(
 ): PaginatedResponse<Message> | undefined {
   if (!cache) return cache
   if (cache.data.some((existing) => existing.id === message.id)) return cache
-  if (cache.pagination.page !== 1) return cache
-
+  // The newest message always belongs at the head of the newest-first list,
+  // regardless of which page is currently rendered.
   return {
     ...cache,
     data: [message, ...cache.data].slice(0, cache.pagination.limit),
@@ -133,12 +133,19 @@ export function findChatIdForContact(
   return conversations?.find((conversation) => conversation.contact.id === contactId)?.id
 }
 
-/** Applies a newly received message to every cache it belongs to. */
+/** Applies a newly received message to every page of the chat's history cache. */
 export function applyIncomingMessage(queryClient: QueryClient, message: Message): void {
-  queryClient.setQueryData(
-    chatHistoryKey(message.chatId, 1),
-    (cache: PaginatedResponse<Message> | undefined) => prependMessageToHistory(cache, message),
-  )
+  queryClient.getQueriesData<PaginatedResponse<Message>>({
+    queryKey: CHAT_HISTORY_KEY,
+  }).forEach(([key, cached]) => {
+    const keyArr = key as readonly unknown[]
+    const [prefix, cachedChatId] = keyArr
+    if (prefix === CHAT_HISTORY_KEY[0] && typeof cachedChatId === 'string' && cachedChatId === message.chatId && cached) {
+      queryClient.setQueryData(key, (prev: PaginatedResponse<Message> | undefined) =>
+        prependMessageToHistory(prev, message),
+      )
+    }
+  })
   queryClient.setQueryData(CONVERSATIONS_KEY, (cache: ConversationListItem[] | undefined) =>
     patchConversationWithMessage(cache, message),
   )

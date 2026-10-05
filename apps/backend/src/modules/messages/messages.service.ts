@@ -168,7 +168,15 @@ export class MessagesService {
       mediaUrl,
     })
     const saved = await this.messagesRepository.save(message)
-    const messageDto = this.toMessageDto(saved)
+    const reloaded = await this.messagesRepository.findOne({
+      where: { id: saved.id },
+      relations: ['sender'],
+    })
+    if (!reloaded) throw new NotFoundException({
+      code: ERROR_CODES.INTERNAL_ERROR,
+      message: ERROR_MESSAGES.INTERNAL,
+    })
+    const messageDto = this.toMessageDto(reloaded)
     // [RT-DELAY] temporary diagnostic
     this.logger?.debug?.(`[RT-DELAY][DB] messageId=${messageDto.id} at=${new Date().toISOString()}`)
 
