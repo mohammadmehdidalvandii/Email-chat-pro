@@ -163,6 +163,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       // only the sender's name and the message content (already
       // authorized for this user); no other data is exposed.
       if (
+        userId &&
         payload.message.senderId !== userId &&
         payload.chatId !== activeChatId
       ) {
