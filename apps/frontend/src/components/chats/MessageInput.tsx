@@ -128,9 +128,9 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
   }
 
   return (
-    <div className="border-t border-neutral-200 bg-white p-4">
+    <div className="border-t border-border bg-main-surface p-4">
       {attachment && (
-        <div className="mb-2 flex items-center justify-between gap-3 text-xs text-neutral-600">
+        <div className="mb-2 flex items-center justify-between gap-3 text-xs text-text-secondary">
           <span className="truncate" dir="auto">
             {t('chat:attachmentAttachedWithUrl', { url: attachment.url })}
           </span>
@@ -146,7 +146,7 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
       )}
 
       {localError && (
-        <p className="mb-2 text-xs text-red-600" role="alert">
+        <p className="mb-2 text-xs text-error" role="alert">
           {localError}
         </p>
       )}
@@ -186,7 +186,7 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
       </div>
 
       {uploadMutation.isPending && (
-        <p className="mt-2 text-xs text-neutral-500" role="status">
+        <p className="mt-2 text-xs text-text-muted" role="status">
           {progress === null
             ? t('chat:uploading')
             : t('chat:uploadingProgress', { percent: progress })}

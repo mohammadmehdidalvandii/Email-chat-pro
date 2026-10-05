@@ -13,11 +13,11 @@ export type ButtonSize = 'default' | 'sm' | 'lg'
 
 const VARIANT_CLASSES: Record<ButtonVariant, string> = {
   primary:
-    'bg-neutral-900 text-white hover:bg-neutral-700 focus-visible:outline-neutral-900',
+    'bg-primary text-white hover:bg-primary-hover focus-visible:outline-primary',
   secondary:
-    'bg-neutral-200 text-neutral-900 hover:bg-neutral-300 focus-visible:outline-neutral-400',
-  ghost: 'bg-transparent hover:bg-neutral-100 focus-visible:outline-neutral-300',
-  link: 'bg-transparent text-neutral-900 underline-offset-4 hover:underline',
+    'bg-card text-text-main hover:bg-card-hover focus-visible:outline-border',
+  ghost: 'bg-transparent hover:bg-card-hover focus-visible:outline-border',
+  link: 'bg-transparent text-text-main underline-offset-4 hover:underline',
 }
 
 const SIZE_CLASSES: Record<ButtonSize, string> = {

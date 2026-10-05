@@ -37,9 +37,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [pathname])
 
   return (
-    <div className="flex min-h-screen bg-neutral-100 text-neutral-900">
+    <div className="flex min-h-screen bg-app-background text-text-main">
       {/* Desktop: persistent sidebar, always visible. */}
-      <aside className="hidden w-64 shrink-0 border-e border-neutral-200 md:block">
+      <aside className="hidden w-64 shrink-0 border-e border-border md:block">
         {/* Sticky so the nav stays put while a long page scrolls. */}
         <div className="sticky top-0 h-screen">
           <AppSidebar />
@@ -48,14 +48,14 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Mobile-only bar: the menu button that opens the drawer. */}
-        <header className="flex items-center gap-3 border-b border-neutral-200 bg-white px-4 py-3 md:hidden">
+        <header className="flex items-center gap-3 border-b border-border bg-main-surface px-4 py-3 md:hidden">
           <button
             type="button"
             aria-expanded={menuOpen}
             aria-controls="app-mobile-nav"
             aria-label={menuOpen ? t('nav.closeMenu') : t('nav.openMenu')}
             onClick={() => setMenuOpen((open) => !open)}
-            className="rounded-md p-2 text-neutral-700 hover:bg-neutral-100"
+            className="rounded-md p-2 text-text-secondary hover:bg-card-hover"
           >
             <Menu className="h-5 w-5" aria-hidden />
           </button>

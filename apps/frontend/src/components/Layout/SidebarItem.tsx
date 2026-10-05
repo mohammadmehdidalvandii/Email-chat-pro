@@ -4,7 +4,7 @@
  * SidebarItem — one navigation row in the authenticated sidebar.
  *
  * Shared by the persistent desktop sidebar and the mobile drawer so the two can
- * never drift. Active state reuses the `bg-neutral-900 text-white` treatment the
+ * never drift. Active state reuses the `bg-primary text-white` treatment the
  * previous top navigation used, so the visual language is unchanged by the move
  * to a sidebar.
  *
@@ -34,8 +34,8 @@ export function SidebarItem({ href, label, icon, active, onNavigate, className }
       aria-current={active ? 'page' : undefined}
       className={cn(
         'flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
-        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900',
-        active ? 'bg-neutral-900 text-white' : 'text-neutral-700 hover:bg-neutral-100',
+        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
+        active ? 'bg-primary text-white' : 'text-text-secondary hover:bg-card-hover',
         className,
       )}
     >

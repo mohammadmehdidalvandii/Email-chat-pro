@@ -9,6 +9,7 @@
 import type { ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import { LanguageSwitcher } from '../Layout/LanguageSwitcher'
+import { ThemeToggle } from '../Layout/ThemeToggle'
 import {
   Card,
   CardContent,
@@ -33,15 +34,16 @@ export function AuthLayout({ title, description, children, footer }: AuthLayoutP
   const { t } = useTranslation('common', { useSuspense: false })
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-neutral-100 p-6">
+    <main className="flex min-h-screen items-center justify-center bg-app-background p-6">
       <div className="flex w-full max-w-md flex-col gap-6">
         {/* Language sits above the title so it is reachable on every
             auth page (login, register, verify-email) without moving the
             forms; it reuses the app's single i18n change mechanism. */}
-        <div className="self-end">
+        <div className="flex self-end items-center gap-2">
           <LanguageSwitcher />
+          <ThemeToggle />
         </div>
-        <h1 className="text-center text-3xl font-bold tracking-tight text-neutral-900" dir="auto">
+        <h1 className="text-center text-3xl font-bold tracking-tight text-text-main" dir="auto">
           {t('appName')}
         </h1>
         <Card>

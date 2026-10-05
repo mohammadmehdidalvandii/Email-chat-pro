@@ -30,13 +30,13 @@ const MEDIA_TYPE_LABEL_KEY = {
 function ReadReceipt({ readAt }: { readAt: string | null }) {
   if (readAt) {
     return (
-      <span aria-label="Read" title="Read" className="text-green-400">
+      <span aria-label="Read" title="Read" className="text-success">
         <CheckCheck size={14} />
       </span>
     )
   }
   return (
-    <span aria-label="Sent" title="Sent" className="text-neutral-400">
+    <span aria-label="Sent" title="Sent" className="text-text-muted">
       <Check size={14} />
     </span>
   )
@@ -110,7 +110,7 @@ export const MessageItem = memo(function MessageItem({ message, isOwn }: Message
     <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
       <div
         className={`max-w-xs rounded-lg px-4 py-2 ${
-          isOwn ? 'bg-blue-600 text-white' : 'bg-neutral-200 text-black'
+          isOwn ? 'bg-message-sent text-white' : 'bg-message-received text-text-main'
         }`}
       >
         {mediaMissing ? (

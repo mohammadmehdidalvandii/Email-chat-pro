@@ -96,7 +96,7 @@ export function MessageList({ chatId }: MessageListProps) {
 
       {pagination && pagination.pages > 1 && (
         <div
-          className="flex items-center justify-between gap-3 border-t border-neutral-200 bg-white px-4 py-2"
+          className="flex items-center justify-between gap-3 border-t border-border bg-main-surface px-4 py-2"
           dir="ltr"
         >
           <button

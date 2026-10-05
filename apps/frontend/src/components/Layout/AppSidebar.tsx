@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import { useLogoutMutation } from '../../hooks/use-auth-mutations'
 import { LanguageSwitcher } from './LanguageSwitcher'
+import { ThemeToggle } from './ThemeToggle'
 import { SidebarItem } from './SidebarItem'
 import { cn } from '../../lib/utils'
 
@@ -73,13 +74,14 @@ export function AppSidebar({ onNavigate, className }: AppSidebarProps) {
   }
 
   return (
-    <div className={cn('flex h-full min-h-0 flex-col bg-white', className)}>
-      <div className="border-b border-neutral-200 px-4 py-4">
+    <div className={cn('flex h-full min-h-0 flex-col bg-sidebar', className)}>
+      <div className="border-b border-border px-4 py-4">
         <span className="text-base font-bold tracking-tight">{t('common:appName')}</span>
 
         {/* Language sits above the nav so it is reachable before scrolling. */}
-        <div className="pt-3">
+        <div className="flex gap-2 pt-3">
           <LanguageSwitcher />
+          <ThemeToggle />
         </div>
       </div>
 
@@ -99,7 +101,7 @@ export function AppSidebar({ onNavigate, className }: AppSidebarProps) {
         ))}
       </nav>
 
-      <div className="border-t border-neutral-200 p-3">
+      <div className="border-t border-border p-3">
         <button
           type="button"
           onClick={onLogout}

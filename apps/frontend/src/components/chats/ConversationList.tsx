@@ -26,7 +26,7 @@ export function ConversationList({ limit }: ConversationListProps = {}) {
   const { t } = useTranslation(['chat', 'common'], { useSuspense: false })
   const { data: conversations, isLoading, isError, refetch } = useConversations()
 
-  if (isLoading) return <p className="text-sm text-neutral-500">{t('common:loading')}</p>
+  if (isLoading) return <p className="text-sm text-text-muted">{t('common:loading')}</p>
 
   if (isError) {
     return (
@@ -37,7 +37,7 @@ export function ConversationList({ limit }: ConversationListProps = {}) {
         <button
           type="button"
           onClick={() => void refetch()}
-          className="text-sm text-neutral-700 underline underline-offset-4"
+          className="text-sm text-text-secondary underline underline-offset-4"
         >
           {t('common:retry')}
         </button>
@@ -47,7 +47,7 @@ export function ConversationList({ limit }: ConversationListProps = {}) {
 
   if (!conversations || conversations.length === 0) {
     return (
-      <p className="text-sm text-neutral-500">
+      <p className="text-sm text-text-muted">
         {t('chat:noConversations')}
       </p>
     )
@@ -84,7 +84,7 @@ export function ConversationList({ limit }: ConversationListProps = {}) {
                 }
               }}
               className={
-                'flex cursor-pointer items-center justify-between gap-3 p-4 transition-colors hover:bg-neutral-100 ' +
+                'flex cursor-pointer items-center justify-between gap-3 p-4 transition-colors hover:bg-card-hover ' +
                 (conversation.unreadCount > 0 ? 'ring-2 ring-green-500/40 rounded-lg' : '')
               }
             >
@@ -97,13 +97,13 @@ export function ConversationList({ limit }: ConversationListProps = {}) {
                   <p className="truncate font-semibold" dir="auto">
                     {contact.username ?? contact.email}
                   </p>
-                  <p className="truncate text-sm text-neutral-500" dir="auto">
+                  <p className="truncate text-sm text-text-muted" dir="auto">
                     {preview}
                   </p>
                 </div>
               </div>
               {activity && (
-                <span className="shrink-0 text-xs text-neutral-400" dir="auto">
+                <span className="shrink-0 text-xs text-text-muted" dir="auto">
                   {activity}
                 </span>
               )}

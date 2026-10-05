@@ -91,7 +91,7 @@ export function EmailVerificationForm() {
           and enters the token — not only on the registration
           success screen, which auto-redirects here within
           seconds. */}
-      <p className="text-sm text-neutral-600">{t('checkSpamFolder')}</p>
+      <p className="text-sm text-text-secondary">{t('checkSpamFolder')}</p>
     </form>
   )
 }

@@ -39,13 +39,13 @@ export function NotificationBanner() {
         <div
           key={item.id}
           role="status"
-          className="pointer-events-auto flex w-72 items-start gap-3 rounded-lg border border-neutral-200 bg-white p-3 shadow-lg"
+          className="pointer-events-auto flex w-72 items-start gap-3 rounded-lg border border-border bg-card p-3 shadow-lg"
         >
           <div className="min-w-0 flex-1">
             <p className="text-sm font-semibold">
               {t('newMessageNotification')}
             </p>
-            <p className="truncate text-xs text-neutral-500">
+            <p className="truncate text-xs text-text-muted">
               {t('newMessageFrom', { sender: item.senderName })}
             </p>
             {item.preview && (

@@ -65,8 +65,8 @@ export function RegisterForm() {
     return (
       <div className="flex flex-col gap-3" role="status" aria-live="polite">
         <p className="text-sm text-green-700">{t('registerSuccess')}</p>
-        <p className="text-sm text-neutral-600">{t('registerSuccessNext')}</p>
-        <p className="text-sm text-neutral-600">{t('checkSpamFolder')}</p>
+        <p className="text-sm text-text-secondary">{t('registerSuccessNext')}</p>
+        <p className="text-sm text-text-secondary">{t('checkSpamFolder')}</p>
         <Button
           type="button"
           className="mt-2 w-full"

@@ -38,13 +38,13 @@ export function ChatHeader({ chatId }: ChatHeaderProps) {
       : t('chat:connection.connecting')
 
   return (
-    <header className="flex items-center gap-3 border-b border-neutral-200 bg-white px-4 py-3">
+    <header className="flex items-center gap-3 border-b border-border bg-main-surface px-4 py-3">
       {/* Back navigation returns to the conversation list on every screen size;
           the header is the only chrome on the chat route. */}
       <Link
         href="/chats"
         aria-label={t('chat:back')}
-        className="rounded-md p-2 text-neutral-700 hover:bg-neutral-100"
+        className="rounded-md p-2 text-text-secondary hover:bg-card-hover"
       >
         <ArrowLeft className="h-5 w-5 rtl:rotate-180" aria-hidden />
       </Link>
@@ -52,7 +52,7 @@ export function ChatHeader({ chatId }: ChatHeaderProps) {
       {contact ? (
         <div className="relative">
           <UserAvatar user={contact} size="sm" />
-          <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-white p-0.5">
+          <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-card p-0.5">
             <PresenceIndicator userId={contact.id} />
           </span>
         </div>
@@ -77,7 +77,7 @@ export function ChatHeader({ chatId }: ChatHeaderProps) {
       <span
         role="status"
         className={`hidden shrink-0 text-xs sm:inline ${
-          hasError ? 'text-red-600' : 'text-neutral-500'
+          hasError ? 'text-error' : 'text-text-muted'
         }`}
       >
         {status}

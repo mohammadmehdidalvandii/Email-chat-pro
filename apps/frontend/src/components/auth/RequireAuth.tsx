@@ -45,8 +45,8 @@ export function RequireAuth({ children }: RequireAuthProps) {
   // Still checking the session → show a minimal loading state.
   if (token && isLoading && !hasSessionResolved) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-neutral-100">
-        <p className="text-sm text-neutral-500">{t('loading')}</p>
+      <main className="flex min-h-screen items-center justify-center bg-app-background">
+        <p className="text-sm text-text-muted">{t('loading')}</p>
       </main>
     )
   }

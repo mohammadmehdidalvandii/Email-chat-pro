@@ -1,19 +1,91 @@
 @import 'tailwindcss';
 
-/* Task 4.3 — i18n. Font stack includes Persian/Arabic glyph support so the
-   RTL locale (fa) renders cleanly without bundling a webfont. */
+/* Theme token architecture (spec: dark tokens defined on .dark, light preserved as default) */
 :root {
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Tahoma, 'Noto Sans', 'Noto Sans Arabic',
     Arial, sans-serif;
+
+  /* Light mode defaults (existing) */
+  --app-background: #ffffff;
+  --sidebar: #ffffff;
+  --main-surface: #f9fafb;
+  --card: #ffffff;
+  --card-hover: #f3f4f6;
+  --input: #ffffff;
+  --border: #e5e7eb;
+  --border-hover: #d1d5db;
+  --primary: #6366f1;
+  --primary-hover: #818cf8;
+  --unread-active: #4f46e5;
+  --message-sent: #3730a3;
+  --message-received: #f3f4f6;
+  --success: #22c55e;
+  --warning: #f59e0b;
+  --error: #ef4444;
+  --info: #38bdf8;
+  --text-main: #171717;
+  --text-secondary: #374151;
+  --text-muted: #6b7280;
+}
+
+.dark {
+  --app-background: #0B1120;
+  --sidebar: #0F172A;
+  --main-surface: #111827;
+  --card: #172033;
+  --card-hover: #1E293B;
+  --input: #0F172A;
+  --border: #243044;
+  --border-hover: #334155;
+  --primary: #6366F1;
+  --primary-hover: #818CF8;
+  --unread-active: #4F46E5;
+  --message-sent: #3730A3;
+  --message-received: #1E293B;
+  --success: #22C55E;
+  --warning: #F59E0B;
+  --error: #EF4444;
+  --info: #38BDF8;
+  --text-main: #F8FAFC;
+  --text-secondary: #CBD5E1;
+  --text-muted: #64748B;
 }
 
 body {
   font-family: var(--font-sans);
+  background-color: var(--app-background);
+  color: var(--text-main);
+  transition: background-color 150ms ease, color 150ms ease;
 }
 
-/* In RTL mode, left/right-agnostic alignment falls back to the text start,
-   which mirrors correctly for the fa locale. */
-[dir='rtl'] {
-  text-align: start;
+.dark ::-webkit-scrollbar-track { background: #0B1120; }
+.dark ::-webkit-scrollbar-thumb { background: #243044; border-radius: 0.5rem; }
+.dark ::-webkit-scrollbar-thumb:hover { background: #334155; }
+
+[dir='rtl'] { text-align: start; }
+
+/* Tailwind v4 theme tokens mapped to CSS variables so semantic
+   utility classes resolve to the specified palette. */
+@theme {
+  --color-app-background: var(--app-background);
+  --color-sidebar: var(--sidebar);
+  --color-main-surface: var(--main-surface);
+  --color-card: var(--card);
+  --color-card-hover: var(--card-hover);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-border-hover: var(--border-hover);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-unread-active: var(--unread-active);
+  --color-message-sent: var(--message-sent);
+  --color-message-received: var(--message-received);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-error: var(--error);
+  --color-info: var(--info);
+  --color-text-main: var(--text-main);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
 }

@@ -49,7 +49,7 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
     // menu bar, leaving only `main`'s py-8 (64px). `dvh` (not `vh`) keeps the
     // composer clear of mobile browser chrome. These must track AppShell's
     // padding — if either changes, this needs the same change.
-    <section className="flex h-[calc(100dvh-6.8125rem)] flex-col overflow-hidden rounded-lg border border-neutral-200 bg-white md:h-[calc(100dvh-4rem)]">
+    <section className="flex h-[calc(100dvh-6.8125rem)] flex-col overflow-hidden rounded-lg border border-border bg-card md:h-[calc(100dvh-4rem)]">
       <ChatHeader chatId={chatId} />
       {sendError && (
         <p className="px-4 py-2 text-sm text-red-600" role="alert">

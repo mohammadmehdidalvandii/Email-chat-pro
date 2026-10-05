@@ -75,7 +75,7 @@ export function FormField({
             onClick={() => setPasswordVisible((visible) => !visible)}
             aria-label={toggleLabel}
             title={toggleLabel}
-            className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-neutral-500 hover:text-neutral-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
+            className="absolute right-3 top-1/2 -translate-y-1/2 cursor-pointer text-text-muted hover:text-text-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
           >
             {passwordVisible ? (
               <EyeOff className="h-4 w-4" aria-hidden />
@@ -99,7 +99,7 @@ export function FormField({
           {validationMessage(error.message)}
         </p>
       ) : (
-        hint && <p className="text-sm text-neutral-500">{hint}</p>
+        hint && <p className="text-sm text-text-muted">{hint}</p>
       )}
     </div>
   )
