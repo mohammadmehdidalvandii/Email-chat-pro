@@ -101,9 +101,9 @@ function Stat({
   loading: boolean
 }) {
   return (
-    <div className="rounded-lg border border-neutral-200 bg-white p-4">
-      <dt className="text-xs text-neutral-500">{label}</dt>
-      <dd className="mt-1 text-2xl font-semibold">
+    <div className="rounded-lg border border-border bg-card p-4 shadow-sm hover:bg-card-hover transition-colors">
+      <dt className="text-xs text-text-muted">{label}</dt>
+      <dd className="mt-1 text-2xl font-semibold text-text-main">
         {loading ? '—' : formatNumber(value ?? 0)}
       </dd>
     </div>

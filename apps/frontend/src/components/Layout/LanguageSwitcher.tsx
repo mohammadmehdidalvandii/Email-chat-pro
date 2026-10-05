@@ -26,19 +26,15 @@ export function LanguageSwitcher() {
             void i18n.changeLanguage(event.target.value)
           }}
           className="
-            w-full appearance-none rounded-lg border border-neutral-200/80
-            bg-white px-3 py-2.5 pl-8 pr-8
-            text-sm font-medium text-neutral-800 shadow-sm
+            w-full appearance-none rounded-lg border border-border
+            bg-card px-3 py-2.5 pl-8 pr-8
+            text-sm font-medium text-text-main shadow-sm
             transition-all duration-150 ease-out
-            hover:border-neutral-300 hover:shadow
+            hover:border-border-hover hover:shadow
             hover:-translate-y-px
-            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-neutral-900/10
-            focus-visible:border-neutral-400 focus-visible:shadow-md
+            focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/20
+            focus-visible:border-border-hover focus-visible:shadow-md
             active:translate-y-0 active:shadow-sm
-            dark:border-neutral-700/60 dark:bg-neutral-800 dark:text-neutral-100
-            dark:hover:border-neutral-600 dark:hover:bg-neutral-700/60
-            dark:focus-visible:ring-neutral-400/20
-            dark:focus-visible:border-neutral-500
           "
         >
           {SUPPORTED_LOCALES.map((code) => (
@@ -49,11 +45,11 @@ export function LanguageSwitcher() {
         </select>
         {/* Icon: globe left, chevron right */}
         <Globe
-          className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400 dark:text-neutral-500"
+          className="pointer-events-none absolute start-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-muted"
           aria-hidden
         />
         <ChevronDown
-          className="pointer-events-none absolute end-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400 dark:text-neutral-500"
+          className="pointer-events-none absolute end-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted"
           aria-hidden
         />
       </span>
