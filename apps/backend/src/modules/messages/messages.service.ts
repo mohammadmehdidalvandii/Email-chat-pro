@@ -56,7 +56,7 @@ export class MessagesService {
     private readonly authService: AuthService,
     private readonly contactsService: ContactsService,
     @Optional()
-    @Inject(forwardRef(() => ChatGateway))
+    @Inject(ChatGateway)
     private readonly chatGateway: ChatGateway | undefined,
   ) {}
 

@@ -10,12 +10,22 @@
 import { useEffect } from 'react'
 import { WS_CLIENT_EVENTS, WS_SERVER_EVENTS } from '@email-chat-pro/types'
 import { useSessionSocket } from '../components/Providers/SocketProvider'
+import { useChatStore } from '../stores/chat.store'
 
 export function useChatSocket(activeChatId: string | null): void {
   const { socket } = useSessionSocket()
+  const setActiveChatId = useChatStore((s) => s.setActiveChatId)
 
   useEffect(() => {
     if (!socket || !activeChatId) return
+
+    // The chat window this hook renders in owns the active-conversation
+    // state: entering the chat registers it, unmounting (navigating away
+    // or closing) clears it. The notification decision in SocketProvider
+    // compares incoming `chatId` against this value, so an unread message
+    // in the open conversation must NOT raise a banner, while a message in
+    // any other conversation must.
+    setActiveChatId(activeChatId)
 
     // The gateway's `chat:join` handler re-resolves the handshake token itself,
     // so the join is safe to emit as soon as the socket exists. Until the
@@ -41,13 +51,15 @@ export function useChatSocket(activeChatId: string | null): void {
     socket.on('connect', onConnectRetry)
 
     return () => {
+      // Leave the room only while still connected; the server drops the
+      // membership on disconnect anyway. Also clear activeChatId so a
+      // message arriving after navigation produces a notification again.
+      setActiveChatId(null)
       socket.off('connect', onConnectRetry)
       socket.off(WS_SERVER_EVENTS.CHAT_JOINED)
-      // Leaving a room only makes sense while still connected; the server
-      // drops the membership on disconnect anyway.
       if (socket.connected) {
         socket.emit(WS_CLIENT_EVENTS.LEAVE_CHAT, { chatId: activeChatId })
       }
     }
-  }, [socket, activeChatId])
+  }, [socket, activeChatId, setActiveChatId])
 }

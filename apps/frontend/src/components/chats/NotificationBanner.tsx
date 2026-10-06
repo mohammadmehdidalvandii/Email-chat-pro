@@ -17,16 +17,17 @@ import { useNotificationStore } from '../../stores/notification.store'
 export function NotificationBanner() {
   const { t } = useTranslation('chat', { useSuspense: false })
   const items = useNotificationStore((s) => s.items)
-  const clear = useNotificationStore((s) => s.clear)
+  const remove = useNotificationStore((s) => s.remove)
 
-  // Auto-dismiss after a short, non-intrusive interval so the
-  // notification does not persist forever. `items` is the only
-  // dependency; the timer resets when a new notification arrives.
+  // Each notification has its own 4-second lifetime so an arrival
+  // does not reset or prematurely kill another entry.
   useEffect(() => {
     if (items.length === 0) return
-    const timer = setTimeout(clear, 4000)
-    return () => clearTimeout(timer)
-  }, [items, clear])
+    const timers = items.map((item) =>
+      setTimeout(() => remove(item.id), 4000),
+    )
+    return () => timers.forEach(clearTimeout)
+  }, [items, remove])
 
   if (items.length === 0) return null
 
@@ -57,7 +58,7 @@ export function NotificationBanner() {
           <div className="flex flex-col gap-1">
             <Link
               href={`/chats/${item.chatId}`}
-              onClick={clear}
+              onClick={() => remove(item.id)}
               aria-label={t('newMessageNotification')}
               className="text-xs text-blue-600 underline underline-offset-4"
             >
@@ -65,7 +66,7 @@ export function NotificationBanner() {
             </Link>
             <button
               type="button"
-              onClick={clear}
+              onClick={() => remove(item.id)}
               aria-label={t('chat:notificationDismiss')}
               className="text-neutral-400 hover:text-neutral-600"
             >

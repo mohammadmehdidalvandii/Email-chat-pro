@@ -69,8 +69,6 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
   const token = useAuthStore((s) => s.token)
   const setIsSocketConnected = useChatStore((s) => s.setIsSocketConnected)
-  const activeChatId = useChatStore((s) => s.activeChatId)
-  const userId = useAuthStore((s) => s.user?.id)
   const addNotification = useNotificationStore((s) => s.add)
   const socketRef = useRef<Socket | null>(null)
   const [isConnected, setIsConnected] = useState(false)
@@ -162,10 +160,20 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       // re-delivery or a repeated emit is a no-op. The preview keeps
       // only the sender's name and the message content (already
       // authorized for this user); no other data is exposed.
+      //
+      // The user id is read from the store's CURRENT state at
+      // event-handling time (not from a closure variable), so the
+      // decision always reflects the authenticated user even if the
+      // session resolves after this effect ran. `activeChatId` is
+      // read the same way: the chat window sets it via useChatSocket,
+      // and the effect deps intentionally exclude it so moving
+      // between conversations never tears down the session socket.
+      const currentUserId = useAuthStore.getState().user?.id
+      const currentActiveChatId = useChatStore.getState().activeChatId
       if (
-        userId &&
-        payload.message.senderId !== userId &&
-        payload.chatId !== activeChatId
+        currentUserId &&
+        payload.message.senderId !== currentUserId &&
+        payload.chatId !== currentActiveChatId
       ) {
         addNotification({
           id: payload.message.id,

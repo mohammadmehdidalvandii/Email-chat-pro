@@ -12,6 +12,8 @@ interface NotificationState {
   items: NotificationItem[]
   seenIds: Set<string>
   add: (item: Omit<NotificationItem, 'timestamp'>) => void
+  /** Remove a single notification (e.g. its auto-dismiss timer fired). */
+  remove: (id: string) => void
   clear: () => void
 }
 
@@ -23,11 +25,16 @@ type WindowWithAudioContext = typeof window & {
   webkitAudioContext?: AudioContextFactory
 }
 
+/** Reused across notifications so we don't create a new context per chime. */
+let sharedCtx: AudioContext | null = null
+
 const getAudioContext = (): AudioContext | null => {
   try {
+    if (sharedCtx) return sharedCtx
     const w = window as WindowWithAudioContext
     const Factory = w.AudioContext ?? w.webkitAudioContext
-    return Factory ? new Factory() : null
+    sharedCtx = Factory ? new Factory() : null
+    return sharedCtx
   } catch {
     return null
   }
@@ -71,5 +78,9 @@ export const useNotificationStore = create<NotificationState>((set, get) => ({
       }
     }
   },
+  remove: (id) => set((s) => ({
+    items: s.items.filter((i) => i.id !== id),
+    seenIds: s.seenIds,
+  })),
   clear: () => set({ items: [], seenIds: new Set() }),
 }))
