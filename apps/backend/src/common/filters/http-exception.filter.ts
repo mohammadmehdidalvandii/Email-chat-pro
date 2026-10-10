@@ -81,6 +81,15 @@ export class HttpExceptionFilter implements ExceptionFilter {
     if (typeof message === 'string') return message
     if (Array.isArray(message)) return message.join(', ')
     if (message === undefined || message === null) return fallback
+    if (typeof message === 'object' && message !== null) {
+      // Validation errors from @nestjs/common's ValidationPipe are objects like { email: ['Email is required'] }
+      const values = Object.values(message)
+      if (Array.isArray(values[0])) {
+        return values[0][0] // first field's first error
+      }
+      // fallback for unexpected object shape
+      return 'Please check the information you entered and try again.'
+    }
     return String(message)
   }
 

@@ -150,9 +150,9 @@ export const ERROR_CODES = {
 
 /** Human-readable messages for registration-, verification-, and profile-related errors. */
 export const ERROR_MESSAGES = {
-  EMAIL_REQUIRED: 'Email is required',
-  EMAIL_INVALID: 'Email must be a valid email address',
-  EMAIL_ALREADY_REGISTERED: 'Email already registered',
+  EMAIL_REQUIRED: 'Please enter your email address',
+  EMAIL_INVALID: 'Please enter a valid email address',
+  EMAIL_ALREADY_REGISTERED: 'An account with this email already exists',
   PASSWORD_REQUIRED: 'Password is required',
   PASSWORD_WEAK:
     'Password must be 8-255 characters and include an uppercase letter, a lowercase letter, a digit, and a special character (!@#$%^&*)',

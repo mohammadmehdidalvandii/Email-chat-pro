@@ -32,7 +32,14 @@ export function authErrorMessage(error: ApiRequestError | null | undefined): str
   if (!error) return ''
 
   const i18n = getI18n()
-  const authT = i18n?.getFixedT(i18n.resolvedLanguage ?? 'en', 'auth') ?? ((k: string) => k)
+  const authT = i18n?.getFixedT(i18n.resolvedLanguage ?? 'en', 'auth') ?? ((k: string) => {
+    if (k === 'emailNotVerified') return i18n.t('auth:emailNotVerified')
+    if (k === 'invalidCredentials') return i18n.t('auth:invalidCredentials')
+    if (k === 'emailAlreadyRegistered') return i18n.t('auth:emailAlreadyRegistered')
+    if (k === 'verificationTokenInvalid') return i18n.t('auth:verificationTokenInvalid')
+    if (k === 'emailSendFailed') return i18n.t('auth:emailSendFailed')
+    return k
+  })
 
   // Auth-specific codes, keyed on the structured contract rather than English
   // message text. The `emailNotVerified` copy prompts the user to verify
