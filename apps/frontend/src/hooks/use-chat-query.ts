@@ -43,6 +43,7 @@ export function prependMessageToHistory(
   message: Message,
 ): PaginatedResponse<Message> | undefined {
   if (!cache) return cache
+  if (!cache.data || !Array.isArray(cache.data)) return cache
   if (cache.data.some((existing) => existing.id === message.id)) return cache
   // The newest message always belongs at the head of the newest-first list,
   // regardless of which page is currently rendered.
@@ -133,8 +134,11 @@ export function findChatIdForContact(
   return conversations?.find((conversation) => conversation.contact.id === contactId)?.id
 }
 
-/** Applies a newly received message to every page of the chat's history cache. */
+/**
+ * Applies a newly received message to both page-level and infinite-query caches.
+ */
 export function applyIncomingMessage(queryClient: QueryClient, message: Message): void {
+  // Page-level keys (used by legacy useChatHistory)
   queryClient.getQueriesData<PaginatedResponse<Message>>({
     queryKey: CHAT_HISTORY_KEY,
   }).forEach(([key, cached]) => {
@@ -146,6 +150,27 @@ export function applyIncomingMessage(queryClient: QueryClient, message: Message)
       )
     }
   })
+
+  // Infinite-query keys (used by MessageList / useChatHistoryInfinite)
+  queryClient.getQueriesData<{ pages: PaginatedResponse<Message>[] }>({
+    queryKey: CHAT_HISTORY_KEY,
+  }).forEach(([key, cached]) => {
+    const keyArr = key as readonly unknown[]
+    const [prefix, cachedChatId] = keyArr
+    if (prefix === CHAT_HISTORY_KEY[0] && typeof cachedChatId === 'string' && cachedChatId === message.chatId && cached && cached.pages) {
+      queryClient.setQueryData(key, (prev: { pages: PaginatedResponse<Message>[] } | undefined) => {
+        if (!prev) return prev
+        if (!prev.pages || prev.pages.length === 0) return prev
+        const firstPage = prev.pages[0]
+        const updatedFirst = prependMessageToHistory(firstPage, message)
+        return {
+          ...prev,
+          pages: [updatedFirst, ...prev.pages.slice(1)],
+        }
+      })
+    }
+  })
+
   queryClient.setQueryData(CONVERSATIONS_KEY, (cache: ConversationListItem[] | undefined) =>
     patchConversationWithMessage(cache, message),
   )
