@@ -59,9 +59,18 @@ body {
   transition: background-color 150ms ease, color 150ms ease;
 }
 
-.dark ::-webkit-scrollbar-track { background: #0B1120; }
-.dark ::-webkit-scrollbar-thumb { background: #243044; border-radius: 0.5rem; }
-.dark ::-webkit-scrollbar-thumb:hover { background: #334155; }
+.dark ::-webkit-scrollbar-track { background: var(--main-surface); }
+.dark ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 0.5rem; }
+.dark ::-webkit-scrollbar-thumb:hover { background: var(--border-hover); }
+
+/* Premium scrollbar for chat message scroll area */
+.chat-scroll::-webkit-scrollbar { width: 8px; }
+.chat-scroll::-webkit-scrollbar-track { background: transparent; }
+.chat-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 0.5rem; }
+.chat-scroll::-webkit-scrollbar-thumb:hover { background: var(--border-hover); }
+.chat-scroll { scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+.dark .chat-scroll::-webkit-scrollbar-thumb { background: var(--border); }
+.dark .chat-scroll::-webkit-scrollbar-thumb:hover { background: var(--border-hover); }
 
 [dir='rtl'] { text-align: start; }
 
