@@ -31,10 +31,11 @@ export function ChatWindow({ chatId }: ChatWindowProps) {
     content: string,
     messageType: 'text' | 'image' | 'video',
     mediaUrl?: string | null,
+    attachmentId?: string | null,
   ): Promise<boolean> => {
     setSendError(null)
     try {
-      await send.mutateAsync({ chatId, content, messageType, mediaUrl })
+      await send.mutateAsync({ chatId, content, messageType, mediaUrl, attachmentId })
       return true
     } catch (error) {
       const apiError = toApiRequestError(error)

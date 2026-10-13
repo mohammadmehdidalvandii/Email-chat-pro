@@ -66,15 +66,25 @@ export async function sendMessageApi(
   chatId: string,
   dto: CreateMessageInput,
 ): Promise<Message> {
-  const { content, messageType, mediaUrl } = dto
+  const { content, messageType, mediaUrl, attachmentId } = dto
 
   // `content` is dropped only when it is genuinely absent/blank: the DTO
   // requires 1–5000 characters, so sending an empty string would fail
   // validation. A real caption always travels with the media.
   const caption = content?.trim() ? content : undefined
 
-  const body: { content?: string; messageType: MessageType; mediaUrl?: string } = mediaUrl
-    ? { messageType, mediaUrl, ...(caption ? { content: caption } : {}) }
+  const body: {
+    content?: string
+    messageType: MessageType
+    mediaUrl?: string
+    attachmentId?: string
+  } = mediaUrl
+    ? {
+        messageType,
+        mediaUrl,
+        ...(attachmentId ? { attachmentId } : {}),
+        ...(caption ? { content: caption } : {}),
+      }
     : { messageType, content }
 
   return apiRequest<Message>({

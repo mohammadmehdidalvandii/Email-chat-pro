@@ -5,6 +5,7 @@ import { ChatsModule } from '../chats/chats.module'
 import { ContactsModule } from '../contacts/contacts.module'
 import { WebSocketModule } from '../websocket/websocket.module'
 import { Message } from './entities/message.entity'
+import { Attachment } from '../files/entities/attachment.entity'
 import { MessagesController } from './messages.controller'
 import { MessagesService } from './messages.service'
 
@@ -23,7 +24,7 @@ import { MessagesService } from './messages.service'
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Message]),
+    TypeOrmModule.forFeature([Message, Attachment]),
     AuthModule,
     ChatsModule,
     ContactsModule,

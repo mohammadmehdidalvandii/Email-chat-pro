@@ -22,6 +22,7 @@ import { AuthService } from '../auth/auth.service'
 import { User } from '../auth/entities/user.entity'
 import { ChatsService } from '../chats/chats.service'
 import { ContactsService } from '../contacts/contacts.service'
+import { Attachment } from '../files/entities/attachment.entity'
 import { ChatGateway } from '../websocket/websocket.gateway'
 import { CreateMessageDto } from './dto/create-message.dto'
 import { Message } from './entities/message.entity'
@@ -57,6 +58,8 @@ export class MessagesService {
     @Optional()
     @Inject(ChatGateway)
     private readonly chatGateway: ChatGateway | undefined,
+    @InjectRepository(Attachment)
+    private readonly attachmentRepo: Repository<Attachment>,
   ) {}
 
   /**
@@ -125,38 +128,99 @@ export class MessagesService {
           message: ERROR_MESSAGES.MESSAGE_MEDIA_NOT_ALLOWED,
         })
       }
+      if (dto.attachmentId) {
+        throw new BadRequestException({
+          code: ERROR_CODES.MESSAGE_MEDIA_NOT_ALLOWED,
+          message: ERROR_MESSAGES.MESSAGE_MEDIA_NOT_ALLOWED,
+        })
+      }
       content = dto.content
       mediaUrl = null
     } else if (dto.messageType === 'image') {
-      if (!dto.mediaUrl) {
+      if (!dto.attachmentId && !dto.mediaUrl) {
         throw new BadRequestException({
           code: ERROR_CODES.IMAGE_MEDIA_URL_REQUIRED,
           message: ERROR_MESSAGES.IMAGE_MEDIA_URL_REQUIRED,
         })
       }
-      if (!isValidHttpUrl(dto.mediaUrl)) {
-        throw new BadRequestException({
-          code: ERROR_CODES.IMAGE_MEDIA_URL_INVALID,
-          message: ERROR_MESSAGES.IMAGE_MEDIA_URL_INVALID,
-        })
+      if (dto.attachmentId) {
+        // Attachment flow (PostgreSQL BYTEA): validate by attachment ID
+        if (dto.mediaUrl && !dto.mediaUrl.startsWith('/api/v1/attachments/')) {
+          throw new BadRequestException({
+            code: ERROR_CODES.IMAGE_MEDIA_URL_INVALID,
+            message: ERROR_MESSAGES.IMAGE_MEDIA_URL_INVALID,
+          })
+        }
+      } else if (dto.mediaUrl) {
+        // Historical / external URL flow: must be absolute http(s)
+        if (!isValidHttpUrl(dto.mediaUrl)) {
+          throw new BadRequestException({
+            code: ERROR_CODES.IMAGE_MEDIA_URL_INVALID,
+            message: ERROR_MESSAGES.IMAGE_MEDIA_URL_INVALID,
+          })
+        }
       }
       content = dto.content ?? ''
-      mediaUrl = dto.mediaUrl
+      mediaUrl = dto.mediaUrl ?? null
     } else {
-      if (!dto.mediaUrl) {
+      if (!dto.attachmentId && !dto.mediaUrl) {
         throw new BadRequestException({
           code: ERROR_CODES.VIDEO_MEDIA_URL_REQUIRED,
           message: ERROR_MESSAGES.VIDEO_MEDIA_URL_REQUIRED,
         })
       }
-      if (!isValidHttpUrl(dto.mediaUrl)) {
+      if (dto.attachmentId) {
+        if (dto.mediaUrl && !dto.mediaUrl.startsWith('/api/v1/attachments/')) {
+          throw new BadRequestException({
+            code: ERROR_CODES.VIDEO_MEDIA_URL_INVALID,
+            message: ERROR_MESSAGES.VIDEO_MEDIA_URL_INVALID,
+          })
+        }
+      } else if (dto.mediaUrl && !isValidHttpUrl(dto.mediaUrl)) {
         throw new BadRequestException({
           code: ERROR_CODES.VIDEO_MEDIA_URL_INVALID,
           message: ERROR_MESSAGES.VIDEO_MEDIA_URL_INVALID,
         })
       }
       content = dto.content ?? ''
-      mediaUrl = dto.mediaUrl
+      mediaUrl = dto.mediaUrl ?? null
+    }
+
+    // Task 4.1 — Attachment association (Option B). An attachment uploaded
+    // before the message is linked to this message inside a transaction so
+    // a failed send cannot leave a half-linked attachment. Ownership is
+    // enforced: the attachment must belong to the sender, must not already
+    // be linked to another message, and the URL must be the attachment's
+    // own internal URL so a user cannot attach another user's upload.
+    let attachment: Attachment | null = null
+    if (dto.attachmentId) {
+      attachment = await this.attachmentRepo.findOne({
+        where: { id: dto.attachmentId },
+      })
+      if (!attachment) {
+        throw new NotFoundException({
+          code: ERROR_CODES.NOT_FOUND,
+          message: ERROR_MESSAGES.NOT_FOUND,
+        })
+      }
+      if (attachment.senderId !== sender.id) {
+        throw new ForbiddenException({
+          code: ERROR_CODES.ATTACHMENT_NOT_OWNER,
+          message: ERROR_MESSAGES.ATTACHMENT_NOT_OWNER,
+        })
+      }
+      if (attachment.messageId) {
+        throw new BadRequestException({
+          code: ERROR_CODES.ATTACHMENT_ALREADY_LINKED,
+          message: ERROR_MESSAGES.ATTACHMENT_ALREADY_LINKED,
+        })
+      }
+      if (mediaUrl !== `/api/v1/attachments/${attachment.id}`) {
+        throw new BadRequestException({
+          code: ERROR_CODES.IMAGE_MEDIA_URL_INVALID,
+          message: ERROR_MESSAGES.IMAGE_MEDIA_URL_INVALID,
+        })
+      }
     }
 
     const message = this.messagesRepository.create({
@@ -166,9 +230,19 @@ export class MessagesService {
       messageType: dto.messageType,
       mediaUrl,
     })
-    const saved = await this.messagesRepository.save(message)
+    const result = await this.messagesRepository.manager.transaction(async (manager) => {
+      const savedMsg = await manager.save(message)
+      if (attachment) {
+        await manager.update(
+          Attachment,
+          { id: attachment.id },
+          { messageId: savedMsg.id },
+        )
+      }
+      return savedMsg
+    })
     const reloaded = await this.messagesRepository.findOne({
-      where: { id: saved.id },
+      where: { id: result.id },
       relations: ['sender'],
     })
     if (!reloaded) throw new NotFoundException({

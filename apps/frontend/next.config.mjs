@@ -6,6 +6,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const nextConfig = {
   reactStrictMode: true,
   outputFileTracingRoot: __dirname,
+  async rewrites() {
+    return [
+      {
+        source: '/api/v1/attachments/:id',
+        destination: 'http://localhost:4000/api/v1/attachments/:id',
+      },
+    ]
+  },
 }
 
 export default nextConfig

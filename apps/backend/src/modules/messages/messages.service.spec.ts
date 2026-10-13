@@ -6,6 +6,7 @@ import { User } from '../auth/entities/user.entity'
 import { ChatsService } from '../chats/chats.service'
 import { Chat } from '../chats/entities/chat.entity'
 import { ContactsService } from '../contacts/contacts.service'
+import { Attachment } from '../files/entities/attachment.entity'
 import { ChatGateway } from '../websocket/websocket.gateway'
 import { CreateMessageDto } from './dto/create-message.dto'
 import { Message } from './entities/message.entity'
@@ -25,6 +26,17 @@ describe('MessagesService', () => {
     create: jest.fn(),
     save: jest.fn(),
     findAndCount: jest.fn(),
+    findOne: jest.fn(),
+    find: jest.fn(),
+    createQueryBuilder: jest.fn(),
+    manager: {
+      transaction: jest.fn(),
+      update: jest.fn(),
+    },
+  }
+
+  const attachmentRepo = {
+    findOne: jest.fn(),
   }
 
   const authService = {
@@ -72,10 +84,29 @@ describe('MessagesService', () => {
     // Task 3.3: by default the pair shares an accepted contact relationship, so
     // existing sendMessage tests pass the gate; a dedicated test overrides it.
     contactsService.areContacts.mockResolvedValue(true)
+    // sendMessage persists inside a repository-manager transaction; the mock
+    // delegates to the callback so the manager's `save`/`update` are
+    // observable on the repository mock.
+    repository.manager.transaction.mockImplementation(
+      async (callback: (manager: unknown) => Promise<unknown>) =>
+        callback({
+          save: repository.save,
+          update: repository.manager.update,
+        }),
+    )
+    // sendMessage reloads the persisted row after the transaction. Mirror
+    // the repository: findOne returns the most recently saved entity
+    // (clearAllMocks does not drop mockResolvedValue implementations, so
+    // this is re-derived here instead of per-test).
+    repository.findOne.mockImplementation(async () => {
+      const results = repository.save.mock.results
+      return results.length > 0 ? results[results.length - 1].value : null
+    })
     const moduleRef = await Test.createTestingModule({
       providers: [
         MessagesService,
         { provide: getRepositoryToken(Message), useValue: repository },
+        { provide: getRepositoryToken(Attachment), useValue: attachmentRepo },
         {
           provide: ChatsService,
           useValue: { findById: jest.fn() },
@@ -306,6 +337,214 @@ describe('MessagesService', () => {
         response: {
           code: ERROR_CODES.IMAGE_MEDIA_URL_INVALID,
           message: ERROR_MESSAGES.IMAGE_MEDIA_URL_INVALID,
+        },
+      })
+      expect(repository.create).not.toHaveBeenCalled()
+    })
+
+    const attachmentId = 'aaaaaaaa-1111-4111-8111-111111111111'
+
+    /** A pending (unlinked) attachment owned by the sender. */
+    const pendingAttachment = (): Attachment =>
+      ({
+        id: attachmentId,
+        messageId: null,
+        senderId: baseUser.id,
+        mimeType: 'image/png',
+        fileSizeBytes: 42,
+        data: Buffer.from('png-bytes'),
+        originalName: 'photo.png',
+        createdAt: new Date('2026-06-01T00:00:00Z'),
+        updatedAt: new Date('2026-06-01T00:00:00Z'),
+      }) as Attachment
+
+    /** DTO for the PostgreSQL attachment flow (internal URL + id). */
+    const attachmentDto = (): CreateMessageDto => ({
+      messageType: 'image',
+      mediaUrl: `/api/v1/attachments/${attachmentId}`,
+      attachmentId,
+    })
+
+    it('sends an image message using a pending attachment and links it transactionally', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+      attachmentRepo.findOne.mockResolvedValue(pendingAttachment())
+      const messageEntity = {
+        id: 'msg-att',
+        chatId: 'chat-1',
+        sender: baseUser,
+        content: '',
+        messageType: 'image',
+        mediaUrl: `/api/v1/attachments/${attachmentId}`,
+        createdAt: new Date('2026-06-01T00:00:00Z'),
+      }
+      repository.create.mockReturnValue(messageEntity)
+      repository.save.mockResolvedValue(messageEntity)
+      repository.findOne.mockResolvedValue({
+        ...messageEntity,
+        sender: baseUser,
+      })
+      authService.toUserDto.mockReturnValue({ id: baseUser.id })
+
+      const result = await service.sendMessage(baseUser, 'chat-1', attachmentDto())
+
+      // The attachment is resolved server-side and the internal URL is
+      // accepted without requiring an absolute http(s) URL.
+      expect(attachmentRepo.findOne).toHaveBeenCalledWith({
+        where: { id: attachmentId },
+      })
+      expect(repository.create).toHaveBeenCalledWith({
+        chatId: 'chat-1',
+        sender: baseUser,
+        content: '',
+        messageType: 'image',
+        mediaUrl: `/api/v1/attachments/${attachmentId}`,
+      })
+      // Atomicity: the message is saved and the attachment is linked
+      // inside the same transaction.
+      expect(repository.manager.transaction).toHaveBeenCalledTimes(1)
+      expect(repository.save).toHaveBeenCalledTimes(1)
+      expect(repository.manager.update).toHaveBeenCalledWith(
+        Attachment,
+        { id: attachmentId },
+        { messageId: 'msg-att' },
+      )
+      expect(result.mediaUrl).toBe(`/api/v1/attachments/${attachmentId}`)
+    })
+
+    it('sends an attachment message without a caption', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+      attachmentRepo.findOne.mockResolvedValue(pendingAttachment())
+      const messageEntity = {
+        id: 'msg-att2',
+        chatId: 'chat-1',
+        sender: baseUser,
+        content: 'My caption',
+        messageType: 'image',
+        mediaUrl: `/api/v1/attachments/${attachmentId}`,
+        createdAt: new Date('2026-06-01T00:00:00Z'),
+      }
+      repository.create.mockReturnValue(messageEntity)
+      repository.save.mockResolvedValue(messageEntity)
+      repository.findOne.mockResolvedValue({
+        ...messageEntity,
+        sender: baseUser,
+      })
+      authService.toUserDto.mockReturnValue({ id: baseUser.id })
+
+      const result = await service.sendMessage(baseUser, 'chat-1', {
+        ...attachmentDto(),
+        content: 'My caption',
+      })
+
+      expect(result.content).toBe('My caption')
+      expect(result.mediaUrl).toBe(`/api/v1/attachments/${attachmentId}`)
+    })
+
+    it('throws NotFoundException when the attachment does not exist', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+      attachmentRepo.findOne.mockResolvedValue(null)
+
+      await expect(
+        service.sendMessage(baseUser, 'chat-1', attachmentDto()),
+      ).rejects.toMatchObject({
+        status: 404,
+        response: {
+          code: ERROR_CODES.NOT_FOUND,
+          message: ERROR_MESSAGES.NOT_FOUND,
+        },
+      })
+      expect(repository.create).not.toHaveBeenCalled()
+    })
+
+    it('throws ForbiddenException when the attachment belongs to another user', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+      attachmentRepo.findOne.mockResolvedValue({
+        ...pendingAttachment(),
+        senderId: '22222222-2222-2222-2222-222222222222',
+      })
+
+      await expect(
+        service.sendMessage(baseUser, 'chat-1', attachmentDto()),
+      ).rejects.toMatchObject({
+        status: 403,
+        response: {
+          code: ERROR_CODES.ATTACHMENT_NOT_OWNER,
+          message: ERROR_MESSAGES.ATTACHMENT_NOT_OWNER,
+        },
+      })
+      expect(repository.create).not.toHaveBeenCalled()
+    })
+
+    it('throws BadRequestException when the attachment is already linked to a message', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+      attachmentRepo.findOne.mockResolvedValue({
+        ...pendingAttachment(),
+        messageId: 'existing-message',
+      })
+
+      await expect(
+        service.sendMessage(baseUser, 'chat-1', attachmentDto()),
+      ).rejects.toMatchObject({
+        status: 400,
+        response: {
+          code: ERROR_CODES.ATTACHMENT_ALREADY_LINKED,
+          message: ERROR_MESSAGES.ATTACHMENT_ALREADY_LINKED,
+        },
+      })
+      expect(repository.create).not.toHaveBeenCalled()
+    })
+
+    it('throws BadRequestException when mediaUrl does not match the attachment id', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+      attachmentRepo.findOne.mockResolvedValue(pendingAttachment())
+
+      await expect(
+        service.sendMessage(baseUser, 'chat-1', {
+          ...attachmentDto(),
+          mediaUrl: `/api/v1/attachments/bbbbbbbb-2222-4222-8222-222222222222`,
+        }),
+      ).rejects.toMatchObject({
+        status: 400,
+        response: {
+          code: ERROR_CODES.IMAGE_MEDIA_URL_INVALID,
+          message: ERROR_MESSAGES.IMAGE_MEDIA_URL_INVALID,
+        },
+      })
+      expect(repository.create).not.toHaveBeenCalled()
+    })
+
+    it('throws BadRequestException when mediaUrl is an external URL with an attachmentId', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+
+      await expect(
+        service.sendMessage(baseUser, 'chat-1', {
+          ...attachmentDto(),
+          mediaUrl: 'https://example.com/other.png',
+        }),
+      ).rejects.toMatchObject({
+        status: 400,
+        response: {
+          code: ERROR_CODES.IMAGE_MEDIA_URL_INVALID,
+          message: ERROR_MESSAGES.IMAGE_MEDIA_URL_INVALID,
+        },
+      })
+      expect(attachmentRepo.findOne).not.toHaveBeenCalled()
+    })
+
+    it('forbids attachmentId on text messages', async () => {
+      chatsService().findById.mockResolvedValue(baseChat)
+
+      await expect(
+        service.sendMessage(baseUser, 'chat-1', {
+          content: 'Hello!',
+          messageType: 'text',
+          attachmentId,
+        } as CreateMessageDto),
+      ).rejects.toMatchObject({
+        status: 400,
+        response: {
+          code: ERROR_CODES.MESSAGE_MEDIA_NOT_ALLOWED,
+          message: ERROR_MESSAGES.MESSAGE_MEDIA_NOT_ALLOWED,
         },
       })
       expect(repository.create).not.toHaveBeenCalled()

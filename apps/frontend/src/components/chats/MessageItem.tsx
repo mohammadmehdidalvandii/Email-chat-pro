@@ -9,11 +9,12 @@
  * derived that the API does not provide — there are no read receipts, edit
  * affordances, or reactions because the backend has no such fields.
  */
-import { memo, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { Message } from '@email-chat-pro/types'
 import { Check, CheckCheck } from 'lucide-react'
 import { formatDate } from '../../i18n/formatting'
+import { apiClient } from '../../lib/api/client'
 
 interface MessageItemProps {
   message: Message
@@ -42,15 +43,68 @@ function ReadReceipt({ readAt }: { readAt: string | null }) {
   )
 }
 
-/** Message media (image/video) as rendered inside a bubble. */
+/**
+ * Message media (image/video) as rendered inside a bubble.
+ *
+ * The media is served from the authenticated `/attachments/:id` endpoint, so
+ * it cannot be loaded with a plain `<img src>` — the browser would send the
+ * request without the JWT and the backend would reject it with a 401. We
+ * therefore fetch the bytes through the shared `apiClient`, whose request
+ * interceptor attaches the `Authorization: Bearer` header, and turn the blob
+ * into an object URL for the element. The URL is revoked on unmount to avoid
+ * leaking object URLs.
+ */
 function MessageMedia({ url, type, alt }: { url: string; type: 'image' | 'video'; alt: string }) {
   const { t } = useTranslation('chat', { useSuspense: false })
-  // A media URL that 404s or is still transforming on Cloudinary must not leave
+  // A media URL that 404s or the token that signed it expires must not leave
   // a broken image icon or an unplayable player in the transcript.
   const [failed, setFailed] = useState(false)
+  const [src, setSrc] = useState<string | null>(null)
   const unavailable = t('mediaUnavailable')
 
-  if (failed) {
+  useEffect(() => {
+    let revoked = false
+
+    async function load() {
+      try {
+        // mediaUrl is absolute from the backend (e.g. /api/v1/attachments/...),
+        // but apiClient.baseURL already includes /api/v1; pass a relative URL
+        // so the base URL is not duplicated (/api/v1/api/v1/attachments/...).
+        const relativeUrl = url.replace(/^\/api\/v1/, '') || url
+        const blob = await apiClient.request<{ data: Blob }>({
+          method: 'GET',
+          url: relativeUrl,
+          responseType: 'blob',
+        }).then((r) => r.data)
+
+        // An error response that also carries a `data` body (e.g. 401 with an
+        // error envelope) is not usable media.
+        if (!(blob instanceof Blob)) {
+          setFailed(true)
+          return
+        }
+
+        if (!revoked) {
+          URL.revokeObjectURL(src ?? '')
+          setSrc(URL.createObjectURL(blob))
+        }
+      } catch {
+        if (!revoked) {
+          setFailed(true)
+        }
+      }
+    }
+
+    load()
+    return () => {
+      revoked = true
+      if (src) {
+        URL.revokeObjectURL(src)
+      }
+    }
+  }, [url, src])
+
+  if (failed || !src) {
     return (
       <p className="mb-2 text-sm opacity-70" role="img" aria-label={unavailable}>
         {unavailable}
@@ -64,23 +118,16 @@ function MessageMedia({ url, type, alt }: { url: string; type: 'image' | 'video'
       // pipeline, so `next/image` (and its host allowlist) is not applicable.
       // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={url}
+        src={src}
         alt={alt}
         loading="lazy"
-        onError={() => setFailed(true)}
         className="mb-2 max-w-full rounded-lg"
       />
     )
   }
 
   return (
-    <video
-      src={url}
-      controls
-      preload="metadata"
-      onError={() => setFailed(true)}
-      className="mb-2 max-w-full rounded-lg"
-    >
+    <video src={src} controls preload="metadata" className="mb-2 max-w-full rounded-lg">
       {unavailable}
     </video>
   )

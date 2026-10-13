@@ -1,6 +1,9 @@
 import { Test } from '@nestjs/testing'
+import { getRepositoryToken } from '@nestjs/typeorm'
 import { FilesController } from './files.controller'
 import { FilesService } from './files.service'
+import { Attachment } from './entities/attachment.entity'
+import { Chat } from '../chats/entities/chat.entity'
 
 // @nestjs/jwt v12 ships ESM-only (type: module); the CJS jest transformer
 // cannot handle it. This mock short-circuits the ESM import chain (the
@@ -17,18 +20,30 @@ describe('FilesController', () => {
     uploadVideo: jest.fn(),
   }
 
+  const attachmentRepo = {
+    findOne: jest.fn(),
+  }
+
+  const chatRepo = {
+    findOne: jest.fn(),
+  }
+
   beforeEach(async () => {
     jest.clearAllMocks()
     const moduleRef = await Test.createTestingModule({
       controllers: [FilesController],
-      providers: [{ provide: FilesService, useValue: filesService }],
+      providers: [
+        { provide: FilesService, useValue: filesService },
+        { provide: getRepositoryToken(Attachment), useValue: attachmentRepo },
+        { provide: getRepositoryToken(Chat), useValue: chatRepo },
+      ],
     }).compile()
 
     controller = moduleRef.get(FilesController)
   })
 
   it('POST upload delegates to the service and wraps the URL in the ApiResponse envelope', async () => {
-    const uploaded = { url: 'https://res.cloudinary.com/example-cloud/img.png' }
+    const uploaded = { url: '/api/v1/attachments/attachment-uuid' }
     filesService.uploadImage.mockResolvedValue(uploaded)
     const file = { buffer: Buffer.from('image-bytes') } as Express.Multer.File
 
@@ -38,7 +53,10 @@ describe('FilesController', () => {
       file,
     )
 
-    expect(filesService.uploadImage).toHaveBeenCalledWith(file)
+    expect(filesService.uploadImage).toHaveBeenCalledWith(
+      file,
+      expect.objectContaining({ id: 'uuid-1' }),
+    )
     expect(result.success).toBe(true)
     expect(result.data).toEqual(uploaded)
     expect(result.timestamp).toEqual(expect.any(String))
@@ -47,7 +65,10 @@ describe('FilesController', () => {
   it('delegates an absent file so the service reports FILE_REQUIRED', async () => {
     const result = await controller.upload({ user: { id: 'uuid-1' } } as never, {}, undefined)
 
-    expect(filesService.uploadImage).toHaveBeenCalledWith(undefined)
+    expect(filesService.uploadImage).toHaveBeenCalledWith(
+      undefined,
+      expect.objectContaining({ id: 'uuid-1' }),
+    )
     expect(result.success).toBe(true)
   })
 
@@ -64,7 +85,7 @@ describe('FilesController', () => {
   })
 
   it('delegates to uploadVideo when dto.type is video', async () => {
-    const uploaded = { url: 'https://res.cloudinary.com/example-cloud/vid.mp4' }
+    const uploaded = { url: '/api/v1/attachments/video-attachment-uuid' }
     filesService.uploadVideo.mockResolvedValue(uploaded)
     const file = { buffer: Buffer.from('video-bytes') } as Express.Multer.File
 
@@ -74,20 +95,26 @@ describe('FilesController', () => {
       file,
     )
 
-    expect(filesService.uploadVideo).toHaveBeenCalledWith(file)
+    expect(filesService.uploadVideo).toHaveBeenCalledWith(
+      file,
+      expect.objectContaining({ id: 'uuid-1' }),
+    )
     expect(filesService.uploadImage).not.toHaveBeenCalled()
     expect(result.success).toBe(true)
     expect(result.data).toEqual(uploaded)
   })
 
   it('delegates to uploadImage when dto.type is absent (image default)', async () => {
-    const uploaded = { url: 'https://res.cloudinary.com/example-cloud/img.png' }
+    const uploaded = { url: '/api/v1/attachments/attachment-uuid' }
     filesService.uploadImage.mockResolvedValue(uploaded)
     const file = { buffer: Buffer.from('image-bytes') } as Express.Multer.File
 
     const result = await controller.upload({ user: { id: 'uuid-1' } } as never, {}, file)
 
-    expect(filesService.uploadImage).toHaveBeenCalledWith(file)
+    expect(filesService.uploadImage).toHaveBeenCalledWith(
+      file,
+      expect.objectContaining({ id: 'uuid-1' }),
+    )
     expect(filesService.uploadVideo).not.toHaveBeenCalled()
     expect(result.success).toBe(true)
   })

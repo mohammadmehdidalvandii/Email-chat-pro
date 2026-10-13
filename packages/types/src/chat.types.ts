@@ -69,6 +69,7 @@ export interface CreateMessageInput {
   content: string
   messageType: MessageType
   mediaUrl?: string | null
+  attachmentId?: string | null
 }
 
 /**

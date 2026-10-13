@@ -32,12 +32,13 @@ interface MessageInputProps {
    * composer clears itself only on `true`, so a failed send keeps the caption
    * and the picked attachment for a retry.
    */
-  onSend: (content: string, messageType: MessageType, mediaUrl?: string | null) => Promise<boolean>
+  onSend: (content: string, messageType: MessageType, mediaUrl?: string | null, attachmentId?: string | null) => Promise<boolean>
   disabled?: boolean
 }
 
 interface Attachment {
   url: string
+  id: string | null
   type: 'image' | 'video'
 }
 
@@ -88,7 +89,7 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
 
     try {
       const result = await uploadMutation.mutateAsync(formData)
-      setAttachment({ url: result.url, type: isImage ? 'image' : 'video' })
+      setAttachment({ url: result.url, id: result.url.replace('/api/v1/attachments/', '') || null, type: isImage ? 'image' : 'video' })
     } catch (error) {
       const apiError = toApiRequestError(error)
       setLocalError(translateApiError(apiError.code, apiError.message))
@@ -108,6 +109,7 @@ export function MessageInput({ onSend, disabled }: MessageInputProps) {
       pendingText,
       pendingAttachment ? pendingAttachment.type : 'text',
       pendingAttachment?.url,
+      pendingAttachment?.id,
     )
 
     // Only clear once the backend confirmed the write. On failure the caption

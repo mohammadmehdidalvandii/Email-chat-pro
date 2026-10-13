@@ -1,4 +1,4 @@
-import { IsIn, IsOptional, IsString, Length } from 'class-validator'
+import { IsIn, IsOptional, IsString, Length, IsUUID } from 'class-validator'
 import { ERROR_MESSAGES } from '@email-chat-pro/constants'
 import {
   MEDIA_URL_MAX_LENGTH,
@@ -16,6 +16,9 @@ import {
  *   "required for text" rule with MESSAGE_CONTENT_REQUIRED.
  * - mediaUrl: 1–500 characters http(s) URL. Optional at the DTO level; the
  *   service enforces "required for image/video / forbidden for text".
+ * - attachmentId: optional uuid of a pending attachment uploaded by this
+ *   user (Task 4.1 — PostgreSQL BYTEA storage). Required for image/video
+ *   when the attachment flow is used; the service validates ownership.
  */
 export class CreateMessageDto {
   @IsOptional()
@@ -30,4 +33,8 @@ export class CreateMessageDto {
   @IsString()
   @Length(1, MEDIA_URL_MAX_LENGTH)
   mediaUrl?: string | null
+
+  @IsOptional()
+  @IsUUID('4', { message: ERROR_MESSAGES.ATTACHMENT_ID_INVALID })
+  attachmentId?: string
 }

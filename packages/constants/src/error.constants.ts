@@ -124,6 +124,11 @@ export const ERROR_CODES = {
   VIDEO_DURATION_EXCEEDED: 'VIDEO_DURATION_EXCEEDED',
   /** The upload to the storage provider failed (HTTP 500). */
   FILE_UPLOAD_FAILED: 'FILE_UPLOAD_FAILED',
+  ATTACHMENT_ID_INVALID: 'ATTACHMENT_ID_INVALID',
+  /** The attachment does not belong to this user (HTTP 403). */
+  ATTACHMENT_NOT_OWNER: 'ATTACHMENT_NOT_OWNER',
+  /** The attachment is already linked to a message (HTTP 409). */
+  ATTACHMENT_ALREADY_LINKED: 'ATTACHMENT_ALREADY_LINKED',
   /** An image message carried no `mediaUrl` (HTTP 400). */
   IMAGE_MEDIA_URL_REQUIRED: 'IMAGE_MEDIA_URL_REQUIRED',
   /** The image `mediaUrl` is not a valid http(s) URL (HTTP 400). */
@@ -175,6 +180,7 @@ export const ERROR_MESSAGES = {
   EMAIL_NOT_VERIFIED: 'Email is not verified. Please verify your email before logging in.',
   LOGGED_OUT: 'Logged out',
   INTERNAL: 'An unexpected error occurred',
+  NOT_FOUND: 'The requested item could not be found.',
   // Task 1.4 — Profile
   USERNAME_REQUIRED: 'Username is required',
   USERNAME_TAKEN: 'Username is already taken',
@@ -223,6 +229,9 @@ export const ERROR_MESSAGES = {
   IMAGE_MEDIA_URL_REQUIRED: 'mediaUrl is required for image messages',
   IMAGE_MEDIA_URL_INVALID: 'mediaUrl must be a valid http(s) URL',
   FILE_UPLOAD_FAILED: 'File upload failed',
+  ATTACHMENT_ID_INVALID: 'Attachment ID must be a valid UUID',
+  ATTACHMENT_NOT_OWNER: 'This attachment does not belong to you',
+  ATTACHMENT_ALREADY_LINKED: 'This attachment is already linked to a message',
   // Task 4.2 — Video Messages
   VIDEO_DURATION_EXCEEDED: `Video duration must be no more than ${VIDEO_MAX_DURATION_SECONDS / 60} minutes`,
   VIDEO_DURATION_INVALID: 'Video duration could not be validated',
