@@ -68,10 +68,6 @@ export const apiClient: AxiosInstance = axios.create({
  */
 apiClient.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const token = getAuthToken()
-  const isAttachmentGet = typeof config.url === 'string' && /\/attachments\/[^/]+$/.test(config.url)
-  if (isAttachmentGet) {
-    console.log('[diag-attachment-auth]', { tokenAvailable: !!token, authorizationHeaderAttached: !!token })
-  }
   if (token) {
     config.headers.set('Authorization', `Bearer ${token}`)
   }

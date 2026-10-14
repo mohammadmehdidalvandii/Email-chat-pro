@@ -14,7 +14,8 @@ import { useTranslation } from 'react-i18next'
 import type { Message } from '@email-chat-pro/types'
 import { Check, CheckCheck } from 'lucide-react'
 import { formatDate } from '../../i18n/formatting'
-import { apiClient } from '../../lib/api/client'
+import { useAuthStore } from '../../stores/auth.store'
+import { fetchAttachmentBlob, releaseAttachment, setSessionUser } from '../../lib/api/attachment-cache'
 
 interface MessageItemProps {
   message: Message
@@ -46,13 +47,19 @@ function ReadReceipt({ readAt }: { readAt: string | null }) {
 /**
  * Message media (image/video) as rendered inside a bubble.
  *
- * The media is served from the authenticated `/attachments/:id` endpoint, so
- * it cannot be loaded with a plain `<img src>` — the browser would send the
- * request without the JWT and the backend would reject it with a 401. We
- * therefore fetch the bytes through the shared `apiClient`, whose request
- * interceptor attaches the `Authorization: Bearer` header, and turn the blob
- * into an object URL for the element. The URL is revoked on unmount to avoid
- * leaking object URLs.
+ * The media is served from the authenticated `/attachments/:id`
+ * endpoint, so it cannot be loaded with a plain `<img src>` — the
+ * browser would send the request without the JWT and the backend would
+ * reject it with a 401. The bytes are therefore fetched through the
+ * shared `apiClient` (whose interceptor attaches the Bearer header)
+ * and turned into an object URL.
+ *
+ * Fetches are deduplicated by the per-user attachment cache: the
+ * blob for a given attachment id is fetched once per session and its
+ * object URL is shared by every bubble that renders it, instead of
+ * once per mount (which, across chat switches and infinite-scroll
+ * pages, exhausted the backend's per-user request throttle and
+ * produced HTTP 429s).
  */
 function MessageMedia({ url, type, alt }: { url: string; type: 'image' | 'video'; alt: string }) {
   const { t } = useTranslation('chat', { useSuspense: false })
@@ -62,47 +69,38 @@ function MessageMedia({ url, type, alt }: { url: string; type: 'image' | 'video'
   const [src, setSrc] = useState<string | null>(null)
   const unavailable = t('mediaUnavailable')
 
+  // Keep the attachment cache scoped to the authenticated user: a
+  // logout or account switch must never serve one user's cached blob
+  // to another.
+  const userId = useAuthStore((s) => s.user?.id ?? null)
   useEffect(() => {
-    let revoked = false
+    setSessionUser(userId)
+  }, [userId])
 
-    async function load() {
-      try {
-        // mediaUrl is absolute from the backend (e.g. /api/v1/attachments/...),
-        // but apiClient.baseURL already includes /api/v1; pass a relative URL
-        // so the base URL is not duplicated (/api/v1/api/v1/attachments/...).
-        const relativeUrl = url.replace(/^\/api\/v1/, '') || url
-        const blob = await apiClient.request<{ data: Blob }>({
-          method: 'GET',
-          url: relativeUrl,
-          responseType: 'blob',
-        }).then((r) => r.data)
+  // Acquire the (deduplicated) object URL for this url. Depends only
+  // on `url`: the effect sets `src`, so including it would re-run the
+  // fetch on every successful load — the loop that caused the 429s.
+  useEffect(() => {
+    let cancelled = false
 
-        // An error response that also carries a `data` body (e.g. 401 with an
-        // error envelope) is not usable media.
-        if (!(blob instanceof Blob)) {
-          setFailed(true)
-          return
+    fetchAttachmentBlob(url)
+      .then((objectUrl) => {
+        if (!cancelled) {
+          setFailed(false)
+          setSrc(objectUrl)
         }
-
-        if (!revoked) {
-          URL.revokeObjectURL(src ?? '')
-          setSrc(URL.createObjectURL(blob))
-        }
-      } catch {
-        if (!revoked) {
+      })
+      .catch(() => {
+        if (!cancelled) {
           setFailed(true)
         }
-      }
-    }
+      })
 
-    load()
     return () => {
-      revoked = true
-      if (src) {
-        URL.revokeObjectURL(src)
-      }
+      cancelled = true
+      releaseAttachment(url)
     }
-  }, [url, src])
+  }, [url])
 
   if (failed || !src) {
     return (
