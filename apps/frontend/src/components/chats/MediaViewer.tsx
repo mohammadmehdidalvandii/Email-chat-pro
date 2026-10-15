@@ -78,6 +78,11 @@ export function MediaViewer() {
   // through `fetchAttachmentBlob` serves this and any other concurrent
   // consumers of the same id (e.g. the thumbnail strip, which uses only
   // `getCachedObjectUrl` and does not keep it alive).
+  //
+  // This effect also resets loading/zoom/info whenever `url` changes, so
+  // navigation between messages needs no separate reset effect: a second
+  // effect keyed on `messageId` would run after this one on the same commit
+  // and clobber the `src` it just set (stale-image / blank stage bug).
   useEffect(() => {
     if (!open || !url) return
     setFailed(false)
@@ -85,16 +90,23 @@ export function MediaViewer() {
     setZoom(1)
     setShowInfo(false)
     let cancelled = false
+    // Tracks whether this effect acquired its own reference to the object URL
+    // via `fetchAttachmentBlob`. The cached path (`getCachedObjectUrl`) does
+    // NOT take a reference, so it must NOT release one on cleanup — releasing
+    // would double-count against the message bubble still showing the same
+    // attachment and could evict it early. Only the fetch path releases.
+    let ownsRef = false
     const cachedUrl = getCachedObjectUrl(url)
     if (cachedUrl) {
       if (!cancelled) {
         setSrc(cachedUrl)
         setLoading(false)
       }
-      return
+      return () => { cancelled = true }
     }
     fetchAttachmentBlob(url)
       .then((objectUrl) => {
+        ownsRef = true
         if (!cancelled) {
           setSrc(objectUrl)
           setFailed(false)
@@ -108,15 +120,31 @@ export function MediaViewer() {
         }
       })
 
-    return () => { cancelled = true; if (url) releaseAttachment(url) }
+    return () => {
+      cancelled = true
+      if (ownsRef && url) releaseAttachment(url)
+    }
   }, [open, url])
 
-  // Reset stage on message change.
-  useEffect(() => {
-    setSrc(null)
-    setFailed(false)
-    setLoading(true)
-  }, [messageId])
+  /** Navigate to previous media message in the loaded-gallery set. */
+  const prev = useCallback(() => {
+    const idx = gallery.currentIndex
+    if (idx > 0) {
+      const prevMsg = gallery.mediaMessages[idx - 1]
+      const prevStore = useMediaViewerStore.getState()
+      prevStore.openViewer({ chatId: prevStore.chatId ?? chatId ?? '', messageId: prevMsg.id })
+    }
+  }, [gallery, chatId])
+
+  /** Navigate to next media message in the loaded-gallery set. */
+  const next = useCallback(() => {
+    const idx = gallery.currentIndex
+    if (idx >= 0 && idx < gallery.mediaMessages.length - 1) {
+      const nextMsg = gallery.mediaMessages[idx + 1]
+      const s = useMediaViewerStore.getState()
+      s.openViewer({ chatId: s.chatId ?? chatId ?? '', messageId: nextMsg.id })
+    }
+  }, [gallery, chatId])
 
   // Keyboard navigation (left/right arrows, Escape to close).
   useEffect(() => {
@@ -128,7 +156,7 @@ export function MediaViewer() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, gallery.hasPrev, gallery.hasNext])
+  }, [open, gallery.hasPrev, gallery.hasNext, prev, next, closeViewer])
 
   /** Navigate to previous media message in the loaded-gallery set. */
   const prev = useCallback(() => {
