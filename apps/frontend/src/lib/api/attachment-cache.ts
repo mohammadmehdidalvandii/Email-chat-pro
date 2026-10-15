@@ -189,6 +189,69 @@ function evictOldest(entries: Map<string, CacheEntry>): void {
 }
 
 /**
+ * Returns the cached object URL for an attachment without touching the
+ * reference count.
+ *
+ * Read-only helpers (viewer thumbnails, metadata) use this so they can
+ * reference an already-loaded blob without keeping it alive on their own
+ * and without issuing a request. Returns `null` when the blob is not yet
+ * cached — the caller falls back to a placeholder instead of fetching.
+ */
+export function getCachedObjectUrl(url: string): string | null {
+  const userId = currentUserId
+  const attachmentId = attachmentIdFromUrl(url)
+  if (!userId || !attachmentId) return null
+  return cache.byUser.get(userId)?.get(attachmentId)?.objectUrl ?? null
+}
+
+/**
+ * Triggers a browser download of an attachment, reusing the cached blob
+ * when it is already loaded so the download costs no extra request. The
+ * filename is derived from the blob's MIME type (`media.<ext>`), because
+ * the `Message` contract carries no filename and there is no JSON metadata
+ * endpoint — see `docs/3-architecture.md` §File Endpoints.
+ */
+export function downloadAttachment(url: string): void {
+  const userId = currentUserId
+  const attachmentId = attachmentIdFromUrl(url)
+  const entry = userId && attachmentId ? cache.byUser.get(userId)?.get(attachmentId) : null
+  const blob = entry?.blob ?? (userId && attachmentId ? null : null)
+  // No cached blob for this session's user: fetch once through apiClient.
+  const fallback = entry ? null : fetchBlob(url)
+  void (async () => {
+    const data = blob ?? (await fallback)
+    const ext = extensionFromMime(data.type)
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(data)
+    a.download = `media-${attachmentId ?? 'file'}.${ext}`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000)
+  })().catch(() => {
+    // A failed download must not break the viewer; the caller decides
+    // whether to surface it (the viewer does, via its own error state).
+  })
+}
+
+/** Best-effort file extension for a MIME type (`image/png` -> `png`). */
+function extensionFromMime(mime: string): string {
+  const sub = mime.split('/')[1]?.split('+')[0]?.toLowerCase()
+  return sub && /^[a-z0-9]+$/.test(sub) ? sub : 'bin'
+}
+
+/**
+ * Returns the cached blob (exposing `.type` and `.size` for a viewer's info
+ * panel) or `null` when not cached. Never fetches.
+ */
+export function getCachedAttachmentBlob(url: string): Blob | null {
+  const userId = currentUserId
+  const attachmentId = attachmentIdFromUrl(url)
+  if (!userId || !attachmentId) return null
+  return cache.byUser.get(userId)?.get(attachmentId)?.blob ?? null
+}
+
+/**
  * Releases a consumer's claim on an attachment's object URL. The URL
  * is revoked only when the last consumer releases it, so a remounting
  * message never sees a dead `blob:` URL.

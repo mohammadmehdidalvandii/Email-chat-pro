@@ -11,6 +11,7 @@
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { MessageItem } from './MessageItem'
+import { MediaViewer } from './MediaViewer'
 import { useChatSocket } from '../../hooks/useChatSocket'
 import { useMarkRead } from '../../hooks/use-chat-mutations'
 import { useAuthStore } from '../../stores/auth.store'
@@ -121,6 +122,7 @@ export function MessageList({ chatId }: MessageListProps) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <MediaViewer />
       <div ref={scrollRef} className="chat-scroll flex flex-1 flex-col gap-2 overflow-y-auto p-4">
         {messages.map((message) => (
           <MessageItem

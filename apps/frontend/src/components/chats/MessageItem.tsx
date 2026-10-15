@@ -16,6 +16,7 @@ import { Check, CheckCheck } from 'lucide-react'
 import { formatDate } from '../../i18n/formatting'
 import { useAuthStore } from '../../stores/auth.store'
 import { fetchAttachmentBlob, releaseAttachment, setSessionUser } from '../../lib/api/attachment-cache'
+import { useMediaViewerStore } from '../../stores/media-viewer.store'
 
 interface MessageItemProps {
   message: Message
@@ -61,7 +62,7 @@ function ReadReceipt({ readAt }: { readAt: string | null }) {
  * pages, exhausted the backend's per-user request throttle and
  * produced HTTP 429s).
  */
-function MessageMedia({ url, type, alt }: { url: string; type: 'image' | 'video'; alt: string }) {
+function MessageMedia({ url, type, alt, messageId, chatId }: { url: string; type: 'image' | 'video'; alt: string; messageId: string; chatId: string }) {
   const { t } = useTranslation('chat', { useSuspense: false })
   // A media URL that 404s or the token that signed it expires must not leave
   // a broken image icon or an unplayable player in the transcript.
@@ -104,30 +105,55 @@ function MessageMedia({ url, type, alt }: { url: string; type: 'image' | 'video'
 
   if (failed || !src) {
     return (
-      <p className="mb-2 text-sm opacity-70" role="img" aria-label={unavailable}>
-        {unavailable}
-      </p>
+      <button
+        type="button"
+        className="mb-2 max-w-full rounded-lg text-sm opacity-70 hover:opacity-100 focus-visible:outline-2 focus-visible:outline-offset-2"
+        onClick={() => {
+          if (messageId && chatId) {
+            useMediaViewerStore.getState().openViewer({ chatId, messageId })
+          }
+        }}
+        aria-label={unavailable}
+      >
+        <p className="mb-2 text-sm opacity-70" role="img" aria-label={unavailable}>
+          {unavailable}
+        </p>
+      </button>
     )
   }
 
   if (type === 'image') {
     return (
-      // The media is served from the storage provider, not the Next.js image
-      // pipeline, so `next/image` (and its host allowlist) is not applicable.
-      // eslint-disable-next-line @next/next/no-img-element
-      <img
-        src={src}
-        alt={alt}
-        loading="lazy"
-        className="mb-2 max-w-full rounded-lg"
-      />
+      <button
+        type="button"
+        onClick={() => {
+          if (messageId && chatId) {
+            useMediaViewerStore.getState().openViewer({ chatId, messageId })
+          }
+        }}
+        className="mb-2 max-w-full rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        aria-label={alt}
+      >
+        <img src={src} alt={alt} loading="lazy" className="mb-2 max-w-full rounded-lg" />
+      </button>
     )
   }
 
   return (
-    <video src={src} controls preload="metadata" className="mb-2 max-w-full rounded-lg">
-      {unavailable}
-    </video>
+    <button
+      type="button"
+      onClick={() => {
+        if (messageId && chatId) {
+          useMediaViewerStore.getState().openViewer({ chatId, messageId })
+        }
+      }}
+      className="mb-2 max-w-full rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+      aria-label={alt}
+    >
+      <video src={src} controls preload="metadata" className="mb-2 max-w-full rounded-lg">
+        {unavailable}
+      </video>
+    </button>
   )
 }
 
@@ -161,7 +187,7 @@ export const MessageItem = memo(function MessageItem({ message, isOwn }: Message
         {mediaMissing ? (
           <p className="mb-2 text-sm opacity-70">{t('mediaUnavailable')}</p>
         ) : mediaType && message.mediaUrl ? (
-          <MessageMedia url={message.mediaUrl} type={mediaType} alt={mediaAlt} />
+          <MessageMedia url={message.mediaUrl} type={mediaType} alt={mediaAlt} messageId={message.id} chatId={message.chatId} />
         ) : null}
         {/* A media-only message stores an empty content string server-side. */}
         {message.content && (
