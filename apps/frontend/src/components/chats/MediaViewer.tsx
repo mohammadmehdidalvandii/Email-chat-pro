@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useMediaViewerStore } from '../../stores/media-viewer.store'
 import { fetchAttachmentBlob, releaseAttachment, getCachedObjectUrl, getCachedAttachmentBlob, downloadAttachment } from '../../lib/api/attachment-cache'
@@ -127,7 +127,7 @@ export function MediaViewer() {
   }, [open, url])
 
   /** Navigate to previous media message in the loaded-gallery set. */
-  const prev = useCallback(() => {
+  const prevMedia = useCallback(() => {
     const idx = gallery.currentIndex
     if (idx > 0) {
       const prevMsg = gallery.mediaMessages[idx - 1]
@@ -137,7 +137,7 @@ export function MediaViewer() {
   }, [gallery, chatId])
 
   /** Navigate to next media message in the loaded-gallery set. */
-  const next = useCallback(() => {
+  const nextMedia = useCallback(() => {
     const idx = gallery.currentIndex
     if (idx >= 0 && idx < gallery.mediaMessages.length - 1) {
       const nextMsg = gallery.mediaMessages[idx + 1]
@@ -151,34 +151,12 @@ export function MediaViewer() {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.preventDefault(); closeViewer() }
-      if (e.key === 'ArrowLeft' && gallery.hasPrev) { e.preventDefault(); prev() }
-      if (e.key === 'ArrowRight' && gallery.hasNext) { e.preventDefault(); next() }
+      if (e.key === 'ArrowLeft' && gallery.hasPrev) { e.preventDefault(); prevMedia() }
+      if (e.key === 'ArrowRight' && gallery.hasNext) { e.preventDefault(); nextMedia() }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, gallery.hasPrev, gallery.hasNext, prev, next, closeViewer])
-
-  /** Navigate to previous media message in the loaded-gallery set. */
-  const prev = useCallback(() => {
-    const idx = gallery.currentIndex
-    if (idx > 0) {
-      const prevMsg = gallery.mediaMessages[idx - 1]
-      const prevStore = useMediaViewerStore.getState()
-      // Navigate by updating the store's messageId, which triggers the
-      // useEffect above to load the new media.
-      prevStore.openViewer({ chatId: prevStore.chatId ?? chatId ?? '', messageId: prevMsg.id })
-    }
-  }, [gallery, chatId])
-
-  /** Navigate to next media message in the loaded-gallery set. */
-  const next = useCallback(() => {
-    const idx = gallery.currentIndex
-    if (idx >= 0 && idx < gallery.mediaMessages.length - 1) {
-      const nextMsg = gallery.mediaMessages[idx + 1]
-      const s = useMediaViewerStore.getState()
-      s.openViewer({ chatId: s.chatId ?? chatId ?? '', messageId: nextMsg.id })
-    }
-  }, [gallery, chatId])
+  }, [open, gallery.hasPrev, gallery.hasNext, prevMedia, nextMedia, closeViewer])
 
   // Metadata from cached blob (no extra request; derived from the same
   // blob the stage is already displaying via `fetchAttachmentBlob`).
@@ -320,7 +298,7 @@ export function MediaViewer() {
             type="button"
             aria-label={t('mediaViewer.previous')}
             title={t('mediaViewer.previous')}
-            onClick={prev}
+            onClick={prevMedia}
             disabled={!gallery.hasPrev}
             className="rounded-md p-2 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white/60 disabled:opacity-30"
           >
@@ -333,7 +311,7 @@ export function MediaViewer() {
             type="button"
             aria-label={t('mediaViewer.next')}
             title={t('mediaViewer.next')}
-            onClick={next}
+            onClick={nextMedia}
             disabled={!gallery.hasNext}
             className="rounded-md p-2 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white/60 disabled:opacity-30"
           >
