@@ -17,6 +17,7 @@ import { formatDate } from '../../i18n/formatting'
 import { useAuthStore } from '../../stores/auth.store'
 import { fetchAttachmentBlob, releaseAttachment, setSessionUser } from '../../lib/api/attachment-cache'
 import { useMediaViewerStore } from '../../stores/media-viewer.store'
+import { useUserProfileDialogStore } from '../../stores/user-profile-dialog.store'
 
 interface MessageItemProps {
   message: Message
@@ -191,9 +192,18 @@ export const MessageItem = memo(function MessageItem({ message, isOwn }: Message
         ) : null}
         {/* A media-only message stores an empty content string server-side. */}
         {message.content && (
-          <p className="whitespace-pre-wrap break-words text-sm" dir="auto">
-            {message.content}
-          </p>
+          <>
+            <button
+              type="button"
+              onClick={() => message.sender && useUserProfileDialogStore.getState().open(message.sender.id, message.chatId)}
+              className="mb-1 text-xs font-semibold text-neutral-500 hover:text-neutral-800 focus-visible:outline-2 focus-visible:outline-offset-2 rounded-sm text-left"
+            >
+              {message.sender?.username ?? message.sender?.fullName ?? message.sender?.email ?? t('chat:unknown')}
+            </button>
+            <p className="whitespace-pre-wrap break-words text-sm" dir="auto">
+              {message.content}
+            </p>
+          </>
         )}
         {time && (
           <p className="mt-1 flex items-center gap-1 text-xs opacity-70" dir="ltr">

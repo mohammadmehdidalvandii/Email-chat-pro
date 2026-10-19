@@ -15,11 +15,13 @@ import { useAuthStore } from '../../stores/auth.store'
 import { setSessionUser, fetchAttachmentBlob, getCachedObjectUrl } from '../../lib/api/attachment-cache'
 import { cn } from '../../lib/utils'
 import { getDisplayName, initialsFromName } from '@email-chat-pro/utils'
+import type { User } from '@email-chat-pro/types'
 
 interface UserAvatarProps {
-  user: Pick<User, 'id' | 'avatarUrl' | 'username' | 'fullName' | 'email'>
+  user: Pick<User, 'id'> & Partial<Pick<User, 'avatarUrl' | 'username' | 'fullName' | 'email'>>
   size?: 'sm' | 'md' | 'lg'
   className?: string
+  onClick?: () => void
 }
 
 const SIZE_CLASSES = {
@@ -34,7 +36,7 @@ function useAuthStoreUser(userId: string | undefined): string | null {
   return authUser?.id ?? null
 }
 
-export function UserAvatar({ user, size = 'md', className }: UserAvatarProps) {
+export function UserAvatar({ user, size = 'md', className, onClick }: UserAvatarProps) {
   const dimension = SIZE_CLASSES[size]
   const userId = useAuthStoreUser(user.id)
   const [src, setSrc] = useState<string | null>(null)
@@ -83,20 +85,27 @@ export function UserAvatar({ user, size = 'md', className }: UserAvatarProps) {
       <img
         src={src}
         alt=""
-        className={cn('shrink-0 rounded-full object-cover', dimension, className)}
+        onClick={onClick}
+        className={cn('shrink-0 rounded-full object-cover', onClick && 'cursor-pointer', dimension, className)}
         onError={() => setFailed(true)}
       />
     )
   }
 
-  const displayName = getDisplayName(user)
+  const displayName = getDisplayName({
+    username: user.username ?? '',
+    fullName: user.fullName ?? '',
+    email: user.email ?? '',
+  })
   const initials = initialsFromName(displayName)
 
   return (
     <span
       aria-label={displayName}
+      onClick={onClick}
       className={cn(
         'flex shrink-0 items-center justify-center rounded-full bg-neutral-300 font-medium text-neutral-700',
+        onClick && 'cursor-pointer',
         dimension,
         className,
       )}

@@ -12,7 +12,7 @@
  */
 import type { ReactNode } from 'react'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useSession } from '../../hooks/use-session'
 import { useAuthStore } from '../../stores/auth.store'
@@ -24,9 +24,16 @@ export interface RequireAuthProps {
 export function RequireAuth({ children }: RequireAuthProps) {
   const { t } = useTranslation('common', { useSuspense: false })
   const router = useRouter()
+  const [mounted, setMounted] = useState(false)
   const token = useAuthStore((s) => s.token)
   const hasSessionResolved = useAuthStore((s) => s.hasSessionResolved)
   const { isError, isLoading } = useSession()
+
+  useEffect(() => { setMounted(true) }, [])
+
+  // Before hydration, render the same consistent loading state the server
+  // would produce (token is null during SSR) to avoid a hydration mismatch.
+  const isPreHydration = !mounted
 
   // No persisted token at all → there is nothing to validate; go to login.
   useEffect(() => {
@@ -43,7 +50,8 @@ export function RequireAuth({ children }: RequireAuthProps) {
   }, [hasSessionResolved, isError, router])
 
   // Still checking the session → show a minimal loading state.
-  if (token && isLoading && !hasSessionResolved) {
+  const showLoading = isPreHydration || (token && isLoading && !hasSessionResolved)
+  if (showLoading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-app-background">
         <p className="text-sm text-text-muted">{t('loading')}</p>

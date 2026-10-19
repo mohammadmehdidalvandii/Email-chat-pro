@@ -15,6 +15,7 @@ import { ArrowLeft } from 'lucide-react'
 import { useSessionSocket } from '../Providers/SocketProvider'
 import { PresenceIndicator } from '../common/PresenceIndicator'
 import { UserAvatar } from '../common/UserAvatar'
+import { useUserProfileDialogStore } from '../../stores/user-profile-dialog.store'
 import { useConversations } from '../../hooks/use-chat-query'
 import { getDisplayName } from '@email-chat-pro/utils'
 
@@ -52,7 +53,9 @@ export function ChatHeader({ chatId }: ChatHeaderProps) {
 
       {contact ? (
         <div className="relative">
-          <UserAvatar user={contact} size="sm" />
+          <button type="button" aria-label={t('profile:openProfile', { name })} onClick={() => contact && useUserProfileDialogStore.getState().open(contact.id, chatId)} className="focus-visible:outline-2 focus-visible:outline-offset-2 rounded-full">
+            <UserAvatar user={contact} size="sm" />
+          </button>
           <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-card p-0.5">
             <PresenceIndicator userId={contact.id} />
           </span>
@@ -60,9 +63,9 @@ export function ChatHeader({ chatId }: ChatHeaderProps) {
       ) : null}
 
       <div className="min-w-0 flex-1">
-        <p className="truncate font-semibold" dir="auto">
+        <button type="button" onClick={() => contact && useUserProfileDialogStore.getState().open(contact.id, chatId)} className="text-left w-full truncate font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 rounded-sm" dir="auto">
           {name}
-        </p>
+        </button>
         {contact ? (
           <PresenceIndicator
             userId={contact.id}

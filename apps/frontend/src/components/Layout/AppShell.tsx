@@ -25,6 +25,7 @@ import { Menu } from 'lucide-react'
 import { AppSidebar } from './AppSidebar'
 import { NotificationBanner } from '../chats/NotificationBanner'
 import { MobileSidebar } from './MobileSidebar'
+import { UserProfileDialog } from '../user/UserProfileDialog'
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { t } = useTranslation('common', { useSuspense: false })
@@ -38,6 +39,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-app-background text-text-main">
+      <UserProfileDialog />
       {/* Desktop: persistent sidebar, always visible. */}
       <aside className="hidden w-64 shrink-0 border-e border-border md:block">
         {/* Sticky so the nav stays put while a long page scrolls. */}
