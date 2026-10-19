@@ -45,6 +45,7 @@ export const useThemeStore = create<ThemeState>()(
 
 /** Applies the theme to the document root. Tailwind v4 class strategy. */
 export function applyTheme(theme: Theme): void {
+  if (typeof document === 'undefined') return
   const root = document.documentElement
   if (theme === 'dark') {
     root.classList.add('dark')
