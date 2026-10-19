@@ -3,6 +3,8 @@
   "language": "Language",
   "loading": "Loading...",
   "retry": "Try again",
+  "copy": "Click to copy",
+  "copied": "Copied to clipboard",
   "nav": {
     "dashboard": "Dashboard",
     "chats": "Chats",
