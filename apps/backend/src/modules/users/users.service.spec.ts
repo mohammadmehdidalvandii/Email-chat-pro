@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common'
+import { BadRequestException, ConflictException } from '@nestjs/common'
 import { Test } from '@nestjs/testing'
 import { getRepositoryToken } from '@nestjs/typeorm'
 import { FindOperator } from 'typeorm'
@@ -10,6 +10,8 @@ import {
   SEARCH_QUERY_MAX_LENGTH,
 } from '@email-chat-pro/constants'
 import { User } from '../auth/entities/user.entity'
+import { Attachment } from '../files/entities/attachment.entity'
+import { FilesService } from '../files/files.service'
 import { UsersService } from './users.service'
 
 describe('UsersService', () => {
@@ -22,6 +24,14 @@ describe('UsersService', () => {
     findOne: jest.fn(),
     find: jest.fn(),
     save: jest.fn(),
+  }
+
+  const attachmentRepository = {
+    delete: jest.fn(),
+  }
+
+  const filesService = {
+    uploadImage: jest.fn(),
   }
 
   const baseUser: User = {
@@ -47,7 +57,12 @@ describe('UsersService', () => {
   beforeEach(async () => {
     jest.clearAllMocks()
     const moduleRef = await Test.createTestingModule({
-      providers: [UsersService, { provide: getRepositoryToken(User), useValue: repository }],
+      providers: [
+        UsersService,
+        { provide: getRepositoryToken(User), useValue: repository },
+        { provide: getRepositoryToken(Attachment), useValue: attachmentRepository },
+        { provide: FilesService, useValue: filesService },
+      ],
     }).compile()
 
     service = moduleRef.get(UsersService)
@@ -232,6 +247,144 @@ describe('UsersService', () => {
       expect(saved.passwordHash).toBe('')
       expect(saved.isActive).toBe(false)
       expect(saved.deletedAt).toBeInstanceOf(Date)
+    })
+  })
+
+  describe('setAvatar', () => {
+    /** A valid uploaded image as Multer would hand it to the route handler. */
+    const validFile = () =>
+      ({ buffer: Buffer.from('png'), originalname: 'avatar.png', mimetype: 'image/png' }) as Express.Multer.File
+
+    const avatarUrl = '/api/v1/attachments/avatar-attachment-uuid'
+
+    beforeEach(() => {
+      filesService.uploadImage.mockResolvedValue({ url: avatarUrl })
+      repository.save.mockImplementation((user: Partial<User>) => Promise.resolve(user))
+      attachmentRepository.delete.mockResolvedValue({ affected: 1 })
+    })
+
+    it('stores the uploaded image, persists the returned URL, and returns the user', async () => {
+      const user = { ...baseUser }
+
+      const result = await service.setAvatar(user, validFile())
+
+      expect(filesService.uploadImage).toHaveBeenCalledWith(validFile(), user)
+      expect(repository.save).toHaveBeenCalledTimes(1)
+      const saved = repository.save.mock.calls[0][0] as User
+      expect(saved.avatarUrl).toBe(avatarUrl)
+      expect(result).toBe(user)
+      // A fresh avatar has no prior attachment to clean up.
+      expect(attachmentRepository.delete).not.toHaveBeenCalled()
+    })
+
+    it('replaces an existing avatar: persists the new URL, then deletes the old attachment', async () => {
+      const oldUrl = '/api/v1/attachments/old-attachment-uuid'
+      const user = { ...baseUser, avatarUrl: oldUrl }
+
+      const result = await service.setAvatar(user, validFile())
+
+      const saved = repository.save.mock.calls[0][0] as User
+      expect(saved.avatarUrl).toBe(avatarUrl)
+      expect(attachmentRepository.delete).toHaveBeenCalledWith({ id: 'old-attachment-uuid' })
+      expect(result.avatarUrl).toBe(avatarUrl)
+    })
+
+    it('propagates a validation error from the file service without saving or deleting', async () => {
+      filesService.uploadImage.mockRejectedValue(
+        new BadRequestException({
+          code: ERROR_CODES.FILE_REQUIRED,
+          message: ERROR_MESSAGES.FILE_REQUIRED,
+        }),
+      )
+      const user = { ...baseUser, avatarUrl: '/api/v1/attachments/existing' }
+
+      await expect(service.setAvatar(user, validFile())).rejects.toMatchObject({
+        status: 400,
+        response: { code: ERROR_CODES.FILE_REQUIRED, message: ERROR_MESSAGES.FILE_REQUIRED },
+      })
+
+      expect(repository.save).not.toHaveBeenCalled()
+      expect(attachmentRepository.delete).not.toHaveBeenCalled()
+      // The user's avatar is untouched when validation rejects the upload.
+      expect(user.avatarUrl).toBe('/api/v1/attachments/existing')
+    })
+
+    it('restores the previous avatar and cleans up the new blob when the profile save fails', async () => {
+      const previousUrl = '/api/v1/attachments/previous'
+      const user = { ...baseUser, avatarUrl: previousUrl }
+      repository.save.mockRejectedValue(new Error('db unavailable'))
+
+      await expect(service.setAvatar(user, validFile())).rejects.toThrow('db unavailable')
+
+      // The just-created attachment is deleted best-effort so it is not orphaned,
+      // and the profile rolls back to the previous avatar.
+      expect(attachmentRepository.delete).toHaveBeenCalledWith({ id: 'avatar-attachment-uuid' })
+      expect(user.avatarUrl).toBe(previousUrl)
+    })
+
+    it('does not delete the old attachment when the profile save fails (rollback only touches the new blob)', async () => {
+      const user = { ...baseUser, avatarUrl: '/api/v1/attachments/previous' }
+      repository.save.mockRejectedValue(new Error('db unavailable'))
+
+      await expect(service.setAvatar(user, validFile())).rejects.toThrow('db unavailable')
+
+      // Cleanup targets only the new attachment; the previous one is left intact
+      // because the user still points at it.
+      expect(attachmentRepository.delete).toHaveBeenCalledTimes(1)
+      expect(attachmentRepository.delete).toHaveBeenCalledWith({ id: 'avatar-attachment-uuid' })
+    })
+  })
+
+  describe('removeAvatar', () => {
+    const avatarUrl = '/api/v1/attachments/avatar-attachment-uuid'
+
+    beforeEach(() => {
+      repository.save.mockImplementation((user: Partial<User>) => Promise.resolve(user))
+      attachmentRepository.delete.mockResolvedValue({ affected: 1 })
+    })
+
+    it('clears the avatar URL, saves, and deletes the old attachment', async () => {
+      const user = { ...baseUser, avatarUrl: avatarUrl }
+
+      const result = await service.removeAvatar(user)
+
+      const saved = repository.save.mock.calls[0][0] as User
+      expect(saved.avatarUrl).toBeNull()
+      expect(attachmentRepository.delete).toHaveBeenCalledWith({ id: 'avatar-attachment-uuid' })
+      expect(result.avatarUrl).toBeNull()
+    })
+
+    it('is a no-op for cleanup when there is no avatar yet', async () => {
+      const user = { ...baseUser, avatarUrl: null }
+
+      const result = await service.removeAvatar(user)
+
+      expect(repository.save).toHaveBeenCalledTimes(1)
+      expect(attachmentRepository.delete).not.toHaveBeenCalled()
+      expect(result.avatarUrl).toBeNull()
+    })
+
+    it('swallows a storage cleanup failure so the request still succeeds', async () => {
+      // Best-effort: a failed attachment deletion must not fail the request or
+      // leave the profile inconsistent (avatar_url is already cleared).
+      attachmentRepository.delete.mockRejectedValue(new Error('storage unavailable'))
+      const user = { ...baseUser, avatarUrl: avatarUrl }
+
+      const result = await service.removeAvatar(user)
+
+      expect(repository.save).toHaveBeenCalledTimes(1)
+      expect(attachmentRepository.delete).toHaveBeenCalledWith({ id: 'avatar-attachment-uuid' })
+      expect(result.avatarUrl).toBeNull()
+    })
+
+    it('restores the previous avatar URL when the profile save fails', async () => {
+      const user = { ...baseUser, avatarUrl: avatarUrl }
+      repository.save.mockRejectedValue(new Error('db unavailable'))
+
+      await expect(service.removeAvatar(user)).rejects.toThrow('db unavailable')
+
+      expect(user.avatarUrl).toBe(avatarUrl)
+      expect(attachmentRepository.delete).not.toHaveBeenCalled()
     })
   })
 

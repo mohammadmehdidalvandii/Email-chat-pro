@@ -2,6 +2,8 @@ import { Module } from '@nestjs/common'
 import { TypeOrmModule } from '@nestjs/typeorm'
 import { AuthModule } from '../auth/auth.module'
 import { User } from '../auth/entities/user.entity'
+import { Attachment } from '../files/entities/attachment.entity'
+import { FilesModule } from '../files/files.module'
 import { UsersController } from './users.controller'
 import { UsersService } from './users.service'
 
@@ -14,7 +16,7 @@ import { UsersService } from './users.service'
  * implementation.
  */
 @Module({
-  imports: [TypeOrmModule.forFeature([User]), AuthModule],
+  imports: [TypeOrmModule.forFeature([User, Attachment]), AuthModule, FilesModule],
   controllers: [UsersController],
   providers: [UsersService],
 })

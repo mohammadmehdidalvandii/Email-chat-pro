@@ -30,7 +30,7 @@ function DashboardContent() {
   const contacts = useContacts()
   const requests = useIncomingRequests()
 
-  const displayName = user?.fullName?.trim() || user?.username?.trim()
+  const displayName = user?.fullName?.trim() || user?.username?.trim() || user?.email
 
   return (
     <AppShell>

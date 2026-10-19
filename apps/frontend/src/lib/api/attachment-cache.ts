@@ -220,6 +220,7 @@ export function downloadAttachment(url: string): void {
   const fallback = entry ? null : fetchBlob(url)
   void (async () => {
     const data = blob ?? (await fallback)
+    if (!data) return
     const ext = extensionFromMime(data.type)
     const a = document.createElement('a')
     a.href = URL.createObjectURL(data)

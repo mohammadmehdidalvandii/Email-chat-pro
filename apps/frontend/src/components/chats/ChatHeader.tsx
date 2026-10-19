@@ -16,6 +16,7 @@ import { useSessionSocket } from '../Providers/SocketProvider'
 import { PresenceIndicator } from '../common/PresenceIndicator'
 import { UserAvatar } from '../common/UserAvatar'
 import { useConversations } from '../../hooks/use-chat-query'
+import { getDisplayName } from '@email-chat-pro/utils'
 
 interface ChatHeaderProps {
   chatId: string
@@ -30,7 +31,7 @@ export function ChatHeader({ chatId }: ChatHeaderProps) {
   // Until the conversation list resolves there is no contact to name; "Chat"
   // identifies the screen without pretending the other person is called
   // "Conversations".
-  const name = contact ? (contact.username ?? contact.email) : t('chat:unknownContact')
+  const name = contact ? getDisplayName(contact) : t('chat:unknownContact')
   const status = hasError
     ? t('chat:connection.failed')
     : isConnected

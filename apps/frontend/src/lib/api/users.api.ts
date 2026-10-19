@@ -31,3 +31,18 @@ export function deleteAccountApi(
 ): Promise<DeleteAccountResponse> {
   return apiRequest<DeleteAccountResponse>({ method: 'DELETE', url: '/users/me', data: input })
 }
+
+/** POST /users/me/avatar — upload or replace avatar (multipart/form-data, file field). */
+export function uploadAvatarApi(formData: FormData): Promise<ProfileResponse> {
+  return apiRequest<ProfileResponse>({
+    method: 'POST',
+    url: '/users/me/avatar',
+    data: formData,
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+
+/** DELETE /users/me/avatar — remove avatar. */
+export function removeAvatarApi(): Promise<ProfileResponse> {
+  return apiRequest<ProfileResponse>({ method: 'DELETE', url: '/users/me/avatar' })
+}

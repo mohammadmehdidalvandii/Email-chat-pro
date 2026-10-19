@@ -17,5 +17,7 @@
   "delete": "Delete",
   "deleteError": "Failed to delete account. Please try again.",
   "saved": "Profile saved.",
-  "updateFailed": "Could not save your profile. Please try again."
+  "updateFailed": "Could not save your profile. Please try again.",
+  "uploadAvatar": "Upload avatar",
+  "removeAvatar": "Remove avatar"
 }

@@ -25,7 +25,7 @@ export function ContactItem({ user }: ContactItemProps) {
   const router = useRouter()
   const { data: conversations } = useConversations()
   const chatId = findChatIdForContact(conversations, user.id)
-  const name = user.username ?? user.email
+  const name = user.username || user.email
 
   return (
     <Card className="flex items-center justify-between gap-3 p-4">

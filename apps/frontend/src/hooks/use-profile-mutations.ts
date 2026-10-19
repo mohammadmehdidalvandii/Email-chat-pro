@@ -6,6 +6,10 @@
  * - useDeleteAccountMutation: DELETE /users/me — on success clears the
  *   auth session and empties the query cache, then lets the
  *   calling page redirect via the session flow.
+ * - useUploadAvatarMutation: POST /users/me/avatar — on success invalidates
+ *   the profile query so the cache stays fresh.
+ * - useRemoveAvatarMutation: DELETE /users/me/avatar — on success invalidates
+ *   the profile query so the cache stays fresh.
  */
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type {
@@ -14,7 +18,12 @@ import type {
   ProfileResponse,
   UpdateProfileInput,
 } from '@email-chat-pro/types'
-import { deleteAccountApi, updateProfileApi } from '../lib/api/users.api'
+import {
+  deleteAccountApi,
+  updateProfileApi,
+  uploadAvatarApi,
+  removeAvatarApi,
+} from '../lib/api/users.api'
 import { PROFILE_QUERY_KEY } from './use-profile-query'
 import { useAuthStore } from '../stores/auth.store'
 import { usePresenceStore } from '../stores/presence.store'
@@ -22,6 +31,8 @@ import type { ApiRequestError } from '../lib/api/client'
 
 export type UpdateProfileError = ApiRequestError
 export type DeleteAccountError = ApiRequestError
+export type AvatarUploadError = ApiRequestError
+export type AvatarRemoveError = ApiRequestError
 
 /** PATCH /users/me — update profile fields. */
 export function useUpdateProfileMutation() {
@@ -48,6 +59,28 @@ export function useDeleteAccountMutation() {
       clearSession()
       queryClient.clear()
       usePresenceStore.getState().resetPresence()
+    },
+  })
+}
+
+/** POST /users/me/avatar — upload/replace the caller's avatar. */
+export function useUploadAvatarMutation() {
+  const queryClient = useQueryClient()
+  return useMutation<ProfileResponse, ApiRequestError, FormData>({
+    mutationFn: uploadAvatarApi,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY })
+    },
+  })
+}
+
+/** DELETE /users/me/avatar — remove the caller's avatar. */
+export function useRemoveAvatarMutation() {
+  const queryClient = useQueryClient()
+  return useMutation<ProfileResponse, ApiRequestError, void>({
+    mutationFn: removeAvatarApi,
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: PROFILE_QUERY_KEY })
     },
   })
 }

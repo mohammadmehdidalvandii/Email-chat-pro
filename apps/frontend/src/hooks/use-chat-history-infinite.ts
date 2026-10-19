@@ -1,4 +1,4 @@
-import { useInfiniteQuery, type QueryClient } from '@tanstack/react-query'
+import { useInfiniteQuery } from '@tanstack/react-query'
 import { getChatHistoryApi } from '../lib/api/chats.api'
 import { useAuthStore } from '../stores/auth.store'
 import type { Message, PaginatedResponse } from '@email-chat-pro/types'

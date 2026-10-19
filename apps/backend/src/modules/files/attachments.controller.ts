@@ -45,6 +45,15 @@ export class AttachmentsController {
         message: ERROR_MESSAGES.NOT_FOUND,
       })
     }
+    // AVATAR exception: when attachment.messageId is null (avatar), serve to any
+    // authenticated user (profile visibility). Private chat attachments remain protected.
+    if (attachment.messageId === null) {
+      res.setHeader('Content-Type', attachment.mimeType)
+      res.setHeader('Cache-Control', 'private, max-age=3600')
+      res.setHeader('Content-Disposition', `inline; filename="${attachment.originalName ?? 'avatar'}.${attachment.id}"`)
+      res.status(200).send(attachment.data)
+      return
+    }
     const chatId = attachment.message?.chatId ?? attachment.messageId ?? null
     if (!chatId) {
       throw new NotFoundException({

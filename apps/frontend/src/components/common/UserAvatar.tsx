@@ -4,11 +4,17 @@
  *
  * The backend returns `avatarUrl` only when the user has set one, so this
  * renders the uploaded image when present and falls back to initials derived
- * from the username or full name. No new upload path is introduced here; the
- * component only displays what the API already provides.
+ * from the username or full name. The image is served through an authenticated
+ * attachment fetch (see {@link AttachmentCache}) rather than a plain `<img
+ * src>` request, because `GET /api/v1/attachments/:id` requires JWT auth:
+ * a direct URL fetch would be rejected with 401, while the bearer token is
+ * attached by the axios interceptor used by chat media.
  */
-import type { User } from '@email-chat-pro/types'
+import { useEffect, useState } from 'react'
+import { useAuthStore } from '../../stores/auth.store'
+import { setSessionUser, fetchAttachmentBlob, getCachedObjectUrl } from '../../lib/api/attachment-cache'
 import { cn } from '../../lib/utils'
+import { getDisplayName, initialsFromName } from '@email-chat-pro/utils'
 
 interface UserAvatarProps {
   user: Pick<User, 'id' | 'avatarUrl' | 'username' | 'fullName' | 'email'>
@@ -22,39 +28,80 @@ const SIZE_CLASSES = {
   lg: 'h-12 w-12 text-base',
 } as const
 
-/** Best available display name for the initials fallback. */
-function initialsFor(user: UserAvatarProps['user']): string {
-  const source = user.fullName?.trim() || user.username?.trim() || user.email
-  const parts = source.split(/[\s._-]+/).filter(Boolean)
-  if (parts.length === 0) return '?'
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return `${parts[0][0]}${parts[1][0]}`.toUpperCase()
+/** Non-reactive userId accessor for use in effects. */
+function useAuthStoreUser(userId: string | undefined): string | null {
+  const authUser = useAuthStore((s) => s.user)
+  return authUser?.id ?? null
 }
 
 export function UserAvatar({ user, size = 'md', className }: UserAvatarProps) {
   const dimension = SIZE_CLASSES[size]
+  const userId = useAuthStoreUser(user.id)
+  const [src, setSrc] = useState<string | null>(null)
+  const [failed, setFailed] = useState(false)
 
-  if (user.avatarUrl) {
+  // Reset error state if avatar URL changes (e.g., user uploads new avatar)
+  useEffect(() => {
+    setFailed(false)
+  }, [user.avatarUrl])
+
+  useEffect(() => {
+    setSessionUser(userId)
+    let cancelled = false
+
+    if (!user.avatarUrl) {
+      setSrc(null)
+      return
+    }
+
+    // If the profile already carries a fetched object URL, reuse it.
+    const cached = getCachedObjectUrl(user.avatarUrl)
+    if (cached) {
+      setSrc(cached)
+      setFailed(false)
+      return
+    }
+
+    fetchAttachmentBlob(user.avatarUrl)
+      .then((objectUrl) => {
+        if (!cancelled) {
+          setSrc(objectUrl)
+          setFailed(false)
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setFailed(true)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [userId, user.avatarUrl])
+
+  if (src && !failed) {
     return (
-      // eslint-disable-next-line @next/next/no-img-element
       <img
-        src={user.avatarUrl}
+        src={src}
         alt=""
         className={cn('shrink-0 rounded-full object-cover', dimension, className)}
+        onError={() => setFailed(true)}
       />
     )
   }
 
+  const displayName = getDisplayName(user)
+  const initials = initialsFromName(displayName)
+
   return (
     <span
-      aria-hidden
+      aria-label={displayName}
       className={cn(
         'flex shrink-0 items-center justify-center rounded-full bg-neutral-300 font-medium text-neutral-700',
         dimension,
         className,
       )}
     >
-      {initialsFor(user)}
+      {initials || '?'}
     </span>
   )
 }

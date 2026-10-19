@@ -26,6 +26,8 @@ describe('UsersController', () => {
     updateProfile: jest.fn(),
     deleteAccount: jest.fn(),
     searchUsers: jest.fn(),
+    setAvatar: jest.fn(),
+    removeAvatar: jest.fn(),
   }
   const authService = {
     toUserDto: jest.fn(),
@@ -93,6 +95,62 @@ describe('UsersController', () => {
       expect(response.data).toEqual({ message: ERROR_MESSAGES.ACCOUNT_DELETED })
       expect(response.timestamp).toEqual(expect.any(String))
       expect(response.error).toBeUndefined()
+    })
+  })
+
+  describe('uploadAvatar', () => {
+    it('sets the avatar on the authenticated caller and returns the updated profile', async () => {
+      const authenticatedUser = { id: 'uuid-1', email: 'user@example.com', avatarUrl: null }
+      const updated = { ...authenticatedUser, avatarUrl: '/api/v1/attachments/abc' }
+      const file = { buffer: Buffer.from('png') } as Express.Multer.File
+
+      usersService.setAvatar.mockResolvedValue(updated)
+      authService.toUserDto.mockReturnValue(updated)
+
+      const response = await controller.uploadAvatar(makeRequest(authenticatedUser), file)
+
+      // The target user is ALWAYS req.user — the verified JWT principal — and
+      // there is no client-supplied user id, so a caller cannot upload onto
+      // another account's avatar (the JWT guard blocks unauthenticated calls).
+      expect(usersService.setAvatar).toHaveBeenCalledWith(authenticatedUser, file)
+      expect(authService.toUserDto).toHaveBeenCalledWith(updated)
+      expect(response.success).toBe(true)
+      expect(response.data).toEqual(updated)
+      expect(response.timestamp).toEqual(expect.any(String))
+      expect(response.error).toBeUndefined()
+    })
+
+    it('is guarded so an unauthenticated caller can never reach the service', () => {
+      // Route is decorated with JwtAuthGuard (see controller source); without an
+      // authenticated principal there is no req.user to act on, so the handler
+      // cannot target a user. This documents the authorization boundary.
+      const meta = Reflect.getMetadata('__guards__', UsersController.prototype.uploadAvatar) ?? []
+      expect(meta.some((guard: unknown) => (guard as { name?: string })?.name === 'JwtAuthGuard')).toBe(true)
+    })
+  })
+
+  describe('removeAvatar', () => {
+    it('removes the avatar from the authenticated caller and returns the updated profile', async () => {
+      const authenticatedUser = { id: 'uuid-1', email: 'user@example.com', avatarUrl: '/api/v1/attachments/abc' }
+      const updated = { ...authenticatedUser, avatarUrl: null }
+
+      usersService.removeAvatar.mockResolvedValue(updated)
+      authService.toUserDto.mockReturnValue(updated)
+
+      const response = await controller.removeAvatar(makeRequest(authenticatedUser))
+
+      // Only the caller's own avatar is cleared; the user comes from req.user.
+      expect(usersService.removeAvatar).toHaveBeenCalledWith(authenticatedUser)
+      expect(authService.toUserDto).toHaveBeenCalledWith(updated)
+      expect(response.success).toBe(true)
+      expect(response.data).toEqual(updated)
+      expect(response.timestamp).toEqual(expect.any(String))
+      expect(response.error).toBeUndefined()
+    })
+
+    it('is guarded so an unauthenticated caller can never reach the service', () => {
+      const meta = Reflect.getMetadata('__guards__', UsersController.prototype.removeAvatar) ?? []
+      expect(meta.some((guard: unknown) => (guard as { name?: string })?.name === 'JwtAuthGuard')).toBe(true)
     })
   })
 

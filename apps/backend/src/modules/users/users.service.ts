@@ -2,6 +2,7 @@ import {
   BadRequestException,
   ConflictException,
   Injectable,
+  Logger,
   UnauthorizedException,
 } from '@nestjs/common'
 import { InjectRepository } from '@nestjs/typeorm'
@@ -15,6 +16,8 @@ import {
   SEARCH_QUERY_MIN_LENGTH,
 } from '@email-chat-pro/constants'
 import { User } from '../auth/entities/user.entity'
+import { Attachment } from '../files/entities/attachment.entity'
+import { FilesService } from '../files/files.service'
 import { DeleteAccountDto } from './dto/delete-account.dto'
 import { UpdateProfileDto } from './dto/update-profile.dto'
 
@@ -35,9 +38,14 @@ const PG_UNIQUE_VIOLATION = '23505'
  */
 @Injectable()
 export class UsersService {
+  private readonly logger = new Logger(UsersService.name)
+
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    @InjectRepository(Attachment)
+    private readonly attachmentRepository: Repository<Attachment>,
+    private readonly filesService: FilesService,
   ) {}
 
   /**
@@ -79,6 +87,91 @@ export class UsersService {
       }
       throw error
     }
+  }
+
+  /**
+   * Uploads (or replaces) the authenticated user's avatar.
+   *
+   * The uploaded image is validated and stored by FilesService (magic bytes,
+   * dimensions, size) as an attachment row with `messageId: null`; this user's
+   * `avatar_url` is then set to the attachment URL.
+   *
+   * Replacement safety: the NEW attachment is stored and its URL is persisted
+   * onto the user BEFORE any cleanup of the previous blob, so a failure never
+   * leaves the user with a dangling avatar. If the profile write fails after
+   * the new blob was stored, the new attachment is left orphaned (best-effort
+   * cleanup below) but the user's avatar is unchanged — the account is never
+   * inconsistent. Cross-database/storage transactions are not atomic here; the
+   * write order is chosen so the profile is never broken.
+   */
+  async setAvatar(user: User, file: Express.Multer.File | undefined): Promise<User> {
+    const { url } = await this.filesService.uploadImage(file, user)
+    const previousUrl = user.avatarUrl
+
+    user.avatarUrl = url
+    let saved: User
+    try {
+      saved = await this.usersRepository.save(user)
+    } catch (error) {
+      // The profile write failed, but the new blob was already stored. Best-effort:
+      // delete the just-created attachment so it does not become a permanent
+      // orphan, then roll the avatar back to the previous value and rethrow.
+      await this.tryDeleteAttachmentForUrl(url)
+      user.avatarUrl = previousUrl
+      throw error
+    }
+    // On success the user now points at the new attachment. Clean up the old
+    // attachment row (if any) best-effort so a dangling avatar never lingers.
+    // Done after the save so the profile never points at a missing row while the
+    // delete is in flight: a concurrent reader only ever sees avatar_url set to
+    // the new URL, which is valid until the save completes anyway.
+    if (previousUrl) {
+      await this.tryDeleteAttachmentForUrl(previousUrl)
+    }
+    return saved
+  }
+
+  /**
+   * Removes the authenticated user's avatar and clears `avatar_url`.
+   *
+   * The old attachment row is deleted best-effort; a failure to delete it must
+   * not fail the request or leave the profile inconsistent, so the profile is
+   * updated first and any cleanup error is swallowed after logging.
+   */
+  async removeAvatar(user: User): Promise<User> {
+    const previousUrl = user.avatarUrl
+    user.avatarUrl = null
+    try {
+      const saved = await this.usersRepository.save(user)
+      if (previousUrl) {
+        await this.tryDeleteAttachmentForUrl(previousUrl)
+      }
+      return saved
+    } catch (error) {
+      user.avatarUrl = previousUrl
+      throw error
+    }
+  }
+
+  /** Best-effort deletion of the attachment referenced by an avatar URL. */
+  private async tryDeleteAttachmentForUrl(url: string): Promise<void> {
+    const attachmentId = this.attachmentIdFromUrl(url)
+    if (!attachmentId) return
+    try {
+      await this.attachmentRepository.delete({ id: attachmentId })
+    } catch (error) {
+      this.logger.warn(`Failed to clean up avatar attachment ${attachmentId}: ${this.errorMessage(error)}`)
+    }
+  }
+
+  /** Extracts the attachment id from an avatar URL (`/api/v1/attachments/:id`). */
+  private attachmentIdFromUrl(url: string): string | null {
+    const match = /\/attachments\/([^/?#]+)/.exec(url)
+    return match?.[1] ? decodeURIComponent(match[1]) : null
+  }
+
+  private errorMessage(error: unknown): string {
+    return error instanceof Error ? error.message : String(error)
   }
 
   /**

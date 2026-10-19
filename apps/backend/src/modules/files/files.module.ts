@@ -16,5 +16,6 @@ import { FilesService } from './files.service'
   imports: [AuthModule, TypeOrmModule.forFeature([Attachment, Chat])],
   controllers: [FilesController, AttachmentsController],
   providers: [FilesService],
+  exports: [FilesService],
 })
 export class FilesModule {}

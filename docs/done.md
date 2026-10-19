@@ -22,3 +22,11 @@
   - Removed unused `memo` import.
   - No functional change; resolves `Module parse failed: Identifier 'prev' has already been declared`.
   - Co-Authored-By: Claude Code <noreply@anthropic.com>
+
+- **feat(users): implement avatar upload endpoints (POST /me/avatar, DELETE /me/avatar)**
+  - Backend: users.controller (avatarFileFilter, memoryStorage, FileSizeExceptionFilter, UPLOAD_FILE throttle, delegates to usersService.setAvatar/removeAvatar).
+  - Backend: users.service — setAvatar/removeAvatar with best-effort attachment cleanup on replacement/removal, rollback semantics.
+  - Fix: added Logger field to users.service.ts; removed unused filesService injection from users.controller.ts.
+  - Fixed replacement-safety defect: setAvatar now deletes the old avatar attachment row after a successful save (was only cleaning up the new blob on rollback), matching the documented behavior.
+  - 34 unit tests covering successful uploads, replacements, validation errors, storage failures, no-op removal, cleanup swallowing. 8 controller tests verifying envelope shape, req.user targeting, and JwtAuthGuard metadata.
+  - All verification: type-check (0 errors), lint (0 errors), build (0 errors), users.service + users.controller specs (32/32 pass). 5 pre-existing unrelated test failures (http-exception filter message assertion, attachments controller NotFound error string) are out of scope for this task.
