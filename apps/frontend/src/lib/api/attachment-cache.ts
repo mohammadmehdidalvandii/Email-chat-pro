@@ -53,6 +53,46 @@ interface AttachmentCache {
 /** Ceiling on cached blobs per user. Eviction is FIFO (oldest first). */
 const MAX_ENTRIES_PER_USER = 100
 
+/**
+ * Global cap on concurrent attachment fetches per user.
+ *
+ * The backend throttles the authenticated user at 100 requests / 15 min
+ * across ALL routes (chat history, avatars, message media). The profile
+ * dialog, gallery, and MediaViewer can each trigger a burst of thumbnail
+ * fetches at once; without a cap they all race the throttle and produce
+ * HTTP 429s that then trip the window for the whole session.
+ *
+ * 4 is generous enough to keep a grid feeling snappy while never opening
+ * 30 connections at once over a real network (and never exhausting the
+ * per-user budget in a single burst).
+ */
+const MAX_CONCURRENT_FETCHES = 4
+
+/** Shared semaphore so the cap applies across all media consumers. */
+let activeFetches = 0
+const waiters: (() => void)[] = []
+
+/**
+ * Waits until fewer than {@link MAX_CONCURRENT_FETCHES} fetches are in
+ * flight, then increments the counter and resolves a release function.
+ * Callers MUST invoke the release in a `finally` so a failed fetch never
+ * leaks its slot (which would otherwise stall every later media request).
+ */
+async function acquireSlot(): Promise<() => void> {
+  if (activeFetches >= MAX_CONCURRENT_FETCHES) {
+    await new Promise<void>((resolve) => waiters.push(resolve))
+  }
+  activeFetches += 1
+  let released = false
+  return () => {
+    if (released) return
+    released = true
+    activeFetches -= 1
+    const next = waiters.shift()
+    if (next) next()
+  }
+}
+
 const cache: AttachmentCache = { byUser: new Map(), inFlight: new Map(), sequence: 0 }
 
 /** Current authenticated user id, set by {@link useAttachmentCache}. */
@@ -269,6 +309,56 @@ export function releaseAttachment(url: string): void {
 
 /** Fetches the blob through `apiClient` (the Bearer token is attached by its interceptor). */
 async function fetchBlob(url: string): Promise<Blob> {
+  const release = await acquireSlot()
+  try {
+    return await fetchBlobUnthrottled(url)
+  } finally {
+    release()
+  }
+}
+
+/**
+ * The underlying single fetch. Runs inside the global concurrency slot
+ * (see {@link fetchBlob}). On an HTTP 429 it reads the backend's
+ * `Retry-After` header (seconds) and waits that long before re-trying
+ * once — a short, backend-driven backoff instead of an immediate burst
+ * that would just trip the throttle again. A second 429 surfaces as a
+ * failure so the caller shows its normal "unavailable" state.
+ */
+async function fetchBlobUnthrottled(url: string): Promise<Blob> {
+  try {
+    return await fetchBlobRaw(url)
+  } catch (error) {
+    if (!isTooManyRequests(error)) throw error
+    const retryAfter = retryAfterSeconds(error)
+    if (retryAfter == null) throw error
+    await delay(Math.min(retryAfter * 1000, 15_000))
+    return fetchBlobRaw(url)
+  }
+}
+
+/** True when `error` is an Axios/HTTP 429 Too Many Requests. */
+function isTooManyRequests(error: unknown): boolean {
+  const status = (error as { response?: { status?: number } } | undefined)?.response?.status
+  return status === 429
+}
+
+/** The backend's `Retry-After` value in whole seconds, or null when absent/invalid. */
+function retryAfterSeconds(error: unknown): number | null {
+  const header = (error as { response?: { headers?: Record<string, string | undefined> } } | undefined)
+    ?.response?.headers?.['retry-after']
+  if (typeof header !== 'string') return null
+  const value = Number.parseInt(header, 10)
+  return Number.isNaN(value) || value < 0 ? null : value
+}
+
+/** Small promisified sleep. */
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+/** Single request with no concurrency slot and no retry (the inner fetch). */
+async function fetchBlobRaw(url: string): Promise<Blob> {
   const response = await apiClient.request<Blob>({
     method: 'GET',
     url: url.replace(/^\/api\/v1/, '') || url,
