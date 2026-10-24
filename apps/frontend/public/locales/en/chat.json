@@ -45,7 +45,8 @@
     "unknownFile": "Unknown file",
     "unknownSize": "Unknown size",
     "bytes": "bytes",
-    "unknownDate": "Unknown date",
+    "avatar": "Avatar"
+  },
     "unknownSender": "Unknown sender",
     "unknownType": "Unknown type",
     "sharedBy": "Shared by {{sender}}",

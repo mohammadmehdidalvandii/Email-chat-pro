@@ -13,7 +13,8 @@ interface MediaViewerState {
   open: boolean
   chatId: string | null
   messageId: string | null
-  openViewer: (opts: { chatId: string; messageId: string }) => void
+  avatarUrl: string | null
+  openViewer: (opts: { chatId?: string | null; messageId?: string | null; avatarUrl?: string | null }) => void
   closeViewer: () => void
 }
 
@@ -21,7 +22,8 @@ export const useMediaViewerStore = create<MediaViewerState>((set) => ({
   open: false,
   chatId: null,
   messageId: null,
-  openViewer: ({ chatId, messageId }) =>
-    set({ open: true, chatId, messageId }),
-  closeViewer: () => set({ open: false, chatId: null, messageId: null }),
+  avatarUrl: null,
+  openViewer: ({ chatId = null, messageId = null, avatarUrl = null }) =>
+    set({ open: true, chatId, messageId, avatarUrl }),
+  closeViewer: () => set({ open: false, chatId: null, messageId: null, avatarUrl: null }),
 }))

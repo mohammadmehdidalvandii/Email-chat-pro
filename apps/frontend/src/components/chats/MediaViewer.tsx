@@ -42,7 +42,7 @@ function useGalleryFromLoadedHistory(chatId: string, messageId: string) {
 
 export function MediaViewer() {
   const { t } = useTranslation('chat', { useSuspense: false })
-  const { open, chatId, messageId, closeViewer } = useMediaViewerStore()
+  const { open, chatId, messageId, avatarUrl, closeViewer } = useMediaViewerStore()
 
   const [src, setSrc] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
@@ -55,10 +55,12 @@ export function MediaViewer() {
   // Gallery from loaded history — never a new request.
   const gallery = useGalleryFromLoadedHistory(chatId ?? '', messageId ?? '')
 
-  // Resolve the current message's media for stage + metadata.
-  const url = gallery.current?.mediaUrl ?? null
-  const mediaType = gallery.current?.messageType ?? null
-  const alt = gallery.current
+  // Resolve the current message's media or avatar for stage + metadata.
+  const url = avatarUrl ?? gallery.current?.mediaUrl ?? null
+  const mediaType = avatarUrl ? 'image' : (gallery.current?.messageType ?? null)
+  const alt = avatarUrl
+    ? t('avatar') // Need to add 'avatar' to chat.json or use a generic alt
+    : gallery.current
     ? t('mediaAlt', {
         sender: gallery.current.sender?.username ?? gallery.current.sender?.email ?? t('you'),
         type: t(`mediaType.${mediaType}`),
@@ -73,16 +75,6 @@ export function MediaViewer() {
   }, [open])
 
   // Fetch the stage media through the attachment cache (deduped + reuse).
-  // If the blob is already cached (`getCachedObjectUrl` hits), we skip
-  // the network entirely for the object URL; otherwise one shared fetch
-  // through `fetchAttachmentBlob` serves this and any other concurrent
-  // consumers of the same id (e.g. the thumbnail strip, which uses only
-  // `getCachedObjectUrl` and does not keep it alive).
-  //
-  // This effect also resets loading/zoom/info whenever `url` changes, so
-  // navigation between messages needs no separate reset effect: a second
-  // effect keyed on `messageId` would run after this one on the same commit
-  // and clobber the `src` it just set (stale-image / blank stage bug).
   useEffect(() => {
     if (!open || !url) return
     setFailed(false)
@@ -90,11 +82,6 @@ export function MediaViewer() {
     setZoom(1)
     setShowInfo(false)
     let cancelled = false
-    // Tracks whether this effect acquired its own reference to the object URL
-    // via `fetchAttachmentBlob`. The cached path (`getCachedObjectUrl`) does
-    // NOT take a reference, so it must NOT release one on cleanup — releasing
-    // would double-count against the message bubble still showing the same
-    // attachment and could evict it early. Only the fetch path releases.
     let ownsRef = false
     const cachedUrl = getCachedObjectUrl(url)
     if (cachedUrl) {
@@ -151,15 +138,15 @@ export function MediaViewer() {
     if (!open) return
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { e.preventDefault(); closeViewer() }
+      if (avatarUrl) return // No nav for avatar
       if (e.key === 'ArrowLeft' && gallery.hasPrev) { e.preventDefault(); prevMedia() }
       if (e.key === 'ArrowRight' && gallery.hasNext) { e.preventDefault(); nextMedia() }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, gallery.hasPrev, gallery.hasNext, prevMedia, nextMedia, closeViewer])
+  }, [open, gallery.hasPrev, gallery.hasNext, prevMedia, nextMedia, closeViewer, avatarUrl])
 
-  // Metadata from cached blob (no extra request; derived from the same
-  // blob the stage is already displaying via `fetchAttachmentBlob`).
+  // Metadata from cached blob.
   const metaBlob = url ? getCachedAttachmentBlob(url) : null
   const metaMime = metaBlob?.type ?? ''
   const metaSize = metaBlob ? metaBlob.size : null
@@ -176,21 +163,23 @@ export function MediaViewer() {
         if (e.target === e.currentTarget) closeViewer()
       }}
     >
-      {/* Header bar — always visible, minimal chrome. */}
+      {/* Header bar */}
       <div className="flex items-center justify-between px-4 py-3 text-white/90">
         <div className="flex items-center gap-2 text-sm tabular-nums opacity-80">
-          <span>{t('mediaViewer.count', { current: gallery.currentIndex + 1, total: gallery.total })}</span>
+          {!avatarUrl && <span>{t('mediaViewer.count', { current: gallery.currentIndex + 1, total: gallery.total })}</span>}
         </div>
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            aria-label={t('mediaViewer.info')}
-            onClick={() => setShowInfo((s) => !s)}
-            className="rounded-md p-2 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white/60"
-            title={t('mediaViewer.info')}
-          >
-            <Info size={18} aria-hidden />
-          </button>
+          {!avatarUrl && (
+            <button
+              type="button"
+              aria-label={t('mediaViewer.info')}
+              onClick={() => setShowInfo((s) => !s)}
+              className="rounded-md p-2 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white/60"
+              title={t('mediaViewer.info')}
+            >
+              <Info size={18} aria-hidden />
+            </button>
+          )}
           <button
             type="button"
             aria-label={t('mediaViewer.close')}
@@ -239,7 +228,7 @@ export function MediaViewer() {
             </Button>
           </div>
         )}
-        {!loading && !failed && src && mediaType === 'image' && (
+        {!loading && !failed && src && (mediaType === 'image' || avatarUrl) && (
           <img
             src={src}
             alt={alt}
@@ -247,7 +236,7 @@ export function MediaViewer() {
             style={{ transform: `scale(${zoom})`, transition: 'transform 200ms ease' }}
           />
         )}
-        {!loading && !failed && src && mediaType === 'video' && (
+        {!loading && !failed && src && mediaType === 'video' && !avatarUrl && (
           <video
             src={src}
             controls
@@ -260,7 +249,7 @@ export function MediaViewer() {
         )}
       </div>
 
-      {/* Bottom toolbar (zoom + navigation + download + info toggle). */}
+      {/* Bottom toolbar */}
       <div className="flex items-center justify-between gap-3 border-t border-white/10 bg-[rgba(0,0,0,0.6)] px-4 py-3 text-white/90 backdrop-blur-md">
         <div className="flex items-center gap-2">
           <button
@@ -293,31 +282,33 @@ export function MediaViewer() {
           </button>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            aria-label={t('mediaViewer.previous')}
-            title={t('mediaViewer.previous')}
-            onClick={prevMedia}
-            disabled={!gallery.hasPrev}
-            className="rounded-md p-2 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white/60 disabled:opacity-30"
-          >
-            <ChevronLeft size={20} aria-hidden />
-          </button>
-          <span className="tabular-nums text-sm">
-            {gallery.currentIndex + 1} {t('mediaViewer.of')} {gallery.total}
-          </span>
-          <button
-            type="button"
-            aria-label={t('mediaViewer.next')}
-            title={t('mediaViewer.next')}
-            onClick={nextMedia}
-            disabled={!gallery.hasNext}
-            className="rounded-md p-2 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white/60 disabled:opacity-30"
-          >
-            <ChevronRight size={20} aria-hidden />
-          </button>
-        </div>
+        {!avatarUrl && (
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              aria-label={t('mediaViewer.previous')}
+              title={t('mediaViewer.previous')}
+              onClick={prevMedia}
+              disabled={!gallery.hasPrev}
+              className="rounded-md p-2 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white/60 disabled:opacity-30"
+            >
+              <ChevronLeft size={20} aria-hidden />
+            </button>
+            <span className="tabular-nums text-sm">
+              {gallery.currentIndex + 1} {t('mediaViewer.of')} {gallery.total}
+            </span>
+            <button
+              type="button"
+              aria-label={t('mediaViewer.next')}
+              title={t('mediaViewer.next')}
+              onClick={nextMedia}
+              disabled={!gallery.hasNext}
+              className="rounded-md p-2 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-white/60 disabled:opacity-30"
+            >
+              <ChevronRight size={20} aria-hidden />
+            </button>
+          </div>
+        )}
 
         <div className="flex items-center gap-2">
           <button
@@ -332,8 +323,8 @@ export function MediaViewer() {
         </div>
       </div>
 
-      {/* Side info panel (desktop) / bottom sheet (mobile) — shown on info toggle. */}
-      {showInfo && (
+      {/* Side info panel */}
+      {showInfo && !avatarUrl && (
         <aside
           role="region"
           aria-label={t('mediaViewer.info')}
