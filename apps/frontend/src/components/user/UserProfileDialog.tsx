@@ -6,7 +6,9 @@ import { useChatHistoryInfinite } from '../../hooks/use-chat-history-infinite'
 import { useMemo, useState, useEffect } from 'react'
 import { useMediaViewerStore } from '../../stores/media-viewer.store'
 import { getDisplayName } from '@email-chat-pro/utils'
-import type { User } from '@email-chat-pro/types'
+import type { Message, PaginatedResponse, User } from '@email-chat-pro/types'
+import type { TFunction } from 'i18next'
+import type { InfiniteData } from '@tanstack/react-query'
 import { fetchAttachmentBlob, getCachedObjectUrl } from '../../lib/api/attachment-cache'
 
 
@@ -24,7 +26,7 @@ function ThumbnailLoader({ url, alt }: { url: string; alt: string }) {
   return <img src={src} alt={alt} loading="lazy" className="w-full h-full object-cover" />
 }
 
-function ProfileHeader({ userId, data, t, onCopy, copyFeedback }: { userId: string; data: any; t: any; onCopy: (text: string, message: string) => void; copyFeedback: string | null }) {
+function ProfileHeader({ userId, data, t, onCopy, copyFeedback }: { userId: string; data: InfiniteData<PaginatedResponse<Message>> | undefined; t: TFunction; onCopy: (text: string, message: string) => void; copyFeedback: string | null }) {
   const profileUser = useMemo(() => {
     if (!data || !userId) return null
     for (const page of data.pages ?? []) {
@@ -78,14 +80,16 @@ function ProfileHeader({ userId, data, t, onCopy, copyFeedback }: { userId: stri
 export function UserProfileDialog() {
   const { userId, chatId, close } = useUserProfileDialogStore()
   const { t } = useTranslation('profile', { useSuspense: false })
-  const { t: commonT } = useTranslation('common', { useSuspense: false })
 
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
 
   useEffect(() => {
+    let timer: NodeJS.Timeout | null = null
     if (copyFeedback) {
-      const timer = setTimeout(() => setCopyFeedback(null), 2000)
-      return () => clearTimeout(timer)
+      timer = setTimeout(() => setCopyFeedback(null), 2000)
+    }
+    return () => {
+      if (timer) clearTimeout(timer)
     }
   }, [copyFeedback])
 

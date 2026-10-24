@@ -31,14 +31,14 @@ const SIZE_CLASSES = {
 } as const
 
 /** Non-reactive userId accessor for use in effects. */
-function useAuthStoreUser(userId: string | undefined): string | null {
+function useAuthStoreUser(): string | null {
   const authUser = useAuthStore((s) => s.user)
   return authUser?.id ?? null
 }
 
 export function UserAvatar({ user, size = 'md', className, onClick }: UserAvatarProps) {
   const dimension = SIZE_CLASSES[size]
-  const userId = useAuthStoreUser(user.id)
+  const userId = useAuthStoreUser()
   const [src, setSrc] = useState<string | null>(null)
   const [failed, setFailed] = useState(false)
 
