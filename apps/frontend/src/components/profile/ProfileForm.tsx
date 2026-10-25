@@ -75,19 +75,19 @@ export function ProfileForm() {
   const loading = isSubmitting || mutation.isPending || uploadAvatarMutation.isPending || removeAvatarMutation.isPending
 
   if (isLoading) {
-    return <p className="text-sm text-neutral-500">{t('common:loading')}</p>
+    return <p className="text-sm text-text-muted">{t('common:loading')}</p>
   }
 
   if (isError || !profile) {
     return (
       <div className="flex flex-col items-start gap-2">
-        <p className="text-sm text-red-600" role="alert">
+        <p className="text-sm text-error" role="alert">
           {t('profile:loadError')}
         </p>
         <button
           type="button"
           onClick={() => void refetch()}
-          className="text-sm text-neutral-700 underline underline-offset-4"
+          className="text-sm text-text-secondary underline underline-offset-4"
         >
           {t('common:retry')}
         </button>
@@ -101,7 +101,7 @@ export function ProfileForm() {
         <UserAvatar user={profile} size="lg" />
         <div className="flex flex-col gap-1">
           <h2 className="text-xl font-semibold">{t('profile:profileTitle')}</h2>
-          <p className="text-sm text-neutral-500" dir="ltr">
+          <p className="text-sm text-text-muted" dir="ltr">
             {profile.email}
           </p>
           <div className="flex gap-2 mt-1">
@@ -128,7 +128,7 @@ export function ProfileForm() {
                 size="sm"
                 onClick={onRemoveAvatar}
                 disabled={loading}
-                className="text-red-600 hover:text-red-700"
+                className="text-error hover:text-error-hover"
               >
                 {t('profile:removeAvatar')}
               </Button>
@@ -166,14 +166,14 @@ export function ProfileForm() {
           {loading ? t('profile:saving') : t('profile:save')}
         </Button>
         {mutation.isSuccess && !loading && (
-          <p className="text-sm text-green-700" role="status">
+          <p className="text-sm text-success" role="status">
             {t('profile:saved')}
           </p>
         )}
       </div>
 
       {(mutation.isError || uploadAvatarMutation.isError || removeAvatarMutation.isError) && (
-        <p className="text-sm text-red-600" dir="auto" role="alert">
+        <p className="text-sm text-error" dir="auto" role="alert">
           {translateApiError(
             toApiRequestError(
               mutation.error ?? uploadAvatarMutation.error ?? removeAvatarMutation.error

@@ -95,7 +95,7 @@ export function FormField({
         />
       )}
       {error ? (
-        <p className="text-sm text-red-600" dir="auto" role="alert">
+        <p className="text-sm text-error" dir="auto" role="alert">
           {validationMessage(error.message)}
         </p>
       ) : (

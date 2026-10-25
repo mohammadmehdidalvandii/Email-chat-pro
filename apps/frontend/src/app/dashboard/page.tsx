@@ -43,8 +43,8 @@ function DashboardContent() {
         {/* The backend reports `profileCompleted`; a missing username is what
             stops other users from finding this account. */}
         {user && !user.profileCompleted && (
-          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-neutral-200 bg-white p-4">
-            <p className="text-sm text-neutral-700">{t('dashboard:profileIncomplete')}</p>
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-4">
+            <p className="text-sm text-text-secondary">{t('dashboard:profileIncomplete')}</p>
             <Link href="/settings/profile">
               <Button size="sm">{t('dashboard:completeProfile')}</Button>
             </Link>

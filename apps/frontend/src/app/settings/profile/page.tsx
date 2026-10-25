@@ -32,11 +32,11 @@ function ProfileContent() {
       <div className="mx-auto w-full max-w-md">
         <h1 className="mb-6 text-2xl font-bold tracking-tight">{t('profileTitle')}</h1>
         <ProfileForm />
-        <div className="mt-6 border-t border-neutral-200 pt-6">
+        <div className="mt-6 border-t border-border pt-6">
           <button
             type="button"
             onClick={openDeleteModal}
-            className="text-sm text-red-600 hover:underline"
+            className="text-sm text-error hover:underline"
           >
             {t('deleteAccount')}
           </button>
