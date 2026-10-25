@@ -264,7 +264,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
       setIsConnected(false)
       setIsSocketConnected(false)
     }
-  }, [token, queryClient, setIsSocketConnected])
+  }, [token, queryClient, setIsSocketConnected, addNotification])
 
   // The socket instance is stable for the session, so the context value only
   // changes when the connection state does.

@@ -58,23 +58,13 @@ export function MessageList({ chatId }: MessageListProps) {
     previousLengthRef.current = newLength
   }, [messages.length])
 
-  // Capture scroll position before new pages load.
-  useEffect(() => {
-    const el = scrollRef.current
-    if (!el) return
-    const onScroll = () => {
-      scrollPositionRef.current = el.scrollTop
-    }
-    el.addEventListener('scroll', onScroll, { passive: true })
-    return () => el.removeEventListener('scroll', onScroll)
-  }, [])
-
   // When opening a chat for the first time, scroll to bottom (newest messages).
   useEffect(() => {
-    if (!isLoading && messages.length > 0 && scrollRef.current) {
+    const hasMessages = messages.length > 0
+    if (!isLoading && hasMessages && scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [chatId, isLoading, messages.length > 0])
+  }, [chatId, isLoading, messages.length])
 
   // Load older messages when scrolling near top.
   useEffect(() => {
