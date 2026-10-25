@@ -18,7 +18,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
           'text-text-main placeholder:text-text-muted',
           'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary',
           'disabled:cursor-not-allowed disabled:opacity-50',
-          'aria-[invalid=true]:border-red-500',
+          'aria-[invalid=true]:border-error',
           className,
         )}
         {...props}

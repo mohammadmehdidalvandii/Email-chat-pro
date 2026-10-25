@@ -54,14 +54,14 @@ export function MobileSidebar({ open, onClose }: MobileSidebarProps) {
         role="dialog"
         aria-modal="true"
         aria-label={t('nav.menu')}
-        className="absolute inset-y-0 start-0 flex w-72 max-w-[85vw] flex-col border-e border-neutral-200 shadow-xl"
+        className="absolute inset-y-0 start-0 flex w-72 max-w-[85vw] flex-col border-e border-border shadow-xl"
       >
-        <div className="flex justify-end border-b border-neutral-200 bg-white px-2 py-2">
+        <div className="flex justify-end border-b border-border bg-sidebar px-2 py-2">
           <button
             type="button"
             onClick={onClose}
             aria-label={t('nav.closeMenu')}
-            className="rounded-md p-2 text-neutral-700 hover:bg-neutral-100"
+            className="rounded-md p-2 text-text-secondary hover:bg-card-hover"
           >
             <X className="h-5 w-5" aria-hidden />
           </button>

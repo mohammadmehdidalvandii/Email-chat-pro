@@ -71,9 +71,9 @@ export function AccountDeletionModal() {
         if (event.target === event.currentTarget) closeDeleteModal()
       }}
     >
-      <div className="w-full max-w-sm rounded-lg border border-neutral-200 bg-white p-6 shadow-lg">
+      <div className="w-full max-w-sm rounded-lg border border-border bg-card p-6 shadow-lg">
         <h2 className="text-lg font-semibold">{t('deleteTitle')}</h2>
-        <p className="mt-1 text-sm text-neutral-500">{t('deleteDescription')}</p>
+        <p className="mt-1 text-sm text-text-muted">{t('deleteDescription')}</p>
 
         <form onSubmit={onSubmit} className="mt-4 flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
@@ -90,13 +90,13 @@ export function AccountDeletionModal() {
           </div>
 
           {submitError && (
-            <p className="text-sm text-red-600" dir="auto" role="alert">
+            <p className="text-sm text-error" dir="auto" role="alert">
               {submitError}
             </p>
           )}
 
           {mutation.isError && mutation.error && !submitError && (
-            <p className="text-sm text-red-600" dir="auto" role="alert">
+            <p className="text-sm text-error" dir="auto" role="alert">
               {translateApiError(
                 toApiRequestError(mutation.error).code,
                 t('deleteError'),
@@ -117,7 +117,7 @@ export function AccountDeletionModal() {
               type="submit"
               variant="primary"
               isLoading={mutation.isPending}
-              className="bg-red-600 hover:bg-red-700 focus-visible:outline-red-600"
+              className="bg-error hover:bg-error-hover focus-visible:outline-error"
             >
               {t('delete')}
             </Button>

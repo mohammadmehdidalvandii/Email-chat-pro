@@ -31,7 +31,7 @@ export function ConversationList({ limit }: ConversationListProps = {}) {
   if (isError) {
     return (
       <div className="flex flex-col items-start gap-3">
-        <p className="text-sm text-red-600" role="alert">
+        <p className="text-sm text-error" role="alert">
           {t('chat:chatError')}
         </p>
         <button
@@ -125,7 +125,7 @@ function PresenceDot({ userId }: { userId: string }) {
   return (
     <PresenceIndicator
       userId={userId}
-      className="absolute -bottom-0.5 -right-0.5 rounded-full bg-white p-0.5"
+      className="absolute -bottom-0.5 -right-0.5 rounded-full bg-card p-0.5"
     />
   )
 }

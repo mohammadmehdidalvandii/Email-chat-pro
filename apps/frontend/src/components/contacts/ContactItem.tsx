@@ -32,7 +32,7 @@ export function ContactItem({ user }: ContactItemProps) {
       <div className="flex min-w-0 items-center gap-3">
         <div className="relative">
           <UserAvatar user={user} />
-          <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-white p-0.5">
+          <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-card p-0.5">
             <PresenceIndicator userId={user.id} lastSeenAt={user.lastSeenAt} />
           </span>
         </div>
@@ -41,7 +41,7 @@ export function ContactItem({ user }: ContactItemProps) {
             {name}
           </p>
           {user.fullName && (
-            <p className="truncate text-sm text-neutral-500" dir="auto">
+            <p className="truncate text-sm text-text-muted" dir="auto">
               {user.fullName}
             </p>
           )}
@@ -52,7 +52,7 @@ export function ContactItem({ user }: ContactItemProps) {
         <button
           type="button"
           onClick={() => router.push(`/chats/${chatId}`)}
-          className="shrink-0 text-sm text-neutral-700 underline underline-offset-4"
+          className="shrink-0 text-sm text-text-secondary underline underline-offset-4"
         >
           {t('contacts:openChat')}
         </button>
